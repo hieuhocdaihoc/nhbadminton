@@ -6,7 +6,7 @@ import { adminSupplierService } from '../../services/admin/supplierService';
 
 const InventoryManager = () => {
     const [activeTab, setActiveTab] = useState('movement');
-    
+
     const [products, setProducts] = useState([]);
     const [suppliers, setSuppliers] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -125,7 +125,7 @@ const InventoryManager = () => {
                     <h2 className="text-base font-semibold text-zinc-800">Kiểm kho & Nhập hàng</h2>
                     <p className="text-xs text-zinc-400 mt-0.5">Theo dõi lịch sử biến động và đơn nhập</p>
                 </div>
-                
+
                 <div className="bg-zinc-100/80 p-1 rounded-lg flex gap-1 border border-zinc-200/60">
                     <button onClick={() => setActiveTab('movement')} className={`px-4 py-2 rounded text-xs font-medium transition-all ${activeTab === 'movement' ? 'bg-white text-zinc-800 shadow-sm border border-zinc-200/50' : 'text-zinc-500 hover:text-zinc-700'}`}>
                         Lịch sử biến động
@@ -176,12 +176,12 @@ const InventoryManager = () => {
                                 <table className="w-full text-left">
                                     <thead className="bg-zinc-50/60 border-b border-zinc-100 text-[10px] font-medium text-zinc-400 uppercase tracking-wider">
                                         <tr>
-                                            <th className="py-3 px-5" style={{width:'150px'}}>Thời gian</th>
-                                            <th className="py-3 px-3" style={{width:'200px'}}>Sản phẩm</th>
-                                            <th className="py-3 px-3 text-center" style={{width:'100px'}}>Loại</th>
-                                            <th className="py-3 px-3 text-right" style={{width:'90px'}}>Biến động</th>
-                                            <th className="py-3 px-3 text-center" style={{width:'120px'}}>Kho (Trước → Sau)</th>
-                                            <th className="py-3 px-5" style={{width:'200px'}}>Lý do</th>
+                                            <th className="py-3 px-5" style={{ width: '150px' }}>Thời gian</th>
+                                            <th className="py-3 px-3" style={{ width: '200px' }}>Sản phẩm</th>
+                                            <th className="py-3 px-3 text-center" style={{ width: '100px' }}>Loại</th>
+                                            <th className="py-3 px-3 text-right" style={{ width: '90px' }}>Biến động</th>
+                                            <th className="py-3 px-3 text-center" style={{ width: '120px' }}>Kho (Trước → Sau)</th>
+                                            <th className="py-3 px-5" style={{ width: '200px' }}>Lý do</th>
                                         </tr>
                                     </thead>
                                     <tbody>

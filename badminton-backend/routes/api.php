@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\Admin\SupplierController;
 use App\Http\Controllers\Api\Admin\ProductController;
 use App\Http\Controllers\Api\Admin\PurchaseOrderController;
 use App\Http\Controllers\Api\Admin\InventoryTransactionController;
+use App\Http\Controllers\Api\Admin\AdminUserController;
 /*
 |--------------------------------------------------------------------------
 | API Routes
@@ -100,6 +101,13 @@ Route::middleware('auth:sanctum')->group(function () {
         // Quản lý và xem báo cáo Biến động kho
         Route::get('inventory-history', [InventoryTransactionController::class, 'index']);
         Route::post('inventory-adjustment', [InventoryTransactionController::class, 'store']);
+
+        Route::get('/users', [AdminUserController::class, 'index']);
+        Route::post('/users', [AdminUserController::class, 'store']);
+        Route::get('/users/{id}', [AdminUserController::class, 'show']);
+        Route::put('/users/{id}', [AdminUserController::class, 'update']);
+        Route::patch('/users/{id}/status', [AdminUserController::class, 'updateStatus']);
+        Route::patch('/users/{id}/reset-password', [AdminUserController::class, 'resetPassword']);
 
     });
 });

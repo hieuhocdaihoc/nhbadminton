@@ -260,11 +260,11 @@ const PricingManager = () => {
                         <table className="w-full min-w-[700px]">
                             <thead>
                                 <tr className="text-[10px] font-medium text-zinc-400 uppercase tracking-wider bg-zinc-50/60 border-b border-zinc-100">
-                                    <th className="text-left py-3 px-5" style={{width:'120px'}}>Loại ngày</th>
-                                    <th className="text-left py-3 px-3" style={{width:'130px'}}>Khung giờ</th>
-                                    <th className="text-right py-3 px-3" style={{width:'110px'}}>Đơn giá/h</th>
-                                    <th className="text-left py-3 px-3" style={{width:'160px'}}>Hiệu lực</th>
-                                    <th className="text-right py-3 px-5" style={{width:'100px'}}>Thao tác</th>
+                                    <th className="text-left py-3 px-5" style={{ width: '120px' }}>Loại ngày</th>
+                                    <th className="text-left py-3 px-3" style={{ width: '130px' }}>Khung giờ</th>
+                                    <th className="text-right py-3 px-3" style={{ width: '110px' }}>Đơn giá/h</th>
+                                    <th className="text-left py-3 px-3" style={{ width: '160px' }}>Hiệu lực</th>
+                                    <th className="text-right py-3 px-5" style={{ width: '100px' }}>Thao tác</th>
                                 </tr>
                             </thead>
                             <tbody>
