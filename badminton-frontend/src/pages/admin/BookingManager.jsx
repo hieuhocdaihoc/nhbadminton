@@ -161,48 +161,34 @@ const BookingManager = () => {
         <div className="space-y-6 max-w-[1600px] mx-auto pb-12">
 
             {/* THANH TOPBAR VẬN HÀNH */}
-            <div className="bg-white p-5 rounded-3xl border border-zinc-200/80 shadow-sm flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+            <div className="bg-white p-5 rounded-2xl border border-zinc-100 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
                 <div>
-                    <h2 className="text-xl font-black text-zinc-900 tracking-tight">Điều Phối & Khai Thác Sân</h2>
-                    <p className="text-xs text-zinc-500 mt-0.5">Click vào ô trống để nạp khách trực tiếp. Click vào ô màu để kiểm duyệt thanh toán/check-in.</p>
+                    <h2 className="text-base font-bold text-zinc-800">Điều Phối & Khai Thác Sân</h2>
+                    <p className="text-xs text-zinc-400 mt-0.5">Click ô trống để nạp khách · Click ô màu để kiểm duyệt.</p>
                 </div>
 
                 {/* Bộ lọc & Ngày */}
                 <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
-                    <div className="flex items-center gap-2 bg-zinc-50 border border-zinc-200 px-3 py-2 rounded-xl text-xs font-bold text-zinc-600">
-                        <span>📅 Ngày:</span>
+                    <div className="flex items-center gap-2 bg-zinc-50 border border-zinc-200 px-3 py-1.5 rounded-lg text-xs font-medium text-zinc-500">
+                        <span>Ngày:</span>
                         <input
                             type="date"
                             value={selectedDate}
                             onChange={e => setSelectedDate(e.target.value)}
-                            className="bg-transparent font-black text-zinc-900 focus:outline-none cursor-pointer"
+                            className="bg-transparent font-semibold text-zinc-800 focus:outline-none cursor-pointer"
                         />
                     </div>
 
-                    <div className="flex bg-zinc-100 p-1 rounded-xl text-xs font-bold">
-                        <button
-                            onClick={() => setFilterStatus('all')}
-                            className={`px-3 py-1.5 rounded-lg transition-all ${filterStatus === 'all' ? 'bg-white text-zinc-900 shadow-xs' : 'text-zinc-500 hover:text-zinc-900'}`}
-                        >
-                            Tất cả
+                    <div className="flex bg-zinc-100 p-0.5 rounded-lg text-xs font-medium">
+                        <button onClick={() => setFilterStatus('all')} className={`px-3 py-1.5 rounded-md transition-all ${filterStatus === 'all' ? 'bg-white text-zinc-800 shadow-sm font-semibold' : 'text-zinc-500 hover:text-zinc-800'}`}>Tất cả</button>
+                        <button onClick={() => setFilterStatus('pending')} className={`px-3 py-1.5 rounded-md transition-all flex items-center gap-1.5 ${filterStatus === 'pending' ? 'bg-white text-amber-600 shadow-sm font-semibold' : 'text-zinc-500 hover:text-zinc-800'}`}>
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-400" /> Chưa cọc
                         </button>
-                        <button
-                            onClick={() => setFilterStatus('pending')}
-                            className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1 ${filterStatus === 'pending' ? 'bg-amber-500 text-white shadow-xs' : 'text-amber-700 hover:text-zinc-900'}`}
-                        >
-                            <span className="w-2 h-2 rounded-full bg-amber-400 block"></span> Chưa cọc
+                        <button onClick={() => setFilterStatus('confirmed')} className={`px-3 py-1.5 rounded-md transition-all flex items-center gap-1.5 ${filterStatus === 'confirmed' ? 'bg-white text-blue-600 shadow-sm font-semibold' : 'text-zinc-500 hover:text-zinc-800'}`}>
+                            <span className="w-1.5 h-1.5 rounded-full bg-blue-400" /> Đã cọc
                         </button>
-                        <button
-                            onClick={() => setFilterStatus('confirmed')}
-                            className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1 ${filterStatus === 'confirmed' ? 'bg-blue-600 text-white shadow-xs' : 'text-blue-700 hover:text-zinc-900'}`}
-                        >
-                            <span className="w-2 h-2 rounded-full bg-blue-400 block"></span> Đã cọc
-                        </button>
-                        <button
-                            onClick={() => setFilterStatus('checked-in')}
-                            className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1 ${filterStatus === 'checked-in' ? 'bg-emerald-600 text-white shadow-xs' : 'text-emerald-700 hover:text-zinc-900'}`}
-                        >
-                            <span className="w-2 h-2 rounded-full bg-emerald-400 block"></span> Đang chơi
+                        <button onClick={() => setFilterStatus('checked-in')} className={`px-3 py-1.5 rounded-md transition-all flex items-center gap-1.5 ${filterStatus === 'checked-in' ? 'bg-white text-emerald-600 shadow-sm font-semibold' : 'text-zinc-500 hover:text-zinc-800'}`}>
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" /> Đang chơi
                         </button>
                     </div>
                 </div>
@@ -210,27 +196,27 @@ const BookingManager = () => {
 
             {/* HỆ THỐNG THẺ CHỈ SỐ NHANH */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-                <div className="bg-gradient-to-br from-zinc-900 to-zinc-800 text-white p-4 rounded-2xl shadow-sm">
+                <div className="bg-zinc-900 text-white p-4 rounded-2xl">
                     <p className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider">Tổng doanh thu ca</p>
                     <h4 className="text-xl font-black mt-1">{stats.revenue.toLocaleString()} đ</h4>
                     <p className="text-[10px] text-zinc-400 mt-1">Tổng: {stats.totalSlots} block đã lấp</p>
                 </div>
-                <div className="bg-white p-4 rounded-2xl border border-zinc-200/80 shadow-sm">
+                <div className="bg-white p-4 rounded-2xl border border-zinc-100">
                     <p className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider">Thực thu tiền mặt/QR</p>
                     <h4 className="text-xl font-black text-emerald-600 mt-1">{stats.collected.toLocaleString()} đ</h4>
                     <p className="text-[10px] text-zinc-500 mt-1">Đã kiểm duyệt hoàn tất</p>
                 </div>
-                <div className="bg-white p-4 rounded-2xl border border-zinc-200/80 shadow-sm">
+                <div className="bg-white p-4 rounded-2xl border border-zinc-100">
                     <p className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider">Cần thu thêm</p>
                     <h4 className="text-xl font-black text-amber-600 mt-1">{(stats.revenue - stats.collected).toLocaleString()} đ</h4>
                     <p className="text-[10px] text-amber-600 font-semibold mt-1">Từ {stats.pendingCount} ca chưa cọc</p>
                 </div>
-                <div className="bg-white p-4 rounded-2xl border border-zinc-200/80 shadow-sm">
+                <div className="bg-white p-4 rounded-2xl border border-zinc-100">
                     <p className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider">Sân đang bận</p>
                     <h4 className="text-xl font-black text-blue-600 mt-1">{stats.activePlayers} Ca</h4>
                     <p className="text-[10px] text-zinc-500 mt-1">Đã xác nhận Check-in</p>
                 </div>
-                <div className="bg-white p-4 rounded-2xl border border-zinc-200/80 shadow-sm">
+                <div className="bg-white p-4 rounded-2xl border border-zinc-100">
                     <p className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider">Trạng thái Cụm</p>
                     <h4 className="text-xl font-black text-zinc-900 mt-1">4/5 Sân</h4>
                     <p className="text-[10px] text-red-500 font-bold mt-1">● Sân 05 khóa bảo trì</p>
@@ -238,7 +224,7 @@ const BookingManager = () => {
             </div>
 
             {/* LƯỚI MA TRẬN KHAI THÁC */}
-            <div className="bg-white rounded-3xl border border-zinc-200/80 shadow-sm overflow-hidden">
+            <div className="bg-white rounded-2xl border border-zinc-100 overflow-hidden">
 
                 {/* Thanh chú giải */}
                 <div className="px-6 py-4 border-b border-zinc-100 flex flex-wrap justify-between items-center bg-zinc-50/50 gap-2">
@@ -394,11 +380,11 @@ const BookingManager = () => {
             {actionModalOpen && activeBooking && (
                 <div
                     onClick={() => setActionModalOpen(false)}
-                    className="fixed inset-0 z-50 bg-zinc-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in"
+                    className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4"
                 >
                     <div
                         onClick={e => e.stopPropagation()}
-                        className="bg-white w-full max-w-lg rounded-3xl shadow-2xl border border-zinc-100 overflow-hidden"
+                        className="bg-white w-full max-w-lg rounded-2xl shadow-xl border border-zinc-100 overflow-hidden"
                     >
                         {/* Header Modal */}
                         <div className="p-6 bg-zinc-50 border-b border-zinc-100 flex items-center justify-between">
@@ -525,11 +511,11 @@ const BookingManager = () => {
             {quickModalOpen && (
                 <div
                     onClick={() => setQuickModalOpen(false)}
-                    className="fixed inset-0 z-50 bg-zinc-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in"
+                    className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4"
                 >
                     <div
                         onClick={e => e.stopPropagation()}
-                        className="bg-white w-full max-w-md rounded-3xl shadow-2xl border border-zinc-100 overflow-hidden"
+                        className="bg-white w-full max-w-md rounded-2xl shadow-xl border border-zinc-100 overflow-hidden"
                     >
                         <div className="p-6 bg-blue-600 text-white flex items-center justify-between">
                             <div>
@@ -622,7 +608,7 @@ const BookingManager = () => {
 
                             <div className="flex gap-2 pt-2 border-t border-zinc-100">
                                 <button type="button" onClick={() => setQuickModalOpen(false)} className="flex-1 py-2.5 bg-zinc-100 text-zinc-600 font-bold rounded-xl text-xs">Hủy</button>
-                                <button type="submit" className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs shadow-md shadow-blue-600/20 transition-all">
+                                <button type="submit" className="flex-1 py-2.5 bg-zinc-900 hover:bg-zinc-800 text-white font-medium rounded-lg text-xs transition-colors">
                                     Khóa ô sân này
                                 </button>
                             </div>

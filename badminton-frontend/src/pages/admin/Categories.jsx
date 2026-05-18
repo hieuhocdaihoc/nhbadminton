@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { adminCategoryService } from '../../services/admin/categoryService';
 
 const Categories = () => {
@@ -37,20 +38,19 @@ const Categories = () => {
                     description: form.description,
                     status: form.status
                 });
-                setMessage({ type: 'success', text: '✓ Cập nhật thành công!' });
+                setMessage({ type: 'success', text: 'Cập nhật thành công!' });
             } else {
                 await adminCategoryService.createCategory({
                     name: form.name,
                     description: form.description,
                     status: form.status
                 });
-                setMessage({ type: 'success', text: '✓ Thêm mới thành công!' });
+                setMessage({ type: 'success', text: 'Thêm mới thành công!' });
             }
             resetForm();
             fetchCategories();
         } catch (error) {
-            const errorMsg = error.response?.data?.message || 'Có lỗi xảy ra!';
-            alert('⚠️ ' + errorMsg);
+            setMessage({ type: 'error', text: error.response?.data?.message || 'Có lỗi xảy ra!' });
         } finally {
             setIsProcessing(false);
             setTimeout(() => setMessage({ type: '', text: '' }), 2500);
@@ -71,10 +71,10 @@ const Categories = () => {
         if (window.confirm(`Bạn có chắc chắn muốn tạm ẩn danh mục [${category.name}]?`)) {
             try {
                 await adminCategoryService.deleteCategory(category.id);
-                setMessage({ type: 'success', text: '✓ Đã tạm ẩn danh mục!' });
+                setMessage({ type: 'success', text: 'Đã tạm ẩn danh mục!' });
                 fetchCategories();
             } catch (error) {
-                alert('❌ Thao tác thất bại!');
+                setMessage({ type: 'error', text: 'Thao tác thất bại!' });
             } finally {
                 setTimeout(() => setMessage({ type: '', text: '' }), 2500);
             }
@@ -86,61 +86,68 @@ const Categories = () => {
         setIsEditing(false);
     };
 
-    return (
-        // Kiểm soát chặt chiều cao h-[100dvh] không sinh scrollbar tổng
-        <div className="max-w-[1600px] mx-auto p-3 gap-3 font-sans h-[calc(100vh-7rem)] flex flex-col overflow-hidden bg-zinc-50/50">
+    const inputClass = "w-full bg-[#f8f8fa] border border-zinc-200 rounded-lg px-3.5 py-2.5 text-sm text-zinc-800 outline-none focus:border-zinc-400 focus:ring-1 focus:ring-zinc-200 transition-all";
 
-            {/* THÀNH PHẦN 1: HEADER CARD (THU GỌN) */}
-            <div className="shrink-0 bg-white p-3 px-5 rounded-2xl border border-zinc-200/60 shadow-xs flex justify-between items-center relative overflow-hidden">
-                <div className="flex items-center gap-2.5">
-                    <div className="w-7 h-7 bg-blue-600 rounded-lg flex items-center justify-center text-white text-xs font-bold shadow-xs">🗂️</div>
-                    <div>
-                        <h2 className="text-base font-black text-zinc-900 tracking-tight leading-none">Cấu Hình Danh Mục Sản Phẩm</h2>
-                        <p className="text-[10px] font-semibold text-zinc-400 mt-1">Phân loại nước uống, hàng hóa, dụng cụ cho quầy Pro-shop</p>
-                    </div>
+    return (
+        <div className="max-w-[1400px] mx-auto space-y-5">
+            
+            {/* HEADER */}
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                    <h2 className="text-base font-semibold text-zinc-800">Danh mục sản phẩm</h2>
+                    <p className="text-xs text-zinc-400 mt-0.5">Phân loại hàng hóa và dịch vụ cho Pro-shop</p>
                 </div>
-                {message.text && (
-                    <div className={`px-3 py-1 rounded-lg text-[11px] font-black tracking-tight border ${message.type === 'success' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-red-50 text-red-600 border-red-100'}`}>
-                        {message.text}
-                    </div>
-                )}
             </div>
 
-            {/* THÀNH PHẦN 2: THÂN GRID CHÍNH (flex-1 min-h-0) */}
-            <div className="flex-1 grid grid-cols-12 gap-3 min-h-0">
+            {/* TOAST */}
+            <AnimatePresence>
+                {message.text && (
+                    <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
+                        className={`p-3 rounded-lg text-xs font-medium ${message.type === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-600 border border-red-200'}`}>
+                        {message.text}
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
-                {/* BẢNG DANH SÁCH BÊN TRÁI (CHIẾM 8 CỘT ĐỂ RỘNG RÃI HƠN) */}
-                <div className="col-span-8 bg-white rounded-2xl border border-zinc-200/60 shadow-xs flex flex-col min-h-0 overflow-hidden">
-                    <div className="flex-1 overflow-auto relative custom-scrollbar">
-                        <table className="w-full text-left text-xs whitespace-nowrap">
-                            <thead className="bg-zinc-50/80 font-black text-zinc-400 uppercase text-[9px] tracking-widest sticky top-0 z-10 border-b border-zinc-200/60 backdrop-blur-sm">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+                
+                {/* LIST TABLE (LEFT) */}
+                <div className="lg:col-span-8 bg-white rounded-xl border border-zinc-200/60 overflow-hidden">
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left">
+                            <thead className="bg-zinc-50/60 border-b border-zinc-100 text-[10px] font-medium text-zinc-400 uppercase tracking-wider">
                                 <tr>
-                                    <th className="py-3 px-4 pl-6">Tên danh mục</th>
-                                    <th className="py-3 px-4">Mô tả chi tiết</th>
-                                    <th className="py-3 px-4 text-center">Trạng thái</th>
-                                    <th className="py-3 px-4 text-right pr-6">Thao tác</th>
+                                    <th className="py-3 px-5" style={{width:'200px'}}>Tên danh mục</th>
+                                    <th className="py-3 px-3" style={{width:'300px'}}>Mô tả</th>
+                                    <th className="py-3 px-3 text-center" style={{width:'100px'}}>Trạng thái</th>
+                                    <th className="py-3 px-5 text-right" style={{width:'100px'}}>Thao tác</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-zinc-100 bg-white">
+                            <tbody>
                                 {isLoading ? (
-                                    <tr><td colSpan="4" className="py-12 text-center text-zinc-400 font-bold uppercase text-[10px] tracking-wider">Đang nạp dữ liệu...</td></tr>
+                                    <tr><td colSpan="4" className="py-16 text-center"><div className="inline-block w-5 h-5 border-2 border-zinc-300 border-t-zinc-600 rounded-full animate-spin" /></td></tr>
                                 ) : categories.length === 0 ? (
-                                    <tr><td colSpan="4" className="py-12 text-center text-zinc-400 italic">Chưa có danh mục nào trong hệ thống.</td></tr>
+                                    <tr><td colSpan="4" className="py-16 text-center text-xs text-zinc-400">Chưa có danh mục nào</td></tr>
                                 ) : (
                                     categories.map(c => (
-                                        <tr key={c.id} className="hover:bg-zinc-50/50 transition-colors group">
-                                            <td className="py-2.5 px-4 pl-6 font-black text-zinc-900 text-xs tracking-tight">{c.name}</td>
-                                            <td className="py-2.5 px-4 max-w-[280px] truncate text-zinc-500 font-semibold">{c.description || <span className="text-zinc-300 italic font-normal">Không có mô tả</span>}</td>
-                                            <td className="py-2.5 px-4 text-center align-middle">
-                                                <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase border ${c.status === 'active' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-zinc-100 text-zinc-400 border-zinc-200'}`}>
-                                                    {c.status === 'active' ? 'Kinh doanh' : 'Tạm ẩn'}
+                                        <tr key={c.id} className="border-b border-zinc-100 last:border-b-0 hover:bg-zinc-50/40 transition-colors group">
+                                            <td className="py-3.5 px-5 text-sm font-semibold text-zinc-800">{c.name}</td>
+                                            <td className="py-3.5 px-3">
+                                                <p className="text-xs text-zinc-500 truncate max-w-[280px]">
+                                                    {c.description || <span className="text-zinc-300 italic">Không có mô tả</span>}
+                                                </p>
+                                            </td>
+                                            <td className="py-3.5 px-3 text-center">
+                                                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium ${c.status === 'active' ? 'text-emerald-700 bg-emerald-50' : 'text-zinc-500 bg-zinc-100'}`}>
+                                                    <span className={`w-1.5 h-1.5 rounded-full ${c.status === 'active' ? 'bg-emerald-500' : 'bg-zinc-400'}`} />
+                                                    {c.status === 'active' ? 'Hoạt động' : 'Tạm ẩn'}
                                                 </span>
                                             </td>
-                                            <td className="py-2.5 px-4 text-right pr-6 align-middle">
-                                                <div className="flex items-center justify-end gap-1.5 opacity-100 sm:opacity-40 sm:group-hover:opacity-100 transition-opacity">
-                                                    <button onClick={() => handleEditClick(c)} className="px-2.5 py-1 bg-zinc-100 hover:bg-blue-600 hover:text-white rounded-md font-black text-[10px] uppercase transition-all shadow-xs">Sửa</button>
+                                            <td className="py-3.5 px-5 text-right">
+                                                <div className="flex items-center justify-end gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                                                    <button onClick={() => handleEditClick(c)} className="px-2.5 py-1 border border-zinc-200 text-zinc-500 rounded text-[10px] hover:bg-zinc-50 transition-colors">Sửa</button>
                                                     {c.status === 'active' && (
-                                                        <button onClick={() => handleDeleteClick(c)} className="px-2.5 py-1 bg-white border border-zinc-200 hover:bg-red-50 hover:text-red-500 hover:border-red-100 text-zinc-400 rounded-md font-black text-[10px] uppercase transition-all">Ẩn</button>
+                                                        <button onClick={() => handleDeleteClick(c)} className="px-2 py-1 text-zinc-400 rounded text-[10px] hover:text-red-500 hover:bg-red-50 transition-colors">Ẩn</button>
                                                     )}
                                                 </div>
                                             </td>
@@ -152,62 +159,50 @@ const Categories = () => {
                     </div>
                 </div>
 
-                {/* KHU VỰC THÊM / SỬA BÊN PHẢI (CHIẾM 4 CỘT - KIỂM SOÁT CHIỀU CAO TUYỆT ĐỐI) */}
-                <div className="col-span-4 bg-white p-4 rounded-2xl border border-zinc-200/60 shadow-xs flex flex-col justify-between min-h-0 overflow-y-auto custom-scrollbar">
-
-                    {/* Cụm Form cuộn nếu tràn */}
-                    <form onSubmit={handleSubmit} className="space-y-3.5 w-full">
-                        <div className="border-b border-zinc-100 pb-2 flex justify-between items-center">
-                            <h3 className="font-black text-xs text-zinc-900 uppercase tracking-wider">{isEditing ? '📝 Cập Nhật Danh Mục' : '✨ Thêm Danh Mục Mới'}</h3>
-                            {isEditing && <button type="button" onClick={resetForm} className="text-[10px] font-black text-blue-600 hover:underline">Hủy sửa</button>}
+                {/* FORM (RIGHT) */}
+                <div className="lg:col-span-4 bg-white rounded-xl border border-zinc-200/60 p-5 sticky top-5">
+                    <div className="flex items-center justify-between mb-4 pb-3 border-b border-zinc-100">
+                        <h3 className="text-sm font-semibold text-zinc-800">{isEditing ? 'Sửa danh mục' : 'Thêm danh mục mới'}</h3>
+                        {isEditing && (
+                            <button onClick={resetForm} className="text-[10px] font-medium text-zinc-400 hover:text-zinc-600 transition-colors">
+                                Hủy sửa
+                            </button>
+                        )}
+                    </div>
+                    
+                    <form onSubmit={handleSubmit} className="space-y-4">
+                        <div>
+                            <label className="block text-[11px] font-medium text-zinc-500 mb-1.5">Tên danh mục *</label>
+                            <input type="text" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={inputClass} placeholder="Ví dụ: Nước giải khát" />
+                        </div>
+                        
+                        <div>
+                            <label className="block text-[11px] font-medium text-zinc-500 mb-1.5">Mô tả chi tiết</label>
+                            <textarea rows="3" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className={`${inputClass} resize-none`} placeholder="Ghi chú thêm (không bắt buộc)..." />
                         </div>
 
                         <div>
-                            <label className="block text-[9px] font-black text-zinc-400 uppercase tracking-widest mb-1">Tên danh mục *</label>
-                            <input
-                                type="text" required placeholder="VD: Nước giải khát, Phụ kiện..." value={form.name}
-                                onChange={(e) => setForm({ ...form, name: e.target.value })}
-                                className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-3 py-2 text-xs font-bold text-zinc-800 outline-none focus:border-blue-500 focus:bg-white transition-all shadow-xs"
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-[9px] font-black text-zinc-400 uppercase tracking-widest mb-1">Mô tả ngắn</label>
-                            <textarea
-                                rows="3" placeholder="Nhập mô tả ngắn..." value={form.description}
-                                onChange={(e) => setForm({ ...form, description: e.target.value })}
-                                className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-3 py-2 text-xs font-semibold text-zinc-700 outline-none focus:border-blue-500 focus:bg-white transition-all shadow-xs resize-none"
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-[9px] font-black text-zinc-400 uppercase tracking-widest mb-1">Trạng thái hiển thị</label>
-                            <div className="grid grid-cols-2 gap-2 mt-1">
-                                <button
-                                    type="button" onClick={() => setForm({ ...form, status: 'active' })}
-                                    className={`py-1.5 rounded-xl text-[10px] font-black transition-all border ${form.status === 'active' ? 'bg-emerald-50 text-emerald-600 border-emerald-200 shadow-xs' : 'bg-zinc-50 text-zinc-400 border-zinc-100'}`}
-                                >
-                                    🟢 KINH DOANH
+                            <label className="block text-[11px] font-medium text-zinc-500 mb-1.5">Trạng thái hiển thị</label>
+                            <div className="grid grid-cols-2 gap-2">
+                                <button type="button" onClick={() => setForm({ ...form, status: 'active' })} 
+                                    className={`py-2 rounded-lg text-xs font-medium transition-colors border ${form.status === 'active' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-zinc-50 text-zinc-400 border-transparent hover:bg-zinc-100'}`}>
+                                    Hoạt động
                                 </button>
-                                <button
-                                    type="button" onClick={() => setForm({ ...form, status: 'inactive' })}
-                                    className={`py-1.5 rounded-xl text-[10px] font-black transition-all border ${form.status === 'inactive' ? 'bg-zinc-100 text-zinc-500 border-zinc-300 shadow-xs' : 'bg-zinc-50 text-zinc-400 border-zinc-100'}`}
-                                >
-                                    🔴 TẠM ẨN
+                                <button type="button" onClick={() => setForm({ ...form, status: 'inactive' })} 
+                                    className={`py-2 rounded-lg text-xs font-medium transition-colors border ${form.status === 'inactive' ? 'bg-zinc-100 text-zinc-600 border-zinc-300' : 'bg-zinc-50 text-zinc-400 border-transparent hover:bg-zinc-100'}`}>
+                                    Tạm ẩn
                                 </button>
                             </div>
                         </div>
+
+                        <div className="pt-2">
+                            <button type="submit" disabled={isProcessing || !form.name.trim()} 
+                                className={`w-full py-2.5 rounded-lg text-xs font-medium text-white transition-colors ${isEditing ? 'bg-zinc-900 hover:bg-zinc-800' : 'bg-lime-600 hover:bg-lime-700'} ${(isProcessing || !form.name.trim()) ? 'opacity-60 cursor-not-allowed' : ''}`}>
+                                {isProcessing ? 'Đang lưu...' : isEditing ? 'Lưu thay đổi' : 'Tạo danh mục'}
+                            </button>
+                        </div>
                     </form>
-
-                    {/* Nút Submit dán chặt ngay dưới Form chứ không đẩy xa vô căn cứ */}
-                    <button
-                        onClick={handleSubmit} disabled={isProcessing || !form.name.trim()}
-                        className={`w-full py-2.5 mt-4 text-white font-black rounded-xl text-xs uppercase tracking-wider shadow-md transition-all shrink-0 ${isEditing ? 'bg-amber-500 hover:bg-amber-600 shadow-amber-100' : 'bg-blue-600 hover:bg-blue-700 shadow-blue-100'}`}
-                    >
-                        {isProcessing ? 'Đang lưu dữ liệu...' : isEditing ? '💾 Cập nhật danh mục' : '➕ Tạo danh mục mới'}
-                    </button>
                 </div>
-
             </div>
         </div>
     );

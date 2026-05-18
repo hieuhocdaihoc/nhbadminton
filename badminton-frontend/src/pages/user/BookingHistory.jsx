@@ -3,218 +3,178 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { bookingService } from '../../services/user/bookingService';
 
 const BookingHistory = () => {
-    // 1. STATES QUẢN LÝ DỮ LIỆU TỪ API
     const [bookings, setBookings] = useState([]);
     const [pagination, setPagination] = useState({ current_page: 1, last_page: 1 });
     const [isLoading, setIsLoading] = useState(true);
-
-    // 2. STATES ĐIỀU KHIỂN BỘ LỌC & LỖI
-    const [activeTab, setActiveTab] = useState('upcoming'); // Mặc định mở tab 'Lịch sắp tới'
+    const [activeTab, setActiveTab] = useState('upcoming');
     const [errorMessage, setErrorMessage] = useState('');
 
-    // --- HÀM ĐỒNG BỘ DỮ LIỆU TỪ SERVER ---
     const fetchHistoryData = async (tab, page) => {
         setIsLoading(true);
         setErrorMessage('');
         try {
             const response = await bookingService.getUserBookingHistory(tab, page);
             const responseData = response.data?.data;
-
             if (responseData) {
-                // Hứng dữ liệu danh sách đơn
                 setBookings(responseData.data || []);
-                // Hứng dữ liệu phân trang từ Laravel paginate()
-                setPagination({
-                    current_page: responseData.current_page || 1,
-                    last_page: responseData.last_page || 1
-                });
-            } else {
-                setBookings([]);
-            }
+                setPagination({ current_page: responseData.current_page || 1, last_page: responseData.last_page || 1 });
+            } else { setBookings([]); }
         } catch (error) {
             console.error('Lỗi tải lịch sử:', error);
-            if (error.response?.status === 401) {
-                setErrorMessage('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
-            } else {
-                setErrorMessage('Không thể tải dữ liệu. Vui lòng kiểm tra lại đường truyền.');
-            }
-        } finally {
-            setIsLoading(false);
-        }
+            setErrorMessage(error.response?.status === 401 ? 'Phiên đăng nhập đã hết hạn.' : 'Không thể tải dữ liệu.');
+        } finally { setIsLoading(false); }
     };
 
-    // Tải lại dữ liệu mỗi khi người dùng đổi Tab hoặc bấm sang Trang khác
-    useEffect(() => {
-        fetchHistoryData(activeTab, 1); // Đổi tab thì reset về trang 1
-    }, [activeTab]);
+    useEffect(() => { fetchHistoryData(activeTab, 1); }, [activeTab]);
 
-    const handlePageChange = (newPage) => {
-        if (newPage >= 1 && newPage <= pagination.last_page) {
-            fetchHistoryData(activeTab, newPage);
-        }
+    const handlePageChange = (p) => {
+        if (p >= 1 && p <= pagination.last_page) fetchHistoryData(activeTab, p);
     };
 
-    // --- HÀM MAP HUY HIỆU TRẠNG THÁI BILL ---
-    const renderStatusBadge = (status, paymentStatus) => {
-        if (status === 'cancelled') {
-            return <span className="px-2.5 py-1 bg-red-50 text-red-600 border border-red-200 text-[11px] font-bold rounded-lg block text-center">✕ Đã hủy</span>;
-        }
-        if (paymentStatus === 'paid') {
-            return <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-bold rounded-lg block text-center">✓ Đã thanh toán</span>;
-        }
-        return <span className="px-2.5 py-1 bg-amber-50 text-amber-700 border border-amber-200 text-[11px] font-bold rounded-lg block text-center">⏳ Chưa thanh toán</span>;
+    const getStatusStyle = (status, paymentStatus) => {
+        if (status === 'cancelled') return { label: 'Đã hủy', dot: 'bg-red-400', text: 'text-red-400', bg: 'bg-red-500/8' };
+        if (paymentStatus === 'paid') return { label: 'Đã thanh toán', dot: 'bg-emerald-400', text: 'text-emerald-400', bg: 'bg-emerald-500/8' };
+        return { label: 'Chờ thanh toán', dot: 'bg-amber-400', text: 'text-amber-400', bg: 'bg-amber-500/8' };
     };
+
+    const tabs = [
+        { id: 'upcoming', label: 'Sắp tới' },
+        { id: 'history', label: 'Đã qua' },
+        { id: 'all', label: 'Tất cả' },
+    ];
 
     return (
-        <div className="min-h-screen bg-zinc-50/60 py-10">
-            <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="bg-zinc-950 min-h-screen">
+            <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
 
-                {/* HEADER & TABS LỌC */}
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
-                    <div>
-                        <h1 className="text-2xl sm:text-3xl font-black text-zinc-900 tracking-tight">Lịch Sử Đặt Sân</h1>
-                        <p className="text-xs sm:text-sm text-zinc-500 mt-0.5">Kiểm tra thông tin chi tiết các ca đấu và trạng thái thanh toán.</p>
-                    </div>
+                {/* ═══ HEADER ═══ */}
+                <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
+                    <h1 className="text-2xl font-extrabold text-white tracking-tight">Lịch sử đặt sân</h1>
+                    <p className="text-sm text-zinc-500 mt-1">Theo dõi trạng thái và thông tin thanh toán.</p>
+                </motion.div>
 
-                    {/* Dải Tab chuyển đổi khớp với Query Params của API */}
-                    <div className="flex bg-white p-1 rounded-xl border border-zinc-200 shadow-xs self-start md:self-auto">
-                        <button
-                            onClick={() => setActiveTab('upcoming')}
-                            className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${activeTab === 'upcoming' ? 'bg-blue-600 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-900'}`}
-                        >
-                            Lịch sắp tới
+                {/* ═══ TAB BAR ═══ */}
+                <div className="flex items-center gap-1 mb-8 border-b border-zinc-800/60">
+                    {tabs.map((tab) => (
+                        <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+                            className={`relative px-5 py-3 text-sm font-semibold transition-colors ${activeTab === tab.id ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'}`}>
+                            {tab.label}
+                            {activeTab === tab.id && (
+                                <motion.div layoutId="historyUnderline"
+                                    className="absolute bottom-0 left-0 right-0 h-0.5 bg-lime-400"
+                                    transition={{ type: 'spring', stiffness: 400, damping: 30 }} />
+                            )}
                         </button>
-                        <button
-                            onClick={() => setActiveTab('history')}
-                            className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${activeTab === 'history' ? 'bg-blue-600 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-900'}`}
-                        >
-                            Đã qua / Đã hủy
-                        </button>
-                        <button
-                            onClick={() => setActiveTab('all')}
-                            className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${activeTab === 'all' ? 'bg-blue-600 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-900'}`}
-                        >
-                            Tất cả
-                        </button>
-                    </div>
+                    ))}
                 </div>
 
+                {/* Error */}
                 {errorMessage && (
-                    <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-700 text-xs font-bold rounded-xl">
-                        {errorMessage}
-                    </div>
+                    <div className="mb-6 p-4 bg-red-500/8 border border-red-500/15 text-red-400 text-sm font-medium rounded-xl">{errorMessage}</div>
                 )}
 
-                {/* BẢNG DANH SÁCH ĐƠN */}
-                <div className="bg-white rounded-3xl border border-zinc-200/80 shadow-sm overflow-hidden">
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left border-collapse min-w-[800px]">
-                            <thead>
-                                <tr className="bg-zinc-50/50 border-b border-zinc-100 text-[11px] font-bold text-zinc-400 uppercase tracking-wider">
-                                    <th className="p-4 pl-6">Mã Đơn / Loại</th>
-                                    <th className="p-4">Thời Gian & Sân Đấu</th>
-                                    <th className="p-4 text-center">Số Ca</th>
-                                    <th className="p-4 text-right">Tổng Tiền</th>
-                                    <th className="p-4 text-center w-36">Trạng Thái</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-zinc-100 text-sm">
-                                {isLoading ? (
-                                    <tr>
-                                        <td colSpan="5" className="py-16 text-center text-xs font-bold text-zinc-400">
-                                            <span className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin inline-block align-middle mr-2"></span>
-                                            Đang tải dữ liệu từ máy chủ...
-                                        </td>
-                                    </tr>
-                                ) : bookings.length === 0 ? (
-                                    <tr>
-                                        <td colSpan="5" className="py-16 text-center text-zinc-400">
-                                            <p className="text-sm font-bold text-zinc-500">Danh sách trống.</p>
-                                            <p className="text-xs mt-1">Không tìm thấy ca đặt sân nào thuộc danh mục này.</p>
-                                        </td>
-                                    </tr>
-                                ) : (
-                                    bookings.map((item) => (
-                                        <tr key={item.booking_id} className="hover:bg-zinc-50/40 transition-colors">
+                {/* ═══ CONTENT ═══ */}
+                <AnimatePresence mode="wait">
+                    <motion.div key={activeTab} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
 
-                                            {/* Cột 1: Mã Đơn */}
-                                            <td className="p-4 pl-6 align-middle">
-                                                <span className="text-xs font-mono font-black text-zinc-900 block">
-                                                    {item.booking_code}
-                                                </span>
-                                                <span className={`inline-block mt-1 px-2 py-0.5 rounded text-[9px] font-bold border ${item.type === 'recurring_session' ? 'bg-purple-50 text-purple-700 border-purple-200' : 'bg-blue-50 text-blue-700 border-blue-200'
-                                                    }`}>
-                                                    {item.type_label}
-                                                </span>
-                                                <span className="block text-[10px] text-zinc-400 mt-1">
-                                                    Đặt lúc: {item.created_at}
-                                                </span>
-                                            </td>
+                        {isLoading ? (
+                            <div className="py-28 text-center">
+                                <div className="w-6 h-6 border-2 border-zinc-700 border-t-lime-400 rounded-full animate-spin mx-auto mb-4" />
+                                <p className="text-sm text-zinc-500">Đang tải...</p>
+                            </div>
+                        ) : bookings.length === 0 ? (
+                            <div className="py-28 text-center">
+                                <p className="text-4xl mb-3 opacity-20">🏸</p>
+                                <p className="text-sm font-semibold text-zinc-400">Không có dữ liệu</p>
+                                <p className="text-xs text-zinc-600 mt-1">Không tìm thấy đơn nào trong danh mục này.</p>
+                                <a href="/" className="inline-block mt-5 text-xs font-semibold text-lime-400 hover:text-lime-300 transition-colors">← Quay lại đặt sân</a>
+                            </div>
+                        ) : (
+                            <div className="space-y-3">
+                                {bookings.map((item, i) => {
+                                    const st = getStatusStyle(item.status, item.payment_status);
+                                    return (
+                                        <motion.div key={item.booking_id}
+                                            initial={{ opacity: 0, y: 10 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            transition={{ delay: i * 0.03 }}
+                                            className="bg-zinc-900/50 border border-zinc-800/60 rounded-2xl p-5 hover:bg-zinc-900/80 hover:border-zinc-700/60 transition-all duration-200 group">
 
-                                            {/* Cột 2: Thời gian & Sân (Trích xuất từ mảng summary) */}
-                                            <td className="p-4 align-middle">
-                                                {item.summary ? (
-                                                    <div>
-                                                        <p className="text-xs font-bold text-zinc-800">
-                                                            📅 Ngày: <span className="text-blue-600">{item.summary.play_date}</span>
-                                                        </p>
-                                                        <p className="text-xs font-mono text-zinc-600 mt-0.5">
-                                                            ⏰ Khung: {item.summary.time_slot}
-                                                        </p>
-                                                        <p className="text-[11px] text-zinc-500 mt-0.5 font-medium">
-                                                            📍 Hướng dẫn: Sân thi đấu số {item.summary.court_id}
-                                                        </p>
-                                                    </div>
-                                                ) : (
-                                                    <span className="text-xs text-zinc-400 italic">Chi tiết đang cập nhật</span>
-                                                )}
-                                            </td>
+                                            {/* Row 1: Code + Status */}
+                                            <div className="flex items-center justify-between mb-4">
+                                                <div className="flex items-center gap-3">
+                                                    <span className="text-sm font-mono font-bold text-white">{item.booking_code}</span>
+                                                    <span className={`px-2 py-0.5 rounded-md text-[10px] font-semibold border ${item.type === 'recurring_session'
+                                                        ? 'text-purple-400 bg-purple-500/8 border-purple-500/15'
+                                                        : 'text-sky-400 bg-sky-500/8 border-sky-500/15'}`}>
+                                                        {item.type_label}
+                                                    </span>
+                                                </div>
+                                                <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold ${st.text} ${st.bg}`}>
+                                                    <span className={`w-1.5 h-1.5 rounded-full ${st.dot}`} />
+                                                    {st.label}
+                                                </div>
+                                            </div>
 
-                                            {/* Cột 3: Số lượng ca */}
-                                            <td className="p-4 text-center align-middle font-bold text-zinc-700">
-                                                {item.details_count || 1} block
-                                            </td>
+                                            {/* Row 2: Details grid */}
+                                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                                                {/* Ngày */}
+                                                <div>
+                                                    <p className="text-[10px] text-zinc-600 font-medium mb-1">Ngày thi đấu</p>
+                                                    <p className="text-sm font-semibold text-white">{item.summary?.play_date || '—'}</p>
+                                                </div>
+                                                {/* Giờ */}
+                                                <div>
+                                                    <p className="text-[10px] text-zinc-600 font-medium mb-1">Khung giờ</p>
+                                                    <p className="text-sm font-mono font-semibold text-zinc-300">{item.summary?.time_slot || '—'}</p>
+                                                </div>
+                                                {/* Sân */}
+                                                <div>
+                                                    <p className="text-[10px] text-zinc-600 font-medium mb-1">Sân</p>
+                                                    <p className="text-sm font-semibold text-zinc-300">#{item.summary?.court_id || '—'}</p>
+                                                </div>
+                                                {/* Tổng tiền */}
+                                                <div className="text-right sm:text-left">
+                                                    <p className="text-[10px] text-zinc-600 font-medium mb-1">Tổng tiền</p>
+                                                    <p className="text-sm font-bold text-lime-400">{Number(item.total_price).toLocaleString()} <span className="text-zinc-500 text-[10px] font-medium">đ</span></p>
+                                                </div>
+                                            </div>
 
-                                            {/* Cột 4: Tổng chi phí */}
-                                            <td className="p-4 text-right align-middle font-black text-blue-600 text-base">
-                                                {Number(item.total_price).toLocaleString()} đ
-                                            </td>
+                                            {/* Row 3: Meta */}
+                                            <div className="mt-3 pt-3 border-t border-zinc-800/40 flex items-center justify-between">
+                                                <span className="text-[10px] text-zinc-600">{item.details_count || 1} block · Đặt lúc {item.created_at}</span>
+                                            </div>
+                                        </motion.div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </motion.div>
+                </AnimatePresence>
 
-                                            {/* Cột 5: Trạng thái thanh toán */}
-                                            <td className="p-4 pr-6 align-middle">
-                                                {renderStatusBadge(item.status, item.payment_status)}
-                                            </td>
-                                        </tr>
-                                    ))
-                                )}
-                            </tbody>
-                        </table>
+                {/* ═══ PAGINATION ═══ */}
+                {pagination.last_page > 1 && (
+                    <div className="mt-8 flex items-center justify-center gap-1">
+                        <button disabled={pagination.current_page === 1}
+                            onClick={() => handlePageChange(pagination.current_page - 1)}
+                            className={`px-3 py-2 rounded-lg text-xs font-semibold transition-colors ${pagination.current_page === 1 ? 'text-zinc-700 cursor-not-allowed' : 'text-zinc-400 hover:text-white hover:bg-zinc-800'}`}>
+                            ←
+                        </button>
+                        {Array.from({ length: pagination.last_page }, (_, i) => i + 1).map(page => (
+                            <button key={page} onClick={() => handlePageChange(page)}
+                                className={`w-9 h-9 rounded-lg text-xs font-semibold transition-all ${page === pagination.current_page
+                                    ? 'bg-lime-500/15 text-lime-400 font-bold'
+                                    : 'text-zinc-500 hover:text-white hover:bg-zinc-800/60'}`}>
+                                {page}
+                            </button>
+                        ))}
+                        <button disabled={pagination.current_page === pagination.last_page}
+                            onClick={() => handlePageChange(pagination.current_page + 1)}
+                            className={`px-3 py-2 rounded-lg text-xs font-semibold transition-colors ${pagination.current_page === pagination.last_page ? 'text-zinc-700 cursor-not-allowed' : 'text-zinc-400 hover:text-white hover:bg-zinc-800'}`}>
+                            →
+                        </button>
                     </div>
-
-                    {/* KHU VỰC PHÂN TRANG (PAGINATION) */}
-                    {pagination.last_page > 1 && (
-                        <div className="p-4 bg-zinc-50/50 border-t border-zinc-100 flex items-center justify-between">
-                            <button
-                                disabled={pagination.current_page === 1}
-                                onClick={() => handlePageChange(pagination.current_page - 1)}
-                                className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${pagination.current_page === 1 ? 'bg-zinc-100 text-zinc-400 border-zinc-200 cursor-not-allowed' : 'bg-white text-zinc-700 border-zinc-300 hover:bg-zinc-50'}`}
-                            >
-                                ← Trang trước
-                            </button>
-                            <span className="text-xs font-bold text-zinc-600">
-                                Trang {pagination.current_page} / {pagination.last_page}
-                            </span>
-                            <button
-                                disabled={pagination.current_page === pagination.last_page}
-                                onClick={() => handlePageChange(pagination.current_page + 1)}
-                                className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${pagination.current_page === pagination.last_page ? 'bg-zinc-100 text-zinc-400 border-zinc-200 cursor-not-allowed' : 'bg-white text-zinc-700 border-zinc-300 hover:bg-zinc-50'}`}
-                            >
-                                Trang sau →
-                            </button>
-                        </div>
-                    )}
-                </div>
-
+                )}
             </div>
         </div>
     );

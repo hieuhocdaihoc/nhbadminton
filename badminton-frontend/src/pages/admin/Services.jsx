@@ -1,24 +1,22 @@
 import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { adminAdditionalService } from '../../services/admin/additionalService';
 
 const Services = () => {
-    // STATE DỮ LIỆU
     const [services, setServices] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [message, setMessage] = useState({ type: '', text: '' });
 
-    // STATE FORM
     const [form, setForm] = useState({ id: null, name: '', service_type: 'drink', price: '', unit: 'Lượt', description: '', status: 'active' });
     const [isEditing, setIsEditing] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
 
-    // MAPPING TYPE SANG TIẾNG VIỆT ĐỂ HIỂN THỊ
     const TYPE_LABELS = {
-        drink: '🥤 Nước uống',
-        rental: '🏸 Thuê dụng cụ',
-        coaching: '🎓 Huấn luyện',
-        shuttlecock: '📦 Quả cầu',
-        other: '⚙️ Khác'
+        drink: 'Nước uống',
+        rental: 'Thuê dụng cụ',
+        coaching: 'Huấn luyện',
+        shuttlecock: 'Quả cầu',
+        other: 'Khác'
     };
 
     const fetchServices = async () => {
@@ -28,9 +26,7 @@ const Services = () => {
             setServices(res.data?.data || []);
         } catch (error) {
             setMessage({ type: 'error', text: 'Không thể tải danh sách dịch vụ.' });
-        } finally {
-            setIsLoading(false);
-        }
+        } finally { setIsLoading(false); }
     };
 
     useEffect(() => { fetchServices(); }, []);
@@ -42,27 +38,23 @@ const Services = () => {
         setMessage({ type: '', text: '' });
 
         const payload = {
-            name: form.name,
-            service_type: form.service_type,
-            price: Number(form.price),
-            unit: form.unit,
-            description: form.description,
-            status: form.status
+            name: form.name, service_type: form.service_type,
+            price: Number(form.price), unit: form.unit,
+            description: form.description, status: form.status
         };
 
         try {
             if (isEditing) {
                 await adminAdditionalService.updateService(form.id, payload);
-                setMessage({ type: 'success', text: '✓ Cập nhật dịch vụ thành công!' });
+                setMessage({ type: 'success', text: 'Cập nhật dịch vụ thành công!' });
             } else {
                 await adminAdditionalService.createService(payload);
-                setMessage({ type: 'success', text: '✓ Thêm dịch vụ mới thành công!' });
+                setMessage({ type: 'success', text: 'Thêm dịch vụ mới thành công!' });
             }
             resetForm();
             fetchServices();
         } catch (error) {
-            const errorMsg = error.response?.data?.message || 'Có lỗi xảy ra, vui lòng kiểm tra lại!';
-            alert('⚠️ ' + errorMsg);
+            setMessage({ type: 'error', text: error.response?.data?.message || 'Có lỗi xảy ra!' });
         } finally {
             setIsProcessing(false);
             setTimeout(() => setMessage({ type: '', text: '' }), 2500);
@@ -72,13 +64,9 @@ const Services = () => {
     const handleEditClick = (service) => {
         setIsEditing(true);
         setForm({
-            id: service.id,
-            name: service.name,
-            service_type: service.service_type,
-            price: service.price,
-            unit: service.unit || 'Lượt',
-            description: service.description || '',
-            status: service.status
+            id: service.id, name: service.name, service_type: service.service_type,
+            price: service.price, unit: service.unit || 'Lượt',
+            description: service.description || '', status: service.status
         });
     };
 
@@ -86,14 +74,10 @@ const Services = () => {
         if (window.confirm(`Bạn có chắc chắn muốn ngưng kinh doanh dịch vụ [${service.name}]?`)) {
             try {
                 await adminAdditionalService.deleteService(service.id);
-                setMessage({ type: 'success', text: '✓ Đã chuyển dịch vụ sang trạng thái tạm ẩn!' });
+                setMessage({ type: 'success', text: 'Đã chuyển sang tạm ẩn!' });
                 fetchServices();
-            } catch (error) {
-                const errorMsg = error.response?.data?.message || 'Thao tác thất bại!';
-                alert('❌ ' + errorMsg);
-            } finally {
-                setTimeout(() => setMessage({ type: '', text: '' }), 2500);
-            }
+            } catch (error) { setMessage({ type: 'error', text: 'Thao tác thất bại!' }); }
+            finally { setTimeout(() => setMessage({ type: '', text: '' }), 2500); }
         }
     };
 
@@ -102,67 +86,75 @@ const Services = () => {
         setIsEditing(false);
     };
 
-    return (
-        <div className="max-w-[1600px] mx-auto p-3 gap-3 font-sans h-[calc(100vh-7rem)] flex flex-col overflow-hidden bg-zinc-50/50">
+    const inputClass = "w-full bg-[#f8f8fa] border border-zinc-200 rounded-lg px-3.5 py-2.5 text-sm text-zinc-800 outline-none focus:border-zinc-400 focus:ring-1 focus:ring-zinc-200 transition-all";
 
+    return (
+        <div className="max-w-[1400px] mx-auto space-y-5">
+            
             {/* HEADER */}
-            <div className="shrink-0 bg-white p-3 px-5 rounded-2xl border border-zinc-200/60 shadow-xs flex justify-between items-center">
-                <div className="flex items-center gap-2.5">
-                    <div className="w-7 h-7 bg-purple-600 rounded-lg flex items-center justify-center text-white text-xs font-bold shadow-xs">🏸</div>
-                    <div>
-                        <h2 className="text-base font-black text-zinc-900 tracking-tight leading-none">Quản Lý Dịch Vụ Bổ Sung</h2>
-                        <p className="text-[10px] font-semibold text-zinc-400 mt-1">Cấu hình giá thuê vợt, huấn luyện viên, nước uống giải khát tại quầy</p>
-                    </div>
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                    <h2 className="text-base font-semibold text-zinc-800">Dịch vụ bổ sung</h2>
+                    <p className="text-xs text-zinc-400 mt-0.5">Quản lý giá thuê vợt, huấn luyện viên, dịch vụ ngoài</p>
                 </div>
-                {message.text && (
-                    <div className={`px-3 py-1 rounded-lg text-[11px] font-black tracking-tight border ${message.type === 'success' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-red-50 text-red-600 border-red-100'}`}>
-                        {message.text}
-                    </div>
-                )}
             </div>
 
-            {/* THÂN GRID CHÍNH */}
-            <div className="flex-1 grid grid-cols-12 gap-3 min-h-0">
+            {/* TOAST */}
+            <AnimatePresence>
+                {message.text && (
+                    <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
+                        className={`p-3 rounded-lg text-xs font-medium ${message.type === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-600 border border-red-200'}`}>
+                        {message.text}
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
-                {/* BẢNG DANH SÁCH BÊN TRÁI (8 CỘT) */}
-                <div className="col-span-8 bg-white rounded-2xl border border-zinc-200/60 shadow-xs flex flex-col min-h-0 overflow-hidden">
-                    <div className="flex-1 overflow-auto relative custom-scrollbar">
-                        <table className="w-full text-left text-xs whitespace-nowrap">
-                            <thead className="bg-zinc-50/80 font-black text-zinc-400 uppercase text-[9px] tracking-widest sticky top-0 z-10 border-b border-zinc-200/60 backdrop-blur-sm">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+                
+                {/* LIST TABLE (LEFT) */}
+                <div className="lg:col-span-8 bg-white rounded-xl border border-zinc-200/60 overflow-hidden">
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left">
+                            <thead className="bg-zinc-50/60 border-b border-zinc-100 text-[10px] font-medium text-zinc-400 uppercase tracking-wider">
                                 <tr>
-                                    <th className="py-3 px-4 pl-6">Tên dịch vụ</th>
-                                    <th className="py-3 px-4">Phân loại</th>
-                                    <th className="py-3 px-4 text-right">Đơn giá</th>
-                                    <th className="py-3 px-4 text-center">Đơn vị</th>
-                                    <th className="py-3 px-4 text-center">Trạng thái</th>
-                                    <th className="py-3 px-4 text-right pr-6">Thao tác</th>
+                                    <th className="py-3 px-5" style={{width:'220px'}}>Dịch vụ</th>
+                                    <th className="py-3 px-3" style={{width:'110px'}}>Phân loại</th>
+                                    <th className="py-3 px-3 text-right" style={{width:'100px'}}>Đơn giá</th>
+                                    <th className="py-3 px-3 text-center" style={{width:'80px'}}>Đơn vị</th>
+                                    <th className="py-3 px-3 text-center" style={{width:'100px'}}>Trạng thái</th>
+                                    <th className="py-3 px-5 text-right" style={{width:'100px'}}>Thao tác</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-zinc-100 bg-white">
+                            <tbody>
                                 {isLoading ? (
-                                    <tr><td colSpan="6" className="py-12 text-center text-zinc-400 font-bold uppercase text-[10px] tracking-wider">Đang nạp dữ liệu...</td></tr>
+                                    <tr><td colSpan="6" className="py-16 text-center"><div className="inline-block w-5 h-5 border-2 border-zinc-300 border-t-zinc-600 rounded-full animate-spin" /></td></tr>
                                 ) : services.length === 0 ? (
-                                    <tr><td colSpan="6" className="py-12 text-center text-zinc-400 italic">Chưa cấu hình dịch vụ bổ sung nào.</td></tr>
+                                    <tr><td colSpan="6" className="py-16 text-center text-xs text-zinc-400">Chưa cấu hình dịch vụ nào</td></tr>
                                 ) : (
                                     services.map(s => (
-                                        <tr key={s.id} className="hover:bg-zinc-50/80 transition-colors group">
-                                            <td className="py-2.5 px-4 pl-6 font-black text-zinc-900 text-xs tracking-tight">
-                                                {s.name}
-                                                <span className="block font-normal text-zinc-400 text-[10px] max-w-[200px] truncate">{s.description || 'Không có mô tả'}</span>
+                                        <tr key={s.id} className="border-b border-zinc-100 last:border-b-0 hover:bg-zinc-50/40 transition-colors group">
+                                            <td className="py-3.5 px-5">
+                                                <p className="text-sm font-semibold text-zinc-800">{s.name}</p>
+                                                <p className="text-xs text-zinc-500 mt-0.5 max-w-[200px] truncate">{s.description || <span className="italic text-zinc-400">Không có mô tả</span>}</p>
                                             </td>
-                                            <td className="py-2.5 px-4 font-bold text-zinc-600 text-[11px]">{TYPE_LABELS[s.service_type] || s.service_type}</td>
-                                            <td className="py-2.5 px-4 text-right font-black text-zinc-900 text-xs tracking-tight">{Number(s.price).toLocaleString()} ₫</td>
-                                            <td className="py-2.5 px-4 text-center font-bold text-zinc-500 text-[11px]"><span className="bg-zinc-100 px-2 py-0.5 rounded">{s.unit || 'Lượt'}</span></td>
-                                            <td className="py-2.5 px-4 text-center align-middle">
-                                                <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase border ${s.status === 'active' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-zinc-100 text-zinc-400 border-zinc-200'}`}>
+                                            <td className="py-3.5 px-3 text-xs text-zinc-600">{TYPE_LABELS[s.service_type] || s.service_type}</td>
+                                            <td className="py-3.5 px-3 text-right">
+                                                <span className="text-sm font-semibold text-zinc-800">{Number(s.price).toLocaleString()}₫</span>
+                                            </td>
+                                            <td className="py-3.5 px-3 text-center">
+                                                <span className="text-xs text-zinc-600 bg-zinc-100 px-2 py-0.5 rounded">{s.unit || 'Lượt'}</span>
+                                            </td>
+                                            <td className="py-3.5 px-3 text-center">
+                                                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium ${s.status === 'active' ? 'text-emerald-700 bg-emerald-50' : 'text-zinc-500 bg-zinc-100'}`}>
+                                                    <span className={`w-1.5 h-1.5 rounded-full ${s.status === 'active' ? 'bg-emerald-500' : 'bg-zinc-400'}`} />
                                                     {s.status === 'active' ? 'Kinh doanh' : 'Tạm dừng'}
                                                 </span>
                                             </td>
-                                            <td className="py-2.5 px-4 text-right pr-6 align-middle">
-                                                <div className="flex items-center justify-end gap-1.5 opacity-100 sm:opacity-40 sm:group-hover:opacity-100 transition-opacity">
-                                                    <button onClick={() => handleEditClick(s)} className="px-2.5 py-1 bg-zinc-100 hover:bg-purple-600 hover:text-white rounded-md font-black text-[10px] uppercase transition-all shadow-xs">Sửa</button>
+                                            <td className="py-3.5 px-5 text-right">
+                                                <div className="flex items-center justify-end gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                                                    <button onClick={() => handleEditClick(s)} className="px-2.5 py-1 border border-zinc-200 text-zinc-500 rounded text-[10px] hover:bg-zinc-50 transition-colors">Sửa</button>
                                                     {s.status === 'active' && (
-                                                        <button onClick={() => handleDeleteClick(s)} className="px-2.5 py-1 bg-white border border-zinc-200 hover:bg-red-50 hover:text-red-500 hover:border-red-100 text-zinc-400 rounded-md font-black text-[10px] uppercase transition-all">Dừng</button>
+                                                        <button onClick={() => handleDeleteClick(s)} className="px-2 py-1 text-zinc-400 rounded text-[10px] hover:text-red-500 hover:bg-red-50 transition-colors">Dừng</button>
                                                     )}
                                                 </div>
                                             </td>
@@ -174,60 +166,72 @@ const Services = () => {
                     </div>
                 </div>
 
-                {/* FORM NHẬP LIỆU BÊN PHẢI (4 CỘT) */}
-                <div className="col-span-4 bg-white p-4 rounded-2xl border border-zinc-200/60 shadow-xs flex flex-col justify-between min-h-0 overflow-y-auto custom-scrollbar">
-                    <form onSubmit={handleSubmit} className="space-y-3 w-full">
-                        <div className="border-b border-zinc-100 pb-2 flex justify-between items-center">
-                            <h3 className="font-black text-xs text-zinc-900 uppercase tracking-wider">{isEditing ? '📝 Cập Nhật Dịch Vụ' : '✨ Thêm Dịch Vụ Mới'}</h3>
-                            {isEditing && <button type="button" onClick={resetForm} className="text-[10px] font-black text-purple-600 hover:underline">Hủy sửa</button>}
-                        </div>
-
+                {/* FORM (RIGHT) */}
+                <div className="lg:col-span-4 bg-white rounded-xl border border-zinc-200/60 p-5 sticky top-5">
+                    <div className="flex items-center justify-between mb-4 pb-3 border-b border-zinc-100">
+                        <h3 className="text-sm font-semibold text-zinc-800">{isEditing ? 'Sửa dịch vụ' : 'Thêm dịch vụ mới'}</h3>
+                        {isEditing && (
+                            <button onClick={resetForm} className="text-[10px] font-medium text-zinc-400 hover:text-zinc-600 transition-colors">
+                                Hủy sửa
+                            </button>
+                        )}
+                    </div>
+                    
+                    <form onSubmit={handleSubmit} className="space-y-4">
                         <div>
-                            <label className="block text-[9px] font-black text-zinc-400 uppercase tracking-widest mb-1">Tên dịch vụ / hàng hóa *</label>
-                            <input type="text" required placeholder="VD: Thuê vợt Yonex, Nước suối Aquafina..." value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-3 py-2 text-xs font-bold text-zinc-800 outline-none focus:border-purple-500 focus:bg-white transition-all shadow-xs" />
+                            <label className="block text-[11px] font-medium text-zinc-500 mb-1.5">Tên dịch vụ *</label>
+                            <input type="text" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={inputClass} placeholder="VD: Thuê vợt Yonex" />
                         </div>
-
-                        <div className="grid grid-cols-2 gap-2">
+                        
+                        <div className="grid grid-cols-2 gap-3">
                             <div>
-                                <label className="block text-[9px] font-black text-zinc-400 uppercase tracking-widest mb-1">Phân loại *</label>
-                                <select required value={form.service_type} onChange={(e) => setForm({ ...form, service_type: e.target.value })} className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-2.5 py-2 text-xs font-bold text-zinc-800 outline-none focus:border-purple-500 transition-all cursor-pointer">
-                                    <option value="drink">🥤 Nước uống</option>
-                                    <option value="rental">🏸 Thuê dụng cụ</option>
-                                    <option value="coaching">🎓 Huấn luyện</option>
-                                    <option value="shuttlecock">📦 Quả cầu</option>
-                                    <option value="other">⚙️ Khác</option>
+                                <label className="block text-[11px] font-medium text-zinc-500 mb-1.5">Phân loại *</label>
+                                <select required value={form.service_type} onChange={(e) => setForm({ ...form, service_type: e.target.value })} className={inputClass}>
+                                    <option value="drink">Nước uống</option>
+                                    <option value="rental">Thuê dụng cụ</option>
+                                    <option value="coaching">Huấn luyện</option>
+                                    <option value="shuttlecock">Quả cầu</option>
+                                    <option value="other">Khác</option>
                                 </select>
                             </div>
                             <div>
-                                <label className="block text-[9px] font-black text-zinc-400 uppercase tracking-widest mb-1">Đơn vị tính</label>
-                                <input type="text" placeholder="VD: Chai, Lượt, Giờ..." value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-3 py-2 text-xs font-bold text-zinc-800 outline-none focus:border-purple-500 focus:bg-white transition-all shadow-xs" />
+                                <label className="block text-[11px] font-medium text-zinc-500 mb-1.5">Đơn vị tính</label>
+                                <input type="text" value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} className={inputClass} placeholder="VD: Lượt, Giờ..." />
                             </div>
                         </div>
 
                         <div>
-                            <label className="block text-[9px] font-black text-zinc-400 uppercase tracking-widest mb-1">Đơn giá (VND) *</label>
-                            <input type="number" min="0" required placeholder="VD: 15000" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-3 py-2 text-xs font-black text-zinc-800 outline-none focus:border-purple-500 focus:bg-white transition-all shadow-xs" />
+                            <label className="block text-[11px] font-medium text-zinc-500 mb-1.5">Đơn giá (₫) *</label>
+                            <input type="number" min="0" required value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} className={inputClass} placeholder="15000" />
                         </div>
 
                         <div>
-                            <label className="block text-[9px] font-black text-zinc-400 uppercase tracking-widest mb-1">Mô tả chi tiết</label>
-                            <textarea rows="2" placeholder="Nhập mô tả dịch vụ..." value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-3 py-2 text-xs font-semibold text-zinc-700 outline-none focus:border-purple-500 focus:bg-white transition-all shadow-xs resize-none" />
+                            <label className="block text-[11px] font-medium text-zinc-500 mb-1.5">Mô tả chi tiết</label>
+                            <textarea rows="2" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className={`${inputClass} resize-none`} placeholder="Mô tả đặc tính dịch vụ..." />
                         </div>
 
                         <div>
-                            <label className="block text-[9px] font-black text-zinc-400 uppercase tracking-widest mb-1">Trạng thái hoạt động</label>
-                            <div className="grid grid-cols-2 gap-2 mt-1">
-                                <button type="button" onClick={() => setForm({ ...form, status: 'active' })} className={`py-1.5 rounded-xl text-[10px] font-black transition-all border ${form.status === 'active' ? 'bg-purple-50 text-purple-600 border-purple-200 shadow-xs' : 'bg-zinc-50 text-zinc-400 border-zinc-100'}`}>🟢 KINH DOANH</button>
-                                <button type="button" onClick={() => setForm({ ...form, status: 'inactive' })} className={`py-1.5 rounded-xl text-[10px] font-black transition-all border ${form.status === 'inactive' ? 'bg-zinc-100 text-zinc-500 border-zinc-300 shadow-xs' : 'bg-zinc-50 text-zinc-400 border-zinc-100'}`}>🔴 TẠM DỪNG</button>
+                            <label className="block text-[11px] font-medium text-zinc-500 mb-1.5">Trạng thái hiển thị</label>
+                            <div className="grid grid-cols-2 gap-2">
+                                <button type="button" onClick={() => setForm({ ...form, status: 'active' })} 
+                                    className={`py-2 rounded-lg text-xs font-medium transition-colors border ${form.status === 'active' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-zinc-50 text-zinc-400 border-transparent hover:bg-zinc-100'}`}>
+                                    Kinh doanh
+                                </button>
+                                <button type="button" onClick={() => setForm({ ...form, status: 'inactive' })} 
+                                    className={`py-2 rounded-lg text-xs font-medium transition-colors border ${form.status === 'inactive' ? 'bg-zinc-100 text-zinc-600 border-zinc-300' : 'bg-zinc-50 text-zinc-400 border-transparent hover:bg-zinc-100'}`}>
+                                    Tạm dừng
+                                </button>
                             </div>
+                        </div>
+
+                        <div className="pt-2">
+                            <button type="submit" disabled={isProcessing || !form.name.trim() || form.price === ''} 
+                                className={`w-full py-2.5 rounded-lg text-xs font-medium text-white transition-colors ${isEditing ? 'bg-zinc-900 hover:bg-zinc-800' : 'bg-lime-600 hover:bg-lime-700'} ${(isProcessing || !form.name.trim() || form.price === '') ? 'opacity-60 cursor-not-allowed' : ''}`}>
+                                {isProcessing ? 'Đang lưu...' : isEditing ? 'Lưu thay đổi' : 'Tạo dịch vụ'}
+                            </button>
                         </div>
                     </form>
-
-                    <button onClick={handleSubmit} disabled={isProcessing || !form.name.trim() || form.price === ''} className={`w-full py-2.5 mt-4 text-white font-black rounded-xl text-xs uppercase tracking-wider shadow-md transition-all shrink-0 ${isEditing ? 'bg-amber-500 hover:bg-amber-600 shadow-amber-100' : 'bg-purple-600 hover:bg-purple-700 shadow-purple-100'}`}>
-                        {isProcessing ? 'Đang lưu dữ liệu...' : isEditing ? '💾 Cập nhật dịch vụ' : '➕ Tạo dịch vụ'}
-                    </button>
                 </div>
-
             </div>
         </div>
     );

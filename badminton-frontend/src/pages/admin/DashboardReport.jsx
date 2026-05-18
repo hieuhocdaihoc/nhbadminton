@@ -1,72 +1,65 @@
 import React from 'react';
 
+const StatCard = ({ label, value, unit, sub, color, icon }) => (
+    <div className="bg-white p-5 rounded-2xl border border-zinc-100 flex items-center justify-between group hover:shadow-md transition-shadow">
+        <div>
+            <p className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">{label}</p>
+            <h4 className="text-2xl font-extrabold mt-1" style={{ color }}>{value} <span className="text-xs font-medium text-zinc-400">{unit}</span></h4>
+            <p className="text-[10px] font-medium mt-1" style={{ color: sub?.color || '#a1a1aa' }}>{sub?.text}</p>
+        </div>
+        <div className="w-11 h-11 rounded-xl flex items-center justify-center text-lg shrink-0" style={{ backgroundColor: color + '10', color }}>{icon}</div>
+    </div>
+);
+
 const DashboardReport = () => {
     return (
         <div className="space-y-6 max-w-[1600px] mx-auto">
             {/* THỐNG KÊ TỔNG QUAN */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="bg-white p-5 rounded-2xl border border-zinc-200/80 shadow-sm">
-                    <p className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Tổng Doanh Thu Tháng</p>
-                    <h4 className="text-2xl font-black text-zinc-900 mt-1">45.800.000 <span className="text-xs font-semibold text-zinc-500">VNĐ</span></h4>
-                    <p className="text-[10px] text-emerald-600 font-bold mt-1">↑ 12% so với tháng trước</p>
-                </div>
-                <div className="bg-white p-5 rounded-2xl border border-zinc-200/80 shadow-sm">
-                    <p className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Lượt Đặt Sân Thành Công</p>
-                    <h4 className="text-2xl font-black text-blue-600 mt-1">342 <span className="text-xs font-semibold text-zinc-500">Lượt</span></h4>
-                    <p className="text-[10px] text-zinc-500 font-medium mt-1">85% từ khung giờ vàng</p>
-                </div>
-                <div className="bg-white p-5 rounded-2xl border border-zinc-200/80 shadow-sm">
-                    <p className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Khách Hàng Mới</p>
-                    <h4 className="text-2xl font-black text-indigo-600 mt-1">48 <span className="text-xs font-semibold text-zinc-500">Vợt thủ</span></h4>
-                    <p className="text-[10px] text-indigo-600 font-bold mt-1">Đã đăng ký tài khoản hệ thống</p>
-                </div>
-                <div className="bg-white p-5 rounded-2xl border border-zinc-200/80 shadow-sm">
-                    <p className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Tỷ Lệ Lấp Đầy Sân</p>
-                    <h4 className="text-2xl font-black text-emerald-600 mt-1">76% <span className="text-xs font-semibold text-zinc-500">Trung bình</span></h4>
-                    <p className="text-[10px] text-emerald-600 font-bold mt-1">Sân số 02 được chuộng nhất</p>
-                </div>
+                <StatCard label="Tổng Doanh Thu Tháng" value="45.800.000" unit="VNĐ" sub={{ text: '↑ 12% so với tháng trước', color: '#10b981' }} color="#18181b" icon="💰" />
+                <StatCard label="Lượt Đặt Sân" value="342" unit="Lượt" sub={{ text: '85% từ khung giờ vàng' }} color="#3b82f6" icon="📅" />
+                <StatCard label="Khách Hàng Mới" value="48" unit="Vợt thủ" sub={{ text: 'Đã đăng ký hệ thống', color: '#6366f1' }} color="#6366f1" icon="👤" />
+                <StatCard label="Tỷ Lệ Lấp Đầy" value="76%" unit="TB" sub={{ text: 'Sân 02 chuộng nhất', color: '#10b981' }} color="#10b981" icon="📊" />
             </div>
 
-            {/* KHUNG MÔ PHỎNG BIỂU ĐỒ TRỰC QUAN */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Biểu đồ chính */}
-                <div className="lg:col-span-2 bg-white p-6 rounded-3xl border border-zinc-200/80 shadow-sm">
-                    <div className="flex justify-between items-center mb-4">
-                        <h3 className="font-black text-zinc-900 text-base">Biểu Đồ Doanh Thu Theo Tuần</h3>
-                        <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2.5 py-1 rounded-lg">Tháng 5/2026</span>
+            {/* BIỂU ĐỒ */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+                <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-zinc-100">
+                    <div className="flex justify-between items-center mb-5">
+                        <h3 className="font-bold text-zinc-800 text-sm">Biểu Đồ Doanh Thu Theo Tuần</h3>
+                        <span className="text-[11px] font-semibold text-lime-600 bg-lime-50 px-2.5 py-1 rounded-lg border border-lime-100">Tháng 5/2026</span>
                     </div>
-                    {/* Khung giả lập chart */}
-                    <div className="h-72 bg-zinc-50 border border-zinc-100 rounded-2xl flex flex-col items-center justify-center text-zinc-400 text-xs font-bold">
-                        <span>📊 [ Tích hợp mượt mà dữ liệu động từ Chart.js / Recharts ]</span>
-                        <span className="text-[10px] text-zinc-400 font-normal mt-1">Trục tung: Doanh thu (VNĐ) - Trục hoành: Các ngày trong tuần</span>
+                    <div className="h-64 bg-zinc-50 border border-zinc-100 rounded-xl flex flex-col items-center justify-center text-zinc-400 text-xs">
+                        <span className="text-3xl mb-2 opacity-30">📊</span>
+                        <span className="font-semibold">Tích hợp Chart.js / Recharts</span>
+                        <span className="text-[10px] text-zinc-400 mt-1">Trục tung: Doanh thu (VNĐ) · Trục hoành: Ngày trong tuần</span>
                     </div>
                 </div>
 
-                {/* Danh sách sân đóng góp cao */}
-                <div className="bg-white p-6 rounded-3xl border border-zinc-200/80 shadow-sm flex flex-col justify-between">
+                <div className="bg-white p-6 rounded-2xl border border-zinc-100 flex flex-col justify-between">
                     <div>
-                        <h3 className="font-black text-zinc-900 text-base mb-4">Hiệu Suất Khai Thác Sân</h3>
+                        <h3 className="font-bold text-zinc-800 text-sm mb-5">Hiệu Suất Khai Thác Sân</h3>
                         <div className="space-y-4">
-                            <div>
-                                <div className="flex justify-between text-xs font-bold mb-1"><span>Sân số 02 (Trung tâm)</span><span className="text-blue-600">14.2M đ</span></div>
-                                <div className="w-full bg-zinc-100 h-2 rounded-full overflow-hidden"><div className="bg-blue-600 h-full rounded-full" style={{ width: '85%' }}></div></div>
-                            </div>
-                            <div>
-                                <div className="flex justify-between text-xs font-bold mb-1"><span>Sân số 01 (Lễ tân)</span><span className="text-blue-600">12.5M đ</span></div>
-                                <div className="w-full bg-zinc-100 h-2 rounded-full overflow-hidden"><div className="bg-blue-600 h-full rounded-full" style={{ width: '75%' }}></div></div>
-                            </div>
-                            <div>
-                                <div className="flex justify-between text-xs font-bold mb-1"><span>Sân số 03 (Góc trong)</span><span className="text-blue-600">10.1M đ</span></div>
-                                <div className="w-full bg-zinc-100 h-2 rounded-full overflow-hidden"><div className="bg-blue-600 h-full rounded-full" style={{ width: '60%' }}></div></div>
-                            </div>
-                            <div>
-                                <div className="flex justify-between text-xs font-bold mb-1"><span>Sân số 04 (Tập luyện)</span><span className="text-blue-600">9.0M đ</span></div>
-                                <div className="w-full bg-zinc-100 h-2 rounded-full overflow-hidden"><div className="bg-blue-600 h-full rounded-full" style={{ width: '50%' }}></div></div>
-                            </div>
+                            {[
+                                { name: 'Sân số 02 (Trung tâm)', value: '14.2M đ', pct: 85 },
+                                { name: 'Sân số 01 (Lễ tân)', value: '12.5M đ', pct: 75 },
+                                { name: 'Sân số 03 (Góc trong)', value: '10.1M đ', pct: 60 },
+                                { name: 'Sân số 04 (Tập luyện)', value: '9.0M đ', pct: 50 },
+                            ].map((court, i) => (
+                                <div key={i}>
+                                    <div className="flex justify-between text-xs font-semibold mb-1.5">
+                                        <span className="text-zinc-600">{court.name}</span>
+                                        <span className="text-zinc-800">{court.value}</span>
+                                    </div>
+                                    <div className="w-full bg-zinc-100 h-1.5 rounded-full overflow-hidden">
+                                        <div className="h-full rounded-full bg-gradient-to-r from-lime-500 to-emerald-500 transition-all duration-500" style={{ width: `${court.pct}%` }} />
+                                    </div>
+                                </div>
+                            ))}
                         </div>
                     </div>
-                    <div className="pt-4 border-t border-zinc-100 text-center text-[11px] text-zinc-400">
-                        Dữ liệu cập nhật tự động theo các giao dịch hoàn tất.
+                    <div className="pt-4 mt-4 border-t border-zinc-100 text-center text-[10px] text-zinc-400">
+                        Cập nhật theo giao dịch hoàn tất.
                     </div>
                 </div>
             </div>

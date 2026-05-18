@@ -5,14 +5,10 @@ import { authService } from '../../services/auth/authService';
 
 const AuthModal = ({ isOpen, onClose, initialMode = 'login', onLoginSuccess }) => {
     const [mode, setMode] = useState(initialMode);
-
-    // Form states
     const [phone, setPhone] = useState('');
     const [password, setPassword] = useState('');
     const [fullName, setFullName] = useState('');
     const [email, setEmail] = useState('');
-
-    // State xử lý trạng thái gọi API
     const [isLoading, setIsLoading] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
 
@@ -20,176 +16,160 @@ const AuthModal = ({ isOpen, onClose, initialMode = 'login', onLoginSuccess }) =
     const handleSubmit = async (e) => {
         e.preventDefault();
         setIsLoading(true);
-        setErrorMessage(''); // Xóa lỗi cũ
+        setErrorMessage('');
 
         if (mode === 'login') {
             try {
-                // Gọi sang Laravel: $request->phone và $request->password
                 const response = await authService.login(phone, password);
-
-                // Laravel trả về thành công (200 OK)
                 const { access_token, user } = response.data;
-
-                // 1. Lưu token vào localStorage để các API sau tự động lấy
                 localStorage.setItem('access_token', access_token);
                 localStorage.setItem('current_user', JSON.stringify(user));
-
-                console.log('Đăng nhập thành công:', user);
-
-                // 2. KÍCH HOẠT PHÂN LUỒNG (ADMIN vs USER)
                 if (user.role === 'admin' || user.role === 'staff') {
-                    // Chuyển hướng thẳng sang luồng Dashboard của Admin
                     window.location.href = '/admin';
                 } else {
-                    // Khách hàng thường: Đóng popup, truyền user thật cho Header
                     onLoginSuccess(user);
                     onClose();
                 }
-
             } catch (error) {
                 console.error('Lỗi đăng nhập:', error);
-                if (error.response && error.response.data) {
-                    setErrorMessage(error.response.data.message || 'Thông tin đăng nhập không chính xác');
-                } else {
-                    setErrorMessage('Không thể kết nối đến máy chủ. Vui lòng thử lại!');
-                }
-            } finally {
-                setIsLoading(false);
-            }
-
+                setErrorMessage(error.response?.data?.message || 'Không thể kết nối đến máy chủ.');
+            } finally { setIsLoading(false); }
         } else {
-            // Xử lý Đăng ký (Register)
             try {
                 await authService.register(fullName, phone, email, password);
-                console.log('Đăng ký thành công');
                 setMode('login');
                 setErrorMessage('🎉 Đăng ký thành công! Vui lòng đăng nhập.');
-                setPassword(''); // Xóa trắng mật khẩu
+                setPassword('');
             } catch (error) {
-                if (error.response && error.response.data && error.response.data.errors) {
-                    const firstError = Object.values(error.response.data.errors)[0][0];
-                    setErrorMessage(firstError);
+                if (error.response?.data?.errors) {
+                    setErrorMessage(Object.values(error.response.data.errors)[0][0]);
                 } else {
                     setErrorMessage('Đăng ký thất bại. Vui lòng kiểm tra lại thông tin.');
                 }
-            } finally {
-                setIsLoading(false);
-            }
+            } finally { setIsLoading(false); }
         }
     };
 
-    const backdropVariant = { hidden: { opacity: 0 }, visible: { opacity: 1 } };
-    const modalVariant = {
-        hidden: { opacity: 0, scale: 0.95, y: 15 },
-        visible: { opacity: 1, scale: 1, y: 0, transition: { duration: 0.2, type: 'spring', stiffness: 300, damping: 25 } },
-        exit: { opacity: 0, scale: 0.95, y: 15, transition: { duration: 0.15 } }
-    };
+    const switchMode = (newMode) => { setMode(newMode); setErrorMessage(''); };
 
-    // --- KIỂM TRA AN TOÀN DOM TRƯỚC KHI RENDER PORTAL ---
-    if (!isOpen || typeof document === 'undefined' || !document.body) {
-        return null;
-    }
+    const inputClass = "w-full px-4 py-3 bg-zinc-800/60 border border-zinc-700/60 rounded-xl text-sm font-medium text-white placeholder-zinc-500 focus:outline-none focus:border-lime-400 focus:shadow-[0_0_12px_rgba(163,230,53,0.15)] transition-all duration-300";
+    const labelClass = "block text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2";
+
+    if (!isOpen || typeof document === 'undefined' || !document.body) return null;
 
     return createPortal(
         <AnimatePresence>
             {isOpen && (
                 <motion.div
-                    variants={backdropVariant}
-                    initial="hidden"
-                    animate="visible"
-                    exit="hidden"
+                    initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                     onClick={onClose}
-                    className="fixed top-0 left-0 w-screen h-screen z-[99999] bg-zinc-900/70 backdrop-blur-md flex items-center justify-center p-4 overflow-hidden"
-                >
+                    className="fixed inset-0 z-[99999] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+
                     <motion.div
-                        variants={modalVariant}
-                        initial="hidden"
-                        animate="visible"
-                        exit="exit"
+                        initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                        animate={{ opacity: 1, scale: 1, y: 0, transition: { type: 'spring', stiffness: 300, damping: 25 } }}
+                        exit={{ opacity: 0, scale: 0.95, y: 20, transition: { duration: 0.15 } }}
                         onClick={(e) => e.stopPropagation()}
-                        className="bg-white w-full max-w-md rounded-3xl shadow-2xl border border-zinc-100 overflow-hidden relative my-auto mx-auto"
-                    >
-                        {/* Nút đóng */}
-                        <button onClick={onClose} className="absolute top-5 right-5 w-8 h-8 flex items-center justify-center rounded-full bg-zinc-100 hover:bg-zinc-200 text-zinc-600 transition-colors z-10 focus:outline-none">
+                        className="bg-zinc-900 w-full max-w-md rounded-3xl border border-zinc-800 shadow-2xl shadow-black/40 relative overflow-hidden">
+
+                        {/* Decorative top line */}
+                        <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-lime-500/30 to-transparent" />
+
+                        {/* Close button */}
+                        <button onClick={onClose}
+                            className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white transition-colors z-10">
                             <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41Z" /></svg>
                         </button>
 
-                        {/* Header Modal */}
-                        <div className="px-8 pt-8 pb-6 text-center bg-gradient-to-b from-blue-50/50 to-white">
-                            <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center text-white font-black text-xl tracking-tighter mx-auto mb-3 shadow-md shadow-blue-600/20">NH</div>
-                            <h3 className="text-2xl font-black text-zinc-900 tracking-tight">
-                                {mode === 'login' ? 'Chào mừng trở lại!' : 'Tạo tài khoản NH'}
+                        {/* Header */}
+                        <div className="px-8 pt-8 pb-5 text-center">
+                            <motion.div whileHover={{ rotate: 3, scale: 1.05 }}
+                                className="w-12 h-12 bg-lime-500 rounded-xl flex items-center justify-center text-zinc-950 font-black text-xl tracking-tighter mx-auto mb-4 shadow-lg shadow-lime-500/20">
+                                NH
+                            </motion.div>
+                            <h3 className="text-xl font-extrabold text-white tracking-tight">
+                                {mode === 'login' ? 'Chào mừng trở lại' : 'Tạo tài khoản'}
                             </h3>
-                            <p className="text-xs text-zinc-500 mt-1">
-                                {mode === 'login' ? 'Đăng nhập bằng số điện thoại đã đăng ký.' : 'Trở thành hội viên để nhận ưu đãi cọc tự động.'}
+                            <p className="text-xs text-zinc-500 mt-1.5">
+                                {mode === 'login' ? 'Đăng nhập bằng số điện thoại đã đăng ký.' : 'Trở thành hội viên để nhận ưu đãi đặt sân.'}
                             </p>
+                        </div>
+
+                        {/* Mode tabs */}
+                        <div className="mx-8 mb-5 grid grid-cols-2 bg-zinc-800/60 p-1 rounded-xl">
+                            {['login', 'register'].map(m => (
+                                <button key={m} type="button" onClick={() => switchMode(m)}
+                                    className={`relative py-2.5 rounded-lg text-xs font-bold transition-all duration-300
+                                        ${mode === m ? 'text-zinc-950' : 'text-zinc-500 hover:text-zinc-300'}`}>
+                                    {mode === m && (
+                                        <motion.div layoutId="authModeTab"
+                                            className="absolute inset-0 bg-lime-500 rounded-lg"
+                                            transition={{ type: 'spring', stiffness: 400, damping: 30 }} />
+                                    )}
+                                    <span className="relative z-10">{m === 'login' ? 'Đăng nhập' : 'Đăng ký'}</span>
+                                </button>
+                            ))}
                         </div>
 
                         {/* Form */}
                         <form onSubmit={handleSubmit} className="px-8 pb-8 space-y-4">
 
-                            {/* Hiển thị thông báo lỗi từ Laravel */}
                             {errorMessage && (
-                                <div className={`p-3 rounded-xl text-xs font-bold text-center ${errorMessage.includes('thành công') ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' : 'bg-red-50 text-red-600 border border-red-200'}`}>
+                                <motion.div initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }}
+                                    className={`p-3 rounded-xl text-xs font-semibold text-center ${errorMessage.includes('thành công')
+                                        ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                        : 'bg-red-500/10 text-red-400 border border-red-500/20'}`}>
                                     {errorMessage}
-                                </div>
-                            )}
-
-                            {mode === 'register' && (
-                                <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="space-y-4 overflow-hidden">
-                                    <div>
-                                        <label className="block text-xs font-bold text-zinc-700 uppercase tracking-wider mb-1.5">Họ và tên *</label>
-                                        <input type="text" required placeholder="Vợt thủ NH" value={fullName} onChange={(e) => setFullName(e.target.value)} className="w-full px-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl text-sm text-zinc-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-medium" />
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-bold text-zinc-700 uppercase tracking-wider mb-1.5">Email *</label>
-                                        <input type="email" required placeholder="user@nhbadminton.vn" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full px-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl text-sm text-zinc-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-medium" />
-                                    </div>
                                 </motion.div>
                             )}
 
+                            <AnimatePresence>
+                                {mode === 'register' && (
+                                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
+                                        className="space-y-4 overflow-hidden">
+                                        <div>
+                                            <label className={labelClass}>Họ và tên *</label>
+                                            <input type="text" required placeholder="Nguyễn Văn A" value={fullName} onChange={e => setFullName(e.target.value)} className={inputClass} />
+                                        </div>
+                                        <div>
+                                            <label className={labelClass}>Email *</label>
+                                            <input type="email" required placeholder="email@example.com" value={email} onChange={e => setEmail(e.target.value)} className={inputClass} />
+                                        </div>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+
                             <div>
-                                <label className="block text-xs font-bold text-zinc-700 uppercase tracking-wider mb-1.5">Số điện thoại *</label>
-                                <input
-                                    type="tel"
-                                    required
-                                    placeholder="09xx xxx xxx"
-                                    value={phone}
-                                    onChange={(e) => setPhone(e.target.value)}
-                                    className="w-full px-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl text-sm text-zinc-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-semibold"
-                                />
+                                <label className={labelClass}>Số điện thoại *</label>
+                                <input type="tel" required placeholder="09xx xxx xxx" value={phone} onChange={e => setPhone(e.target.value)} className={inputClass} />
                             </div>
 
                             <div>
-                                <div className="flex items-center justify-between mb-1.5">
-                                    <label className="block text-xs font-bold text-zinc-700 uppercase tracking-wider">Mật khẩu *</label>
-                                    {mode === 'login' && <a href="#" className="text-xs font-semibold text-blue-600 hover:underline">Quên mật khẩu?</a>}
+                                <div className="flex items-center justify-between mb-2">
+                                    <label className={labelClass + ' mb-0'}>Mật khẩu *</label>
+                                    {mode === 'login' && <a href="#" className="text-[10px] font-semibold text-lime-400/70 hover:text-lime-400 transition-colors">Quên mật khẩu?</a>}
                                 </div>
-                                <input
-                                    type="password"
-                                    required
-                                    placeholder="••••••••"
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
-                                    className="w-full px-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl text-sm text-zinc-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                                />
+                                <input type="password" required placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} className={inputClass} />
                             </div>
 
-                            <motion.button whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }} type="submit" disabled={isLoading} className={`w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-lg shadow-blue-600/20 transition-all duration-200 mt-2 text-sm flex items-center justify-center gap-2 ${isLoading ? 'opacity-70 cursor-not-allowed' : ''}`}>
+                            <motion.button type="submit" disabled={isLoading}
+                                whileHover={!isLoading ? { scale: 1.01 } : {}}
+                                whileTap={!isLoading ? { scale: 0.99 } : {}}
+                                className={`w-full py-3.5 bg-lime-500 hover:bg-lime-400 text-zinc-950 font-extrabold rounded-xl text-sm uppercase tracking-wider transition-all shadow-lg shadow-lime-500/15 flex items-center justify-center gap-2 mt-2 ${isLoading ? 'opacity-60 cursor-not-allowed' : ''}`}>
                                 {isLoading ? (
-                                    <><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin block"></span><span>Đang xử lý...</span></>
+                                    <><span className="w-4 h-4 border-2 border-zinc-950 border-t-transparent rounded-full animate-spin" /> Đang xử lý...</>
                                 ) : (
-                                    mode === 'login' ? 'Đăng nhập vào hệ thống' : 'Đăng ký hội viên'
+                                    mode === 'login' ? 'Đăng nhập' : 'Đăng ký hội viên'
                                 )}
                             </motion.button>
 
-                            <div className="pt-4 border-t border-zinc-100 text-center text-xs text-zinc-500 font-medium">
-                                {mode === 'login' ? (
-                                    <>Chưa có tài khoản? <button type="button" onClick={() => { setMode('register'); setErrorMessage(''); }} className="font-bold text-blue-600 hover:underline focus:outline-none">Đăng ký ngay</button></>
-                                ) : (
-                                    <>Đã có tài khoản? <button type="button" onClick={() => { setMode('login'); setErrorMessage(''); }} className="font-bold text-blue-600 hover:underline focus:outline-none">Đăng nhập</button></>
-                                )}
-                            </div>
+                            <p className="text-center text-[11px] text-zinc-600 pt-2">
+                                {mode === 'login' ? 'Chưa có tài khoản? ' : 'Đã có tài khoản? '}
+                                <button type="button" onClick={() => switchMode(mode === 'login' ? 'register' : 'login')}
+                                    className="font-bold text-lime-400 hover:text-lime-300 transition-colors">
+                                    {mode === 'login' ? 'Đăng ký ngay' : 'Đăng nhập'}
+                                </button>
+                            </p>
                         </form>
                     </motion.div>
                 </motion.div>
