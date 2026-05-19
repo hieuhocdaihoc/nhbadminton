@@ -82,4 +82,12 @@ export const adminUserService = {
     getUserDetail: (id) => {
         return axiosClient.get(`/admin/users/${id}`);
     },
+    /**
+     * -------------------------------------------------------------
+     * THỐNG KÊ ĐƠN ĐẶT SÂN CỦA TÀI KHOẢN
+     * -------------------------------------------------------------
+     */
+    getBookingStats: (id) => {
+        return axiosClient.get(`/admin/users/${id}/booking-stats`);
+    },
 };

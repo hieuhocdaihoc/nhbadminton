@@ -270,4 +270,65 @@ class AdminUserController extends Controller
             'message' => 'Đặt lại mật khẩu thành công'
         ]);
     }
+    /**
+     * -------------------------------------------------------------
+     * THỐNG KÊ ĐƠN ĐẶT SÂN CỦA TÀI KHOẢN
+     * -------------------------------------------------------------
+     */
+    public function bookingStats($id)
+    {
+        // Tìm tài khoản theo id
+        $user = User::findOrFail($id);
+
+        // Khởi tạo query lấy các đơn đặt sân của tài khoản này
+        $bookingQuery = $user->bookings();
+
+        // Đếm tổng số đơn
+        $totalBookings = (clone $bookingQuery)->count();
+
+        // Đếm số đơn theo từng trạng thái
+        $pendingBookings = (clone $bookingQuery)->where('status', 'pending')->count();
+        $confirmedBookings = (clone $bookingQuery)->where('status', 'confirmed')->count();
+        $completedBookings = (clone $bookingQuery)->where('status', 'completed')->count();
+        $cancelledBookings = (clone $bookingQuery)->where('status', 'cancelled')->count();
+
+        // Đếm số đơn đã thanh toán
+        $paidBookings = (clone $bookingQuery)->where('payment_status', 'paid')->count();
+
+        // Tính tổng tiền từ các đơn không bị hủy
+        $totalBookingAmount = (clone $bookingQuery)
+            ->where('status', '!=', 'cancelled')
+            ->sum('total_price');
+
+        // Tính tổng tiền đã thanh toán
+        $totalPaidAmount = (clone $bookingQuery)
+            ->where('payment_status', 'paid')
+            ->where('status', '!=', 'cancelled')
+            ->sum('total_price');
+
+        // Trả kết quả về frontend
+        return response()->json([
+            'message' => 'Lấy thống kê đơn đặt sân của tài khoản thành công',
+            'data' => [
+                'user' => [
+                    'id' => $user->id,
+                    'full_name' => $user->full_name,
+                    'phone' => $user->phone,
+                    'email' => $user->email,
+                    'role' => $user->role,
+                    'status' => $user->status,
+                ],
+                'booking_stats' => [
+                    'total_bookings' => $totalBookings,
+                    'pending_bookings' => $pendingBookings,
+                    'confirmed_bookings' => $confirmedBookings,
+                    'completed_bookings' => $completedBookings,
+                    'cancelled_bookings' => $cancelledBookings,
+                    'paid_bookings' => $paidBookings,
+                    'total_booking_amount' => $totalBookingAmount,
+                    'total_paid_amount' => $totalPaidAmount,
+                ]
+            ]
+        ]);
+    }
 }

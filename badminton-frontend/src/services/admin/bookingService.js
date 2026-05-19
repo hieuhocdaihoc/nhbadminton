@@ -48,5 +48,11 @@ export const adminBookingService = {
     addItemToBooking: (bookingId, payload) => {
         // Đường dẫn này map chính xác với Route::post('/bookings/{id}/add-item', ...) bên Laravel của bạn
         return axiosClient.post(`/admin/bookings/${bookingId}/add-item`, payload);
+    },
+    // =========================================================================
+    // 9. LỄ TÂN NHIỀU THÊM MÓN / DỊCH VỤ VÀO ĐƠN ĐANG CHƠI (MỚI THÊM)
+    // =========================================================================
+    addItemsToBooking: (bookingId, payload) => {
+        return axiosClient.post(`/admin/bookings/${bookingId}/add-items`, payload);
     }
 };

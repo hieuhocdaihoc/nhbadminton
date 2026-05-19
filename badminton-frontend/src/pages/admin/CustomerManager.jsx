@@ -15,13 +15,16 @@ const CustomerManager = () => {
 
     const [form, setForm] = useState({
         id: null, full_name: '', email: '', phone: '',
-        password: '', gender: '', date_of_birth: '', 
+        password: '', gender: '', date_of_birth: '',
         membership_level: '', status: 'active'
     });
     const [isEditing, setIsEditing] = useState(false);
 
     const [isDetailOpen, setIsDetailOpen] = useState(false);
     const [detailUser, setDetailUser] = useState(null);
+
+    const [bookingStats, setBookingStats] = useState(null);
+    const [isDetailLoading, setIsDetailLoading] = useState(false);
 
     const [isResetOpen, setIsResetOpen] = useState(false);
     const [resetUser, setResetUser] = useState(null);
@@ -33,7 +36,7 @@ const CustomerManager = () => {
             const params = { page, per_page: 10 };
             if (customSearch.trim() !== '') params.search = customSearch.trim();
             if (customStatus !== '') params.status = customStatus;
-            
+
             const response = await adminUserService.getCustomers(params);
             setCustomers(response.data?.data?.data || []);
             setPagination({
@@ -57,7 +60,7 @@ const CustomerManager = () => {
         setForm({
             id: user.id, full_name: user.full_name || '', email: user.email || '',
             phone: user.phone || '', password: '', gender: user.gender || '',
-            date_of_birth: user.date_of_birth || '', 
+            date_of_birth: user.date_of_birth || '',
             membership_level: user.membership_level || '', status: user.status || 'active'
         });
     };
@@ -66,7 +69,7 @@ const CustomerManager = () => {
         setIsEditing(false);
         setForm({
             id: null, full_name: '', email: '', phone: '',
-            password: '', gender: '', date_of_birth: '', 
+            password: '', gender: '', date_of_birth: '',
             membership_level: '', status: 'active'
         });
     };
@@ -78,8 +81,8 @@ const CustomerManager = () => {
 
         try {
             if (!isEditing) {
-                const payload = { 
-                    ...form, 
+                const payload = {
+                    ...form,
                     role: 'customer',
                     email: form.email || null,
                     gender: form.gender || null,
@@ -92,7 +95,7 @@ const CustomerManager = () => {
                 const payload = {
                     full_name: form.full_name, email: form.email || null,
                     phone: form.phone, gender: form.gender || null,
-                    date_of_birth: form.date_of_birth || null, 
+                    date_of_birth: form.date_of_birth || null,
                     membership_level: form.membership_level || null,
                     status: form.status,
                 };
@@ -110,11 +113,23 @@ const CustomerManager = () => {
     };
 
     const handleViewDetail = async (id) => {
+        setIsDetailLoading(true);
+        setBookingStats(null);
+
         try {
-            const response = await adminUserService.getUserDetail(id);
-            setDetailUser(response.data?.data);
+            const [detailResponse, statsResponse] = await Promise.all([
+                adminUserService.getUserDetail(id),
+                adminUserService.getBookingStats(id),
+            ]);
+
+            setDetailUser(detailResponse.data?.data);
+            setBookingStats(statsResponse.data?.data?.booking_stats || null);
             setIsDetailOpen(true);
-        } catch (error) { alert('Không thể lấy chi tiết khách hàng.'); }
+        } catch (error) {
+            alert('Không thể lấy chi tiết khách hàng.');
+        } finally {
+            setIsDetailLoading(false);
+        }
     };
 
     const handleToggleStatus = async (user) => {
@@ -152,7 +167,7 @@ const CustomerManager = () => {
 
     const totalCustomers = customers.length;
     const activeCustomers = customers.filter((user) => user.status === 'active').length;
-    
+
     const inputClass = "w-full bg-[#f8f8fa] border border-zinc-200 rounded-lg px-3.5 py-2 text-sm text-zinc-800 outline-none focus:border-zinc-400 focus:ring-1 focus:ring-zinc-200 transition-all";
 
     return (
@@ -203,18 +218,18 @@ const CustomerManager = () => {
 
             {/* MAIN CONTENT: 8-4 GRID */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
-                
+
                 {/* TABLE (LEFT) */}
                 <div className="lg:col-span-8 bg-white rounded-xl border border-zinc-200/60 overflow-hidden">
                     <div className="overflow-x-auto">
                         <table className="w-full text-left">
                             <thead className="bg-zinc-50/60 border-b border-zinc-100 text-[10px] font-medium text-zinc-400 uppercase tracking-wider">
                                 <tr>
-                                    <th className="py-3 px-5" style={{width:'240px'}}>Khách hàng</th>
-                                    <th className="py-3 px-3" style={{width:'110px'}}>SĐT</th>
-                                    <th className="py-3 px-3" style={{width:'110px'}}>Thẻ / Điểm</th>
-                                    <th className="py-3 px-3 text-center" style={{width:'100px'}}>Trạng thái</th>
-                                    <th className="py-3 px-5 text-right" style={{width:'160px'}}>Thao tác</th>
+                                    <th className="py-3 px-5" style={{ width: '240px' }}>Khách hàng</th>
+                                    <th className="py-3 px-3" style={{ width: '110px' }}>SĐT</th>
+                                    <th className="py-3 px-3" style={{ width: '110px' }}>Thẻ / Điểm</th>
+                                    <th className="py-3 px-3 text-center" style={{ width: '100px' }}>Trạng thái</th>
+                                    <th className="py-3 px-5 text-right" style={{ width: '160px' }}>Thao tác</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -292,13 +307,13 @@ const CustomerManager = () => {
                             <button onClick={resetFormState} className="text-[10px] font-medium text-zinc-400 hover:text-zinc-600 transition-colors">Hủy sửa</button>
                         )}
                     </div>
-                    
+
                     <form onSubmit={handleSubmitForm} className="space-y-4">
                         <div>
                             <label className="block text-[11px] font-medium text-zinc-500 mb-1.5">Họ tên KH *</label>
                             <input type="text" required value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} className={inputClass} placeholder="Nguyễn Văn A" />
                         </div>
-                        
+
                         <div className="grid grid-cols-2 gap-3">
                             <div>
                                 <label className="block text-[11px] font-medium text-zinc-500 mb-1.5">SĐT *</label>
@@ -347,7 +362,7 @@ const CustomerManager = () => {
                         </div>
 
                         <div className="pt-2">
-                            <button type="submit" disabled={isSaving || !form.full_name.trim()} 
+                            <button type="submit" disabled={isSaving || !form.full_name.trim()}
                                 className={`w-full py-2.5 rounded-lg text-xs font-medium text-white transition-colors ${isEditing ? 'bg-zinc-900 hover:bg-zinc-800' : 'bg-lime-600 hover:bg-lime-700'} ${(isSaving || !form.full_name.trim()) ? 'opacity-60 cursor-not-allowed' : ''}`}>
                                 {isSaving ? 'Đang xử lý...' : isEditing ? 'Lưu thay đổi' : 'Thêm khách hàng'}
                             </button>
@@ -365,7 +380,16 @@ const CustomerManager = () => {
                             className="bg-white w-full max-w-sm rounded-2xl shadow-xl overflow-hidden">
                             <div className="px-6 py-4 border-b border-zinc-100 flex items-center justify-between">
                                 <h3 className="text-sm font-semibold text-zinc-800">Hồ sơ khách hàng</h3>
-                                <button onClick={() => setIsDetailOpen(false)} className="text-zinc-400 hover:text-zinc-600">✕</button>
+                                <button
+                                    onClick={() => {
+                                        setIsDetailOpen(false);
+                                        setDetailUser(null);
+                                        setBookingStats(null);
+                                    }}
+                                    className="text-zinc-400 hover:text-zinc-600">
+
+                                    ✕
+                                </button>
                             </div>
                             <div className="p-6">
                                 <div className="flex items-center gap-4 mb-6">
@@ -386,6 +410,66 @@ const CustomerManager = () => {
                                     <div className="flex justify-between border-b border-zinc-50 pb-2"><span className="text-zinc-500">Giới tính</span><span className="font-medium text-zinc-800">{detailUser.gender === 'male' ? 'Nam' : detailUser.gender === 'female' ? 'Nữ' : 'Khác'}</span></div>
                                     <div className="flex justify-between border-b border-zinc-50 pb-2"><span className="text-zinc-500">Ngày sinh</span><span className="font-medium text-zinc-800">{detailUser.date_of_birth ? new Date(detailUser.date_of_birth).toLocaleDateString('vi-VN') : '—'}</span></div>
                                 </div>
+                                {bookingStats && (
+                                    <div className="mt-6 pt-5 border-t border-zinc-100">
+                                        <h4 className="text-xs font-bold text-zinc-700 uppercase tracking-wide mb-3">
+                                            Thống kê đặt sân
+                                        </h4>
+
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <div className="bg-zinc-50 border border-zinc-100 rounded-xl p-3">
+                                                <p className="text-[10px] text-zinc-400 uppercase">Tổng đơn</p>
+                                                <p className="text-lg font-bold text-zinc-800">
+                                                    {bookingStats.total_bookings}
+                                                </p>
+                                            </div>
+
+                                            <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3">
+                                                <p className="text-[10px] text-emerald-500 uppercase">Hoàn thành</p>
+                                                <p className="text-lg font-bold text-emerald-700">
+                                                    {bookingStats.completed_bookings}
+                                                </p>
+                                            </div>
+
+                                            <div className="bg-amber-50 border border-amber-100 rounded-xl p-3">
+                                                <p className="text-[10px] text-amber-500 uppercase">Chờ xử lý</p>
+                                                <p className="text-lg font-bold text-amber-700">
+                                                    {bookingStats.pending_bookings}
+                                                </p>
+                                            </div>
+
+                                            <div className="bg-red-50 border border-red-100 rounded-xl p-3">
+                                                <p className="text-[10px] text-red-500 uppercase">Đã hủy</p>
+                                                <p className="text-lg font-bold text-red-600">
+                                                    {bookingStats.cancelled_bookings}
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        <div className="mt-4 space-y-2 text-sm">
+                                            <div className="flex justify-between border-b border-zinc-50 pb-2">
+                                                <span className="text-zinc-500">Đơn đã thanh toán</span>
+                                                <span className="font-semibold text-zinc-800">
+                                                    {bookingStats.paid_bookings}
+                                                </span>
+                                            </div>
+
+                                            <div className="flex justify-between border-b border-zinc-50 pb-2">
+                                                <span className="text-zinc-500">Tổng tiền đặt sân</span>
+                                                <span className="font-semibold text-zinc-800">
+                                                    {Number(bookingStats.total_booking_amount || 0).toLocaleString('vi-VN')}đ
+                                                </span>
+                                            </div>
+
+                                            <div className="flex justify-between">
+                                                <span className="text-zinc-500">Tổng tiền đã thanh toán</span>
+                                                <span className="font-semibold text-emerald-600">
+                                                    {Number(bookingStats.total_paid_amount || 0).toLocaleString('vi-VN')}đ
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </motion.div>
                     </div>
@@ -413,7 +497,7 @@ const CustomerManager = () => {
                                     <input type="password" required minLength={6} value={resetForm.password_confirmation} onChange={(e) => setResetForm({ ...resetForm, password_confirmation: e.target.value })} className={inputClass} placeholder="Nhập lại mật khẩu" />
                                 </div>
                                 <div className="pt-2">
-                                    <button type="submit" disabled={isSaving || resetForm.password !== resetForm.password_confirmation} 
+                                    <button type="submit" disabled={isSaving || resetForm.password !== resetForm.password_confirmation}
                                         className={`w-full py-2.5 rounded-lg text-xs font-medium text-white transition-colors bg-amber-500 hover:bg-amber-600 ${(isSaving || resetForm.password !== resetForm.password_confirmation) ? 'opacity-60 cursor-not-allowed' : ''}`}>
                                         {isSaving ? 'Đang xử lý...' : 'Xác nhận cấp lại'}
                                     </button>

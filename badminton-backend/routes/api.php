@@ -1,113 +1,116 @@
 <?php
 
-use App\Http\Controllers\Api\AuthController;
-use App\Http\Controllers\Api\Admin\CourtController;
-use App\Http\Controllers\Api\Admin\CourtPricingController;
-use App\Http\Controllers\Api\Admin\ImageController;
-use App\Http\Controllers\Api\Admin\BookingController as AdminBooking;
-use App\Http\Controllers\Api\User\BookingController as UserBooking;
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\Api\Admin\AdditionalServiceController;
-use App\Http\Controllers\Api\Admin\CategoryController;
-use App\Http\Controllers\Api\Admin\SupplierController;
-use App\Http\Controllers\Api\Admin\ProductController;
-use App\Http\Controllers\Api\Admin\PurchaseOrderController;
-use App\Http\Controllers\Api\Admin\InventoryTransactionController;
-use App\Http\Controllers\Api\Admin\AdminUserController;
+use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\User\BookingController as UserBooking;
+use App\Http\Controllers\Api\Admin\{
+    AdminUserController,
+    AdditionalServiceController,
+    BookingController as AdminBooking,
+    CategoryController,
+    CourtController,
+    CourtPricingController,
+    ImageController,
+    InventoryTransactionController,
+    ProductController,
+    PurchaseOrderController,
+    SupplierController
+};
+
 /*
 |--------------------------------------------------------------------------
-| API Routes
+| 1. PUBLIC ENDPOINTS (CÔNG KHAI)
 |--------------------------------------------------------------------------
 */
-
-// =============================================================================
-// 1. NHÓM API CÔNG KHAI (Mở hoàn toàn cho Khách Vãng Lai - KHÔNG yêu cầu Token)
-// =============================================================================
-
-// Luồng xác thực danh tính
+// Xác thực
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login'])->name('login');
 
-// Phân hệ tra cứu Sân và Bảng giá tham khảo
+// Tra cứu sân & bảng giá công khai
 Route::get('/courts', [CourtController::class, 'getPublicCourts']);
 Route::get('/courts/{id}', [CourtController::class, 'show']);
 Route::get('/courts/{id}/pricing', [CourtPricingController::class, 'getPublicPricing']);
 Route::post('/courts/calculate-price', [CourtPricingController::class, 'calculatePrice']);
 
-// Luồng đặt sân cốt lõi: Xem giờ trống và Tiếp nhận Đơn đặt hàng
+// Lịch trống & Đặt sân lẻ
 Route::get('/courts/{id}/availability', [UserBooking::class, 'getCourtAvailability']);
-Route::post('/bookings', [UserBooking::class, 'store']); // Đưa ra Public để tiếp nhận đơn lẻ
+Route::post('/bookings', [UserBooking::class, 'store']);
 
-
-// =============================================================================
-// 2. NHÓM API BẢO MẬT (Yêu cầu Token hợp lệ qua cơ chế Middleware Sanctum)
-// =============================================================================
+/*
+|--------------------------------------------------------------------------
+| 2. AUTHENTICATED ENDPOINTS (BẢO MẬT VỚI SANCTUM)
+|--------------------------------------------------------------------------
+*/
 Route::middleware('auth:sanctum')->group(function () {
 
-    // --- PHÂN HỆ NGƯỜI DÙNG THÀNH VIÊN ---
+    // --- PHÂN HỆ KHÁCH HÀNG THÀNH VIÊN ---
     Route::get('/user/bookings', [UserBooking::class, 'getUserBookings']);
 
-    // Hồ sơ tài khoản
-    Route::get('/profile', [AuthController::class, 'getProfile']);
-    Route::put('/update-profile', [AuthController::class, 'updateProfile']);
-    Route::post('/change-password', [AuthController::class, 'changePassword']);
-    Route::post('/logout', [AuthController::class, 'logout']);
-    Route::post('/logout-all', [AuthController::class, 'logoutAllDevices']);
+    Route::controller(AuthController::class)->group(function () {
+        Route::get('/profile', 'getProfile');
+        Route::put('/update-profile', 'updateProfile');
+        Route::post('/change-password', 'changePassword');
+        Route::post('/logout', 'logout');
+        Route::post('/logout-all', 'logoutAllDevices');
+        Route::post('/address', 'addAddress');
+        Route::put('/address/{id}', 'updateAddress');
+    });
 
-    // Sổ địa chỉ liên hệ
-    Route::post('/address', [AuthController::class, 'addAddress']);
-    Route::put('/address/{id}', [AuthController::class, 'updateAddress']);
-
-
-    // --- PHÂN HỆ QUẢN TRỊ HỆ THỐNG (ADMIN DASHBOARD) ---
+    // --- PHÂN HỆ QUẢN TRỊ (ADMIN / LỄ TÂN) ---
     Route::prefix('admin')->group(function () {
 
-        // CRUD Quản lý danh mục Sân & Giá
-        Route::apiResource('courts', CourtController::class);
-        Route::post('court-pricing/calculate', [CourtPricingController::class, 'calculatePrice']);
-        Route::apiResource('court-pricing', CourtPricingController::class);
+        // Quản lý User / Nhân viên
+        Route::controller(AdminUserController::class)->group(function () {
+            Route::get('/users', 'index');
+            Route::post('/users', 'store');
+            Route::get('/users/{id}', 'show');
+            Route::put('/users/{id}', 'update');
+            Route::get('/users/{id}/booking-stats', 'bookingStats');
+            Route::patch('/users/{id}/status', 'updateStatus');
+            Route::patch('/users/{id}/reset-password', 'resetPassword');
+        });
 
-        // Upload hình ảnh đính kèm
+        // Quản lý Đơn đặt sân & Bán thêm món
+        Route::controller(AdminBooking::class)->group(function () {
+            Route::get('/bookings/today', 'getTodayBookings');
+            Route::get('/bookings/single', 'getSingleBookings');
+            Route::get('/bookings/recurring', 'getRecurringMasters');
+            Route::get('/bookings/recurring/{id}/sessions', 'getRecurringSessions');
+            Route::get('/bookings/search', 'searchBookings');
+            Route::patch('/bookings/{id}/status', 'updateStatus');
+            Route::patch('/bookings/details/{detailId}/reschedule', 'reschedule');
+            Route::post('/bookings/{id}/add-item', 'addItemToBooking');
+            Route::post('/bookings/{id}/add-items', 'addItemsToBooking');
+        });
+
+        // Quản lý Nhập kho (Phiếu nhập)
+        Route::controller(PurchaseOrderController::class)->group(function () {
+            Route::get('purchase-orders', 'index');
+            Route::get('purchase-orders/{id}', 'show');
+            Route::post('purchase-orders', 'store');
+        });
+
+        // Quản lý Sổ cái kho & Kiểm kho thủ công
+        Route::controller(InventoryTransactionController::class)->group(function () {
+            Route::get('inventory-history', 'index');
+            Route::post('inventory-adjustment', 'store');
+        });
+
+        // Quản lý Hình ảnh
         Route::post('images', [ImageController::class, 'store']);
         Route::delete('images/{id}', [ImageController::class, 'destroy']);
 
-        // Phân hệ kiểm soát đơn đặt hàng của Ban Quản Lý
-        Route::get('/bookings/today', [AdminBooking::class, 'getTodayBookings']);
-        Route::get('/bookings/single', [AdminBooking::class, 'getSingleBookings']);
-        Route::get('/bookings/recurring', [AdminBooking::class, 'getRecurringMasters']);
-        Route::get('/bookings/recurring/{id}/sessions', [AdminBooking::class, 'getRecurringSessions']);
-        Route::patch('/bookings/details/{detailId}/reschedule', [AdminBooking::class, 'reschedule']);
-        Route::post('/bookings/{id}/add-item', [App\Http\Controllers\Api\Admin\BookingController::class, 'addItemToBooking']);
-        Route::get('/bookings/search', [AdminBooking::class, 'searchBookings']);
-        // Quản lý Dịch vụ / Hàng hóa bán kèm
-        Route::apiResource('services', AdditionalServiceController::class);
-        // Quản lý Danh mục sản phẩm (Nước uống, Quả cầu...)
-        Route::apiResource('categories', CategoryController::class);
+        // Tính giá sân (Nút bấm thử cho Admin)
+        Route::post('court-pricing/calculate', [CourtPricingController::class, 'calculatePrice']);
 
-        // Quản lý Nhà cung cấp (Tạp hóa, Đại lý đồ thể thao...)
-        Route::apiResource('suppliers', SupplierController::class);
-
-        // Cập nhật trạng thái thanh toán và quy trình xử lý đơn
-        Route::patch('/bookings/{id}/status', [AdminBooking::class, 'updateStatus']);
-        // Quản lý Hàng hóa / Sản phẩm (Cần quản lý tồn kho)
-        Route::apiResource('products', ProductController::class);
-
-        // Quản lý Nhập Kho & Lịch sử
-        // Phiếu nhập kho làm xong là chốt sổ, không có chuyện sửa hay xóa để đảm bảo luồng kế toán.
-        // Nên ta chỉ dùng 3 hàm: index (xem danh sách), show (xem chi tiết) và store (tạo mới)
-        Route::get('purchase-orders', [PurchaseOrderController::class, 'index']);
-        Route::get('purchase-orders/{id}', [PurchaseOrderController::class, 'show']);
-        Route::post('purchase-orders', [PurchaseOrderController::class, 'store']);
-        // Quản lý và xem báo cáo Biến động kho
-        Route::get('inventory-history', [InventoryTransactionController::class, 'index']);
-        Route::post('inventory-adjustment', [InventoryTransactionController::class, 'store']);
-
-        Route::get('/users', [AdminUserController::class, 'index']);
-        Route::post('/users', [AdminUserController::class, 'store']);
-        Route::get('/users/{id}', [AdminUserController::class, 'show']);
-        Route::put('/users/{id}', [AdminUserController::class, 'update']);
-        Route::patch('/users/{id}/status', [AdminUserController::class, 'updateStatus']);
-        Route::patch('/users/{id}/reset-password', [AdminUserController::class, 'resetPassword']);
-
+        // Các bộ API CRUD nền tảng (Sân, Giá, Dịch vụ, Danh mục, Đối tác, Sản phẩm)
+        Route::apiResources([
+            'courts' => CourtController::class,
+            'court-pricing' => CourtPricingController::class,
+            'services' => AdditionalServiceController::class,
+            'categories' => CategoryController::class,
+            'suppliers' => SupplierController::class,
+            'products' => ProductController::class,
+        ]);
     });
 });

@@ -351,4 +351,118 @@ class BookingController extends Controller
             ]);
         });
     }
+
+    // =========================================================================
+// LỄ TÂN: THÊM NHIỀU DỊCH VỤ / SẢN PHẨM VÀO HÓA ĐƠN ĐANG CHƠI
+// =========================================================================
+    public function addItemsToBooking(Request $request, $bookingId)
+    {
+        $request->validate([
+            'items' => 'required|array|min:1',
+            'items.*.type' => 'required|in:product,service',
+            'items.*.item_id' => 'required|string',
+            'items.*.quantity' => 'required|integer|min:1',
+            'items.*.note' => 'nullable|string',
+        ]);
+
+        $user = $request->user('sanctum');
+
+        return DB::transaction(function () use ($request, $bookingId, $user) {
+            $booking = Booking::lockForUpdate()->findOrFail($bookingId);
+
+            $createdDetails = [];
+            $totalAddedAmount = 0;
+
+            foreach ($request->items as $item) {
+                $quantity = $item['quantity'];
+                $unitPrice = 0;
+                $productId = null;
+                $serviceId = null;
+
+                // -------------------------------------------------------------
+                // TRƯỜNG HỢP 1: SẢN PHẨM CÓ TRỪ KHO
+                // -------------------------------------------------------------
+                if ($item['type'] === 'product') {
+                    $product = Product::lockForUpdate()->findOrFail($item['item_id']);
+
+                    if ($product->stock_quantity < $quantity) {
+                        throw new \Exception("Sản phẩm {$product->name} chỉ còn {$product->stock_quantity} trong kho.");
+                    }
+
+                    $unitPrice = $product->selling_price;
+                    $productId = $product->id;
+
+                    $beforeQty = $product->stock_quantity;
+                    $afterQty = $beforeQty - $quantity;
+
+                    $product->update([
+                        'stock_quantity' => $afterQty,
+                        'sold_count' => $product->sold_count + $quantity,
+                    ]);
+
+                    InventoryTransaction::create([
+                        'product_id' => $productId,
+                        'transaction_type' => 'sale',
+                        'quantity' => -$quantity,
+                        'before_quantity' => $beforeQty,
+                        'after_quantity' => $afterQty,
+                        'reference_type' => 'booking',
+                        'reference_id' => $booking->id,
+                        'note' => "Bán cho hóa đơn {$booking->booking_code}",
+                        'created_by' => $user ? $user->id : null,
+                    ]);
+                }
+
+                // -------------------------------------------------------------
+                // TRƯỜNG HỢP 2: DỊCH VỤ KHÔNG TRỪ KHO
+                // -------------------------------------------------------------
+                if ($item['type'] === 'service') {
+                    $service = AdditionalService::findOrFail($item['item_id']);
+
+                    if ($service->status === 'inactive') {
+                        throw new \Exception("Dịch vụ {$service->name} hiện đang tạm ngưng.");
+                    }
+
+                    $unitPrice = $service->price;
+                    $serviceId = $service->id;
+                }
+
+                // -------------------------------------------------------------
+                // GHI CHI TIẾT HÓA ĐƠN
+                // -------------------------------------------------------------
+                $totalPrice = $unitPrice * $quantity;
+                $totalAddedAmount += $totalPrice;
+
+                $detail = BookingServiceDetail::create([
+                    'booking_id' => $booking->id,
+                    'product_id' => $productId,
+                    'service_id' => $serviceId,
+                    'quantity' => $quantity,
+                    'unit_price' => $unitPrice,
+                    'total_price' => $totalPrice,
+                    'note' => $item['note'] ?? null,
+                ]);
+
+                $createdDetails[] = $detail;
+            }
+
+            // -------------------------------------------------------------
+            // CẬP NHẬT TỔNG TIỀN BILL SAU KHI THÊM TẤT CẢ MÓN
+            // -------------------------------------------------------------
+            $booking->update([
+                'subtotal_service' => $booking->subtotal_service + $totalAddedAmount,
+                'total_price' => $booking->total_price + $totalAddedAmount,
+            ]);
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Đã thêm danh sách món vào hóa đơn thành công!',
+                'data' => [
+                    'booking_id' => $booking->id,
+                    'total_added_amount' => $totalAddedAmount,
+                    'details' => $createdDetails,
+                ],
+            ], 201);
+        });
+    }
 }
