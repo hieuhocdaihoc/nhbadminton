@@ -7,15 +7,16 @@ use App\Models\Booking;
 use App\Models\RecurringBooking;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
-use App\Models\Product;              // THÊM DÒNG NÀY
-use App\Models\AdditionalService;    // THÊM DÒNG NÀY
-use App\Models\BookingServiceDetail; // THÊM DÒNG NÀY
-use App\Models\InventoryTransaction; // THÊM DÒNG NÀY
+use App\Models\Product;              
+use App\Models\AdditionalService;    
+use App\Models\BookingServiceDetail; 
+use App\Models\InventoryTransaction; 
 use Illuminate\Support\Facades\DB;
 
 
 class BookingController extends Controller
-{
+{   
+    //xem  danh sách các ca chơi hôm nay (dành cho lễ tân)
     public function getTodayBookings()
     {
         $today = \Carbon\Carbon::now()->format('Y-m-d');
@@ -101,17 +102,44 @@ class BookingController extends Controller
         ]);
     }
 
-    public function updateStatus(Request $request, $bookingId)
-    {
-        $request->validate(['status' => 'required|in:confirmed,cancelled,completed,paid', 'payment_status' => 'nullable|in:unpaid,partially_paid,paid']);
+        public function updateStatus(Request $request, $bookingId)
+        {
+        $request->validate([
+            'status' => 'required|in:pending,confirmed,cancelled,completed,paid',
+            'payment_status' => 'nullable|in:unpaid,partially_paid,paid'
+        ]);
+
         $booking = Booking::findOrFail($bookingId);
+
         $booking->status = $request->status;
+
         if ($request->has('payment_status')) {
             $booking->payment_status = $request->payment_status;
+
+            // Nếu xác nhận đã thu đủ tiền
+            if ($request->payment_status === 'paid') {
+                $booking->deposit_amount = $booking->total_price;
+                $booking->remaining_amount = 0;
+            }
+
+            // Nếu đưa về chưa thanh toán
+            if ($request->payment_status === 'unpaid') {
+                $booking->deposit_amount = 0;
+                $booking->remaining_amount = $booking->total_price;
+            }
+
+            // Nếu chỉ mới thanh toán một phần thì giữ nguyên deposit_amount và remaining_amount
+            // Trạng thái này thường xảy ra khi khách đã trả tiền sân nhưng phát sinh thêm Pro-shop.
         }
+
         $booking->save();
-        return response()->json(['status' => 'success', 'message' => 'Cập nhật trạng thái thành công!', 'data' => $booking]);
-    }
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Cập nhật trạng thái thành công!',
+            'data' => $booking
+        ]);
+        }
 
 
     // =========================================================================
@@ -340,9 +368,18 @@ class BookingController extends Controller
                 'note' => $request->note
             ]);
 
-            // 2. Cộng dồn tiền vào tổng Bill
-            $booking->increment('subtotal_service', $totalPrice);
-            $booking->increment('total_price', $totalPrice);
+            // 2. Cộng dồn tiền dịch vụ vào bill
+            $newSubtotalService = (float) $booking->subtotal_service + $totalPrice;
+            $newTotalPrice = (float) $booking->total_price + $totalPrice;
+            $newRemainingAmount = (float) $booking->remaining_amount + $totalPrice;
+
+            // Nếu phát sinh thêm dịch vụ thì số tiền đó là khoản còn phải thu
+            $booking->update([
+                'subtotal_service' => $newSubtotalService,
+                'total_price' => $newTotalPrice,
+                'remaining_amount' => $newRemainingAmount,
+                'payment_status' => $newRemainingAmount > 0 ? 'partially_paid' : 'paid',
+            ]);
 
             return response()->json([
                 'status' => 'success',
@@ -449,9 +486,17 @@ class BookingController extends Controller
             // -------------------------------------------------------------
             // CẬP NHẬT TỔNG TIỀN BILL SAU KHI THÊM TẤT CẢ MÓN
             // -------------------------------------------------------------
+            $newSubtotalService = (float) $booking->subtotal_service + $totalAddedAmount;
+            $newTotalPrice = (float) $booking->total_price + $totalAddedAmount;
+            $newRemainingAmount = (float) $booking->remaining_amount + $totalAddedAmount;
+
+            // Khi thêm Pro-shop, phần tiền phát sinh này phải được cộng vào tiền còn phải thu.
+            // Nếu trước đó khách đã trả tiền sân rồi, hệ thống sẽ chuyển sang partially_paid.
             $booking->update([
-                'subtotal_service' => $booking->subtotal_service + $totalAddedAmount,
-                'total_price' => $booking->total_price + $totalAddedAmount,
+                'subtotal_service' => $newSubtotalService,
+                'total_price' => $newTotalPrice,
+                'remaining_amount' => $newRemainingAmount,
+                'payment_status' => $newRemainingAmount > 0 ? 'partially_paid' : 'paid',
             ]);
 
             return response()->json([

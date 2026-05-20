@@ -62,4 +62,13 @@ class Booking extends Model
         // Laravel sẽ tự động biến đổi tên hàm camelCase này thành snake_case "service_details" khi trả về dạng JSON cho React
         return $this->hasMany(BookingServiceDetail::class, 'booking_id', 'id');
     }
+    /**
+     * -------------------------------------------------------------
+     * QUAN HỆ VỚI THANH TOÁN
+     * -------------------------------------------------------------
+     */
+    public function payments()
+    {
+        return $this->hasMany(Payment::class, 'booking_id', 'id');
+    }
 }

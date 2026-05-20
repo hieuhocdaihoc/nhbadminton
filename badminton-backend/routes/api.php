@@ -16,6 +16,7 @@ use App\Http\Controllers\Api\Admin\{
     PurchaseOrderController,
     SupplierController
 };
+use App\Http\Controllers\Api\Payment\SePayController;
 
 /*
 |--------------------------------------------------------------------------
@@ -31,6 +32,10 @@ Route::get('/courts', [CourtController::class, 'getPublicCourts']);
 Route::get('/courts/{id}', [CourtController::class, 'show']);
 Route::get('/courts/{id}/pricing', [CourtPricingController::class, 'getPublicPricing']);
 Route::post('/courts/calculate-price', [CourtPricingController::class, 'calculatePrice']);
+// Webhook nhận thông báo thanh toán từ SePay
+Route::post('/sepay/webhook', [SePayController::class, 'webhook']);
+// Lấy thông tin thanh toán và QR chuyển khoản của đơn đặt sân
+Route::get('/bookings/{id}/payment-info', [SePayController::class, 'paymentInfo']);
 
 // Lịch trống & Đặt sân lẻ
 Route::get('/courts/{id}/availability', [UserBooking::class, 'getCourtAvailability']);

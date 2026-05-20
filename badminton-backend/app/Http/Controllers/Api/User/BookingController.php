@@ -15,31 +15,41 @@ use Illuminate\Support\Str;
 class BookingController extends Controller
 {
     // =========================================================================
-    // 1. API CÔNG KHAI: Tra cứu lưới giờ khả dụng (Hỗ trợ trả về mảng Grid cho UI)
+    // 1. API CÔNG KHAI: Tra cứu lưới giờ khả dụng
     // =========================================================================
     public function getCourtAvailability(Request $request, $courtId)
     {
-        $request->validate(['date' => 'required|date']);
+        $request->validate([
+            'date' => 'required|date'
+        ]);
+
         $targetDate = $request->date;
         $todayStr = now()->format('Y-m-d');
 
-        // Bỏ qua nếu User chọn ngày trong quá khứ
+        // Không trả lịch nếu user chọn ngày quá khứ
         if ($targetDate < $todayStr) {
-            return response()->json(['status' => 'success', 'data' => []]);
+            return response()->json([
+                'status' => 'success',
+                'data' => []
+            ]);
         }
 
-        // Truy vấn các ca chơi đã được giữ chỗ (Không tính đơn đã hủy)
+        // Lấy các khung giờ đã bận, không tính đơn đã hủy
         $busySlots = BookingDetail::where('court_id', $courtId)
             ->where('booking_date', $targetDate)
             ->whereHas('booking', function ($query) {
                 $query->where('status', '!=', 'cancelled');
-            })->get();
+            })
+            ->get();
 
-        // Chế độ Grid: Dành cho giao diện đặt sân của User (Hiển thị từng block 60p kèm giá)
+        // Chế độ grid dùng cho giao diện đặt sân
         if ($request->query('mode') === 'grid') {
             $dayType = (date('N', strtotime($targetDate)) >= 6) ? 'weekend' : 'weekday';
+
             $pricings = CourtPricing::where('court_id', $courtId)
-                ->where('day_type', $dayType)->orderBy('start_time')->get();
+                ->where('day_type', $dayType)
+                ->orderBy('start_time')
+                ->get();
 
             $gridSlots = [];
             $currentTimeStr = now()->format('H:i');
@@ -53,14 +63,15 @@ class BookingController extends Controller
                     $slotStart = $start->format('H:i');
                     $slotEnd = $start->copy()->addMinutes(60)->format('H:i');
 
-                    // Kiểm tra block này có nằm trong khung giờ bận hay không
+                    // Kiểm tra block này có bị trùng với booking nào không
                     $isBusy = $busySlots->contains(function ($b) use ($slotStart, $slotEnd) {
                         $bStart = substr($b->start_time, 0, 5);
                         $bEnd = substr($b->end_time, 0, 5);
+
                         return ($slotStart < $bEnd) && ($slotEnd > $bStart);
                     });
 
-                    // Tự động khóa các block giờ đã trôi qua nếu xem lịch ngày hôm nay
+                    // Nếu là hôm nay thì khóa các giờ đã qua
                     $isPassed = $isToday && ($slotStart <= $currentTimeStr);
 
                     $gridSlots[] = [
@@ -70,13 +81,18 @@ class BookingController extends Controller
                         'price' => $pricing->price,
                         'is_available' => (!$isBusy && !$isPassed)
                     ];
+
                     $start->addMinutes(60);
                 }
             }
-            return response()->json(['status' => 'success', 'data' => $gridSlots]);
+
+            return response()->json([
+                'status' => 'success',
+                'data' => $gridSlots
+            ]);
         }
 
-        // Chế độ mặc định: Trả về danh sách giờ bận tóm tắt
+        // Chế độ mặc định: trả về các khung giờ bận
         $formattedBusy = $busySlots->map(function ($item) {
             return [
                 'start_time' => substr($item->start_time, 0, 5),
@@ -85,11 +101,16 @@ class BookingController extends Controller
             ];
         });
 
-        return response()->json(['status' => 'success', 'data' => ['busy_slots' => $formattedBusy]]);
+        return response()->json([
+            'status' => 'success',
+            'data' => [
+                'busy_slots' => $formattedBusy
+            ]
+        ]);
     }
 
     // =========================================================================
-    // 2. API CHỐT ĐẶT SÂN: Xử lý lưu đơn hàng (Phân quyền động theo Booking Type)
+    // 2. API CHỐT ĐẶT SÂN
     // =========================================================================
     public function store(Request $request)
     {
@@ -99,13 +120,13 @@ class BookingController extends Controller
             'customer_name' => 'required|string|max:100',
             'customer_phone' => 'required|string|max:20',
 
-            // Validate quy tắc đặt lẻ
+            // Đặt lẻ
             'slots' => 'required_if:booking_type,single|array',
             'slots.*.date' => 'required_with:slots|date',
             'slots.*.start' => 'required_with:slots|date_format:H:i',
-            'slots.*.end' => 'required_with:slots|date_format:H:i|after:slots.*.start',
+            'slots.*.end' => 'required_with:slots|date_format:H:i',
 
-            // Validate quy tắc đặt định kỳ
+            // Đặt định kỳ
             'start_date' => 'required_if:booking_type,recurring|date',
             'end_date' => 'required_if:booking_type,recurring|date|after_or_equal:start_date',
             'day_of_week' => 'required_if:booking_type,recurring|integer|min:1|max:7',
@@ -113,16 +134,26 @@ class BookingController extends Controller
             'end_time' => 'required_if:booking_type,recurring|date_format:H:i|after:start_time',
         ]);
 
-        // Lấy thông tin tài khoản nếu request có gửi kèm Bearer Token
+        // Lấy user nếu có token
         $user = $request->user('sanctum');
         $userId = $user ? $user->id : null;
 
         // ---------------------------------------------------------------------
-        // KỊCH BẢN A: ĐẶT LẺ (SINGLE) -> Mở cửa tự do cho cả khách vãng lai
+        // KỊCH BẢN A: ĐẶT LẺ
         // ---------------------------------------------------------------------
         if ($request->booking_type === 'single') {
 
-            // Kiểm tra trước rủi ro đụng lịch ngầm
+            // Validate lại end > start cho từng slot
+            foreach ($request->slots as $slot) {
+                if ($slot['end'] <= $slot['start']) {
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => "Khung giờ {$slot['start']}-{$slot['end']} không hợp lệ!"
+                    ], 400);
+                }
+            }
+
+            // Kiểm tra trùng lịch trước khi tạo đơn
             foreach ($request->slots as $slot) {
                 if ($this->checkSlotBusy($request->court_id, $slot['date'], $slot['start'], $slot['end'])) {
                     return response()->json([
@@ -133,64 +164,117 @@ class BookingController extends Controller
             }
 
             return DB::transaction(function () use ($request, $userId) {
-                // Khóa record Sân để tránh Race Condition (2 người đặt cùng lúc)
-                DB::table('courts')->where('id', $request->court_id)->lockForUpdate()->first();
+                // Khóa sân để hạn chế race condition khi nhiều người đặt cùng lúc
+                DB::table('courts')
+                    ->where('id', $request->court_id)
+                    ->lockForUpdate()
+                    ->first();
 
-                $bookingId = (string) Str::uuid();
-                $totalPrice = 0;
-                $detailsToInsert = [];
+                /**
+                 * Chia slot thành các nhóm liên tiếp.
+                 *
+                 * Ví dụ:
+                 * 17:00-18:00 + 18:00-19:00
+                 * => cùng 1 booking_id
+                 *
+                 * 08:00-10:00 + 14:00-16:00
+                 * => tách thành 2 booking_id khác nhau
+                 */
+                $slotGroups = $this->groupContinuousSlots($request->slots);
 
-                foreach ($request->slots as $slot) {
-                    $slotPrice = $this->internalCalculatePrice($request->court_id, $slot['date'], $slot['start'], $slot['end']);
-                    $totalPrice += $slotPrice;
-                    $minutes = (strtotime($slot['end']) - strtotime($slot['start'])) / 60;
+                $createdBookings = [];
+                $paymentBookingId = null;
+                $grandTotal = 0;
 
-                    $detailsToInsert[] = [
-                        'id' => (string) Str::uuid(),
+                foreach ($slotGroups as $group) {
+                    $bookingId = (string) Str::uuid();
+                    $bookingCode = 'BILL_' . strtoupper(Str::random(6));
+                    $bookingTotal = 0;
+                    $detailsToInsert = [];
+
+                    foreach ($group as $slot) {
+                        $slotPrice = $this->internalCalculatePrice(
+                            $request->court_id,
+                            $slot['date'],
+                            $slot['start'],
+                            $slot['end']
+                        );
+
+                        $bookingTotal += $slotPrice;
+                        $grandTotal += $slotPrice;
+
+                        $minutes = (strtotime($slot['end']) - strtotime($slot['start'])) / 60;
+
+                        $detailsToInsert[] = [
+                            'id' => (string) Str::uuid(),
+                            'booking_id' => $bookingId,
+                            'court_id' => $request->court_id,
+                            'booking_date' => $slot['date'],
+                            'start_time' => $slot['start'] . ':00',
+                            'end_time' => $slot['end'] . ':00',
+                            'duration_minutes' => $minutes,
+                            'price_per_hour' => ($minutes > 0) ? ($slotPrice / ($minutes / 60)) : 0,
+                            'price' => $slotPrice
+                        ];
+                    }
+
+                    Booking::insert([
+                        'id' => $bookingId,
+                        'booking_code' => $bookingCode,
+                        'user_id' => $userId,
+                        'recurring_booking_id' => null,
+                        'subtotal_court' => $bookingTotal,
+                        'subtotal_service' => 0,
+                        'discount_amount' => 0,
+                        'total_price' => $bookingTotal,
+                        'deposit_amount' => 0,
+                        'remaining_amount' => $bookingTotal,
+                        'customer_name' => $request->customer_name,
+                        'customer_phone' => $request->customer_phone,
+                        'status' => 'pending',
+                        'payment_status' => 'unpaid',
+                        'created_at' => now()
+                    ]);
+
+                    BookingDetail::insert($detailsToInsert);
+
+                    if (!$paymentBookingId) {
+                        $paymentBookingId = $bookingId;
+                    }
+
+                    $createdBookings[] = [
                         'booking_id' => $bookingId,
-                        'court_id' => $request->court_id,
-                        'booking_date' => $slot['date'],
-                        'start_time' => $slot['start'] . ':00',
-                        'end_time' => $slot['end'] . ':00',
-                        'duration_minutes' => $minutes,
-                        'price_per_hour' => ($minutes > 0) ? ($slotPrice / ($minutes / 60)) : 0,
-                        'price' => $slotPrice
+                        'booking_code' => $bookingCode,
+                        'total_price' => $bookingTotal,
+                        'slots_count' => count($group),
+                        'start_time' => $group[0]['start'],
+                        'end_time' => $group[count($group) - 1]['end'],
                     ];
                 }
 
-                // Ghi nhận hóa đơn (Nếu vãng lai thì user_id sẽ tự động lưu giá trị NULL)
-                Booking::insert([
-                    'id' => $bookingId,
-                    'booking_code' => 'BILL_' . strtoupper(Str::random(6)),
-                    'user_id' => $userId,
-                    'recurring_booking_id' => null,
-                    'subtotal_court' => $totalPrice,
-                    'total_price' => $totalPrice,
-                    'deposit_amount' => 0,
-                    'remaining_amount' => $totalPrice,
-                    'customer_name' => $request->customer_name,
-                    'customer_phone' => $request->customer_phone,
-                    'status' => 'pending',
-                    'payment_status' => 'unpaid',
-                    'created_at' => now()
-                ]);
-
-                BookingDetail::insert($detailsToInsert);
-
                 return response()->json([
                     'status' => 'success',
-                    'message' => 'Đặt sân lẻ thành công!',
-                    'data' => ['booking_id' => $bookingId, 'total_price' => $totalPrice]
+                    'message' => count($createdBookings) > 1
+                        ? 'Đặt sân thành công! Các khung giờ cách nhau đã được tách thành nhiều hóa đơn.'
+                        : 'Đặt sân lẻ thành công!',
+                    'data' => [
+                        'booking_id' => $paymentBookingId,
+                        'payment_booking_id' => $paymentBookingId,
+                        'payment_booking_code' => $createdBookings[0]['booking_code'] ?? null,
+                        'bookings' => $createdBookings,
+                        'booking_count' => count($createdBookings),
+                        'total_price' => $grandTotal,
+                    ]
                 ], 201);
             });
         }
 
         // ---------------------------------------------------------------------
-        // KỊCH BẢN B: ĐẶT ĐỊNH KỲ (RECURRING) -> BẮT BUỘC PHẢI CÓ TÀI KHOẢN
+        // KỊCH BẢN B: ĐẶT ĐỊNH KỲ
         // ---------------------------------------------------------------------
         if ($request->booking_type === 'recurring') {
 
-            // Rào cản kiểm tra: Chặn lập tức nếu phát hiện là khách vãng lai
+            // Đặt định kỳ bắt buộc phải đăng nhập
             if (!$userId) {
                 return response()->json([
                     'status' => 'error',
@@ -198,7 +282,6 @@ class BookingController extends Controller
                 ], 401);
             }
 
-            // Quét dải ngày hiệu lực để trích xuất ra các ngày đánh chính xác
             $start = Carbon::parse($request->start_date);
             $end = Carbon::parse($request->end_date);
             $targetDates = [];
@@ -216,7 +299,7 @@ class BookingController extends Controller
                 ], 400);
             }
 
-            // Kiểm tra đụng lịch: Một buổi vướng lịch sẽ hủy toàn bộ giao dịch
+            // Nếu 1 ngày trong chuỗi bị trùng lịch thì hủy toàn bộ
             foreach ($targetDates as $playDate) {
                 if ($this->checkSlotBusy($request->court_id, $playDate, $request->start_time, $request->end_time)) {
                     return response()->json([
@@ -227,9 +310,12 @@ class BookingController extends Controller
             }
 
             return DB::transaction(function () use ($request, $userId, $targetDates) {
-                DB::table('courts')->where('id', $request->court_id)->lockForUpdate()->first();
+                DB::table('courts')
+                    ->where('id', $request->court_id)
+                    ->lockForUpdate()
+                    ->first();
 
-                // Khởi tạo bản ghi Hợp đồng gốc (Master Contract)
+                // Tạo hợp đồng định kỳ gốc
                 $recurring = RecurringBooking::create([
                     'user_id' => $userId,
                     'court_id' => $request->court_id,
@@ -244,12 +330,28 @@ class BookingController extends Controller
 
                 $bookingsToInsert = [];
                 $detailsToInsert = [];
+
+                $paymentBookingId = null;
+                $totalContractAmount = 0;
+
                 $minutes = (strtotime($request->end_time) - strtotime($request->start_time)) / 60;
 
-                // Chiến lược Eager Generation: Sinh sẵn hóa đơn độc lập cho từng tuần thi đấu
+                // Sinh sẵn hóa đơn độc lập cho từng tuần
                 foreach ($targetDates as $playDate) {
                     $bookingId = (string) Str::uuid();
-                    $slotPrice = $this->internalCalculatePrice($request->court_id, $playDate, $request->start_time, $request->end_time);
+
+                    if (!$paymentBookingId) {
+                        $paymentBookingId = $bookingId;
+                    }
+
+                    $slotPrice = $this->internalCalculatePrice(
+                        $request->court_id,
+                        $playDate,
+                        $request->start_time,
+                        $request->end_time
+                    );
+
+                    $totalContractAmount += $slotPrice;
 
                     $bookingsToInsert[] = [
                         'id' => $bookingId,
@@ -257,6 +359,8 @@ class BookingController extends Controller
                         'user_id' => $userId,
                         'recurring_booking_id' => $recurring->id,
                         'subtotal_court' => $slotPrice,
+                        'subtotal_service' => 0,
+                        'discount_amount' => 0,
                         'total_price' => $slotPrice,
                         'deposit_amount' => 0,
                         'remaining_amount' => $slotPrice,
@@ -285,20 +389,31 @@ class BookingController extends Controller
 
                 return response()->json([
                     'status' => 'success',
-                    'message' => 'Đăng ký hợp đồng định kỳ thành công!'
+                    'message' => 'Đăng ký hợp đồng định kỳ thành công!',
+                    'data' => [
+                        'recurring_id' => $recurring->id,
+                        'payment_booking_id' => $paymentBookingId,
+                        'booking_id' => $paymentBookingId,
+                        'total_price' => $totalContractAmount,
+                        'total_sessions' => count($targetDates),
+                    ]
                 ], 201);
             });
         }
     }
 
     // =========================================================================
-    // 3. API LỊCH SỬ CÁ NHÂN: Truy xuất các đơn của riêng User đang đăng nhập
+    // 3. API LỊCH SỬ CÁ NHÂN
     // =========================================================================
     public function getUserBookings(Request $request)
     {
         $user = $request->user('sanctum');
+
         if (!$user) {
-            return response()->json(['status' => 'error', 'message' => 'Vui lòng đăng nhập!'], 401);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Vui lòng đăng nhập!'
+            ], 401);
         }
 
         $tab = $request->query('tab', 'all');
@@ -306,32 +421,37 @@ class BookingController extends Controller
 
         $query = Booking::with([
             'details' => function ($q) {
-                $q->orderBy('booking_date', 'asc')->orderBy('start_time', 'asc');
+                $q->orderBy('booking_date', 'asc')
+                    ->orderBy('start_time', 'asc');
             }
         ])->where('user_id', $user->id);
 
-        // Lọc trạng thái Tab view
         if ($tab === 'upcoming') {
-            $query->where('status', '!=', 'cancelled')->whereHas('details', function ($q) use ($today) {
-                $q->where('booking_date', '>=', $today);
-            });
+            $query->where('status', '!=', 'cancelled')
+                ->whereHas('details', function ($q) use ($today) {
+                    $q->where('booking_date', '>=', $today);
+                });
         } elseif ($tab === 'history') {
             $query->where(function ($q) use ($today) {
-                $q->where('status', 'cancelled')->orWhereDoesntHave('details', function ($subQ) use ($today) {
-                    $subQ->where('booking_date', '>=', $today);
-                });
+                $q->where('status', 'cancelled')
+                    ->orWhereDoesntHave('details', function ($subQ) use ($today) {
+                        $subQ->where('booking_date', '>=', $today);
+                    });
             });
         }
 
         $bookings = $query->orderBy('created_at', 'desc')->paginate(10);
 
-        // Chuẩn hóa cấu trúc đầu ra để giao diện vẽ các thẻ (Card) trực quan
         $formatted = $bookings->through(function ($booking) {
             $first = $booking->details->first();
+            $last = $booking->details->last();
+
             return [
                 'booking_id' => $booking->id,
                 'booking_code' => $booking->booking_code,
-                'type_label' => !is_null($booking->recurring_booking_id) ? 'Buổi chơi Định kỳ' : 'Đặt Lẻ',
+                'type_label' => !is_null($booking->recurring_booking_id)
+                    ? 'Buổi chơi Định kỳ'
+                    : 'Đặt Lẻ',
                 'total_price' => $booking->total_price,
                 'status' => $booking->status,
                 'payment_status' => $booking->payment_status,
@@ -339,43 +459,99 @@ class BookingController extends Controller
                 'summary' => $first ? [
                     'court_id' => $first->court_id,
                     'play_date' => Carbon::parse($first->booking_date)->format('d/m/Y'),
-                    'time_slot' => substr($first->start_time, 0, 5) . ' - ' . substr($first->end_time, 0, 5)
+                    'time_slot' => substr($first->start_time, 0, 5) . ' - ' . substr($last->end_time, 0, 5)
                 ] : null,
                 'details_count' => $booking->details->count(),
             ];
         });
 
-        return response()->json(['status' => 'success', 'data' => $formatted]);
+        return response()->json([
+            'status' => 'success',
+            'data' => $formatted
+        ]);
     }
 
-    // --- CÁC HÀM TIỆN ÍCH TÍNH TOÁN NỘI BỘ ---
+    // =========================================================================
+    // HÀM PHỤ: CHIA SLOT ĐẶT LẺ THÀNH CÁC NHÓM LIỀN NHAU
+    // =========================================================================
+    private function groupContinuousSlots(array $slots)
+    {
+        usort($slots, function ($a, $b) {
+            $dateCompare = strcmp($a['date'], $b['date']);
 
-    // Dò tìm va chạm lịch dựa trên khoảng thời gian bắt đầu và kết thúc
+            if ($dateCompare !== 0) {
+                return $dateCompare;
+            }
+
+            return strcmp($a['start'], $b['start']);
+        });
+
+        $groups = [];
+        $currentGroup = [];
+
+        foreach ($slots as $slot) {
+            if (empty($currentGroup)) {
+                $currentGroup[] = $slot;
+                continue;
+            }
+
+            $lastSlot = $currentGroup[count($currentGroup) - 1];
+
+            $isSameDate = $lastSlot['date'] === $slot['date'];
+            $isContinuous = $lastSlot['end'] === $slot['start'];
+
+            if ($isSameDate && $isContinuous) {
+                $currentGroup[] = $slot;
+            } else {
+                $groups[] = $currentGroup;
+                $currentGroup = [$slot];
+            }
+        }
+
+        if (!empty($currentGroup)) {
+            $groups[] = $currentGroup;
+        }
+
+        return $groups;
+    }
+
+    // =========================================================================
+    // HÀM PHỤ: KIỂM TRA TRÙNG LỊCH
+    // =========================================================================
     private function checkSlotBusy($courtId, $date, $start, $end)
     {
-        return BookingDetail::where('court_id', $courtId)->where('booking_date', $date)
+        return BookingDetail::where('court_id', $courtId)
+            ->where('booking_date', $date)
             ->where(function ($q) use ($start, $end) {
-                $q->where('start_time', '<', $end . ':00')->where('end_time', '>', $start . ':00');
+                $q->where('start_time', '<', $end . ':00')
+                    ->where('end_time', '>', $start . ':00');
             })
             ->whereHas('booking', function ($q) {
                 $q->where('status', '!=', 'cancelled');
-            })->exists();
+            })
+            ->exists();
     }
 
-    // Động cơ tính giá tiền chính xác dựa trên sự đan xen các dải giá trong ngày
+    // =========================================================================
+    // HÀM PHỤ: TÍNH GIÁ THEO BẢNG GIÁ
+    // =========================================================================
     private function internalCalculatePrice($courtId, $date, $start, $end)
     {
         $dayOfWeek = date('N', strtotime($date));
         $dayType = ($dayOfWeek >= 6) ? 'weekend' : 'weekday';
 
-        $pricings = CourtPricing::where('court_id', $courtId)->where('day_type', $dayType)
+        $pricings = CourtPricing::where('court_id', $courtId)
+            ->where('day_type', $dayType)
             ->where(function ($q) use ($date) {
-                $q->whereNull('effective_from')->orWhere('effective_from', '<=', $date);
+                $q->whereNull('effective_from')
+                    ->orWhere('effective_from', '<=', $date);
             })
             ->where(function ($q) use ($date) {
-                $q->whereNull('effective_to')->orWhere('effective_to', '>=', $date);
+                $q->whereNull('effective_to')
+                    ->orWhere('effective_to', '>=', $date);
             })
-            ->orderByRaw('effective_from DESC')->get();
+            ->orderByRaw('effective_from DESC')
+            ->get();
 
         $price = 0;
         $filled = [];
@@ -384,18 +560,19 @@ class BookingController extends Controller
             $dbS = substr($pricing->start_time, 0, 5);
             $dbE = substr($pricing->end_time, 0, 5);
 
-            // Tìm điểm chung (Overlap) giữa ca chơi thực tế và khung giờ cấu hình bảng giá
             $overlapS = max($start, $dbS);
             $overlapE = min($end, $dbE);
 
             if ($overlapS < $overlapE) {
                 $key = $overlapS . '-' . $overlapE;
+
                 if (!isset($filled[$key])) {
                     $price += ((strtotime($overlapE) - strtotime($overlapS)) / 3600) * $pricing->price;
                     $filled[$key] = true;
                 }
             }
         }
+
         return $price;
     }
 }

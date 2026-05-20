@@ -3,6 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { adminBookingService } from '../../services/admin/bookingService';
 import { adminProductService } from '../../services/admin/productService';
 import { adminAdditionalService } from '../../services/admin/additionalService';
+import { adminCourtService } from '../../services/admin/courtService';
+
 
 const emptyItemRow = {
     selected_val: '',
@@ -14,11 +16,13 @@ const TodayBookings = () => {
     const [bookings, setBookings] = useState([]);
     const [products, setProducts] = useState([]);
     const [services, setServices] = useState([]);
+    const [courts, setCourts] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [message, setMessage] = useState({ type: '', text: '' });
 
     const [searchTerm, setSearchTerm] = useState('');
     const [filterStatus, setFilterStatus] = useState('all');
+    const [filterCourt, setFilterCourt] = useState('all');
 
     const [isBillModalOpen, setIsBillModalOpen] = useState(false);
     const [selectedBill, setSelectedBill] = useState(null);
@@ -34,22 +38,98 @@ const TodayBookings = () => {
         day: 'numeric'
     });
 
+    // -------------------------------------------------------------
+    // GỘP CÁC KHUNG GIỜ LIỀN NHAU
+    // Nếu 17:00-18:00 và 18:00-19:00 => 17:00-19:00
+    // Nếu 08:00-10:00 và 14:00-16:00 => tách thành 2 dòng
+    // -------------------------------------------------------------
+    const buildDisplayRows = (bookingList) => {
+        const rows = [];
+
+        bookingList.forEach((booking) => {
+            const details = [...(booking.details || [])].sort((a, b) => {
+                const dateCompare = String(a.booking_date).localeCompare(String(b.booking_date));
+                if (dateCompare !== 0) return dateCompare;
+
+                const courtCompare = String(a.court_id).localeCompare(String(b.court_id));
+                if (courtCompare !== 0) return courtCompare;
+
+                return String(a.start_time).localeCompare(String(b.start_time));
+            });
+
+            if (details.length === 0) {
+                rows.push({
+                    ...booking,
+                    _displayKey: booking.id,
+                    _groupDetails: [],
+                    _groupStart: null,
+                    _groupEnd: null,
+                    _groupCourtName: '—',
+                    _groupPrice: Number(booking.subtotal_court || booking.total_price || 0),
+                });
+
+                return;
+            }
+
+            let currentGroup = [details[0]];
+
+            for (let i = 1; i < details.length; i++) {
+                const previous = currentGroup[currentGroup.length - 1];
+                const current = details[i];
+
+                const isSameDate = previous.booking_date === current.booking_date;
+                const isSameCourt = previous.court_id === current.court_id;
+                const isContinuous = previous.end_time === current.start_time;
+
+                if (isSameDate && isSameCourt && isContinuous) {
+                    currentGroup.push(current);
+                } else {
+                    rows.push(createDisplayRow(booking, currentGroup));
+                    currentGroup = [current];
+                }
+            }
+
+            rows.push(createDisplayRow(booking, currentGroup));
+        });
+
+        return rows;
+    };
+
+    const createDisplayRow = (booking, groupDetails) => {
+        const firstDetail = groupDetails[0];
+        const lastDetail = groupDetails[groupDetails.length - 1];
+
+        return {
+            ...booking,
+            _displayKey: `${booking.id}_${firstDetail?.id || Math.random()}`,
+            _groupDetails: groupDetails,
+            _groupStart: firstDetail?.start_time,
+            _groupEnd: lastDetail?.end_time,
+            _groupCourtName: firstDetail?.court?.name || `Sân ${firstDetail?.court_id?.slice(-2) || '...'}`,
+            _groupPrice: groupDetails.reduce((sum, detail) => sum + Number(detail.price || 0), 0),
+        };
+    };
+
     // --- FETCH ---
     const fetchTodayData = async () => {
         setIsLoading(true);
 
         try {
-            const res = await adminBookingService.getTodayBookings();
-            setBookings(res.data?.data || []);
-
-            const [prodRes, servRes] = await Promise.all([
+            const [bookingRes, prodRes, servRes, courtRes] = await Promise.all([
+                adminBookingService.getTodayBookings(),
                 adminProductService.getProducts(1, '', ''),
-                adminAdditionalService.getServices()
+                adminAdditionalService.getServices(),
+                adminCourtService.getCourts()
             ]);
 
+            setBookings(bookingRes.data?.data || []);
             setProducts(prodRes.data?.data?.data || []);
             setServices(servRes.data?.data || []);
+
+            const courtData = courtRes.data?.data?.data || courtRes.data?.data || [];
+            setCourts(courtData);
         } catch (error) {
+            console.error('Lỗi tải dữ liệu hôm nay:', error);
             setMessage({ type: 'error', text: 'Không thể tải dữ liệu.' });
         } finally {
             setIsLoading(false);
@@ -67,10 +147,10 @@ const TodayBookings = () => {
 
             await adminBookingService.updateStatus(id, { status, payment_status });
 
-            setMessage({ type: 'success', text: '✓ Cập nhật thành công!' });
+            setMessage({ type: 'success', text: '✓ Cập nhật thanh toán thành công!' });
             fetchTodayData();
         } catch (error) {
-            alert('Thao tác thất bại!');
+            alert(error.response?.data?.message || 'Thao tác thất bại!');
         }
     };
 
@@ -127,15 +207,6 @@ const TodayBookings = () => {
                 items,
             });
 
-            // Nếu khách đã thanh toán tiền sân trước đó,
-            // nhưng phát sinh thêm sản phẩm/dịch vụ thì đổi sang trạng thái nợ Pro-shop
-            if (addItemModal.booking.payment_status === 'paid') {
-                await adminBookingService.updateStatus(addItemModal.booking.id, {
-                    status: addItemModal.booking.status,
-                    payment_status: 'partially_paid'
-                });
-            }
-
             setMessage({
                 type: 'success',
                 text: `Thêm ${items.length} món vào bill thành công!`
@@ -157,8 +228,18 @@ const TodayBookings = () => {
     };
 
     // --- FILTER ---
+    const displayBookings = useMemo(() => {
+        return buildDisplayRows(bookings);
+    }, [bookings]);
+
+    const activeCourts = useMemo(() => {
+        return courts
+            .filter(court => court.status !== 'inactive')
+            .sort((a, b) => String(a.name).localeCompare(String(b.name)));
+    }, [courts]);
+
     const filteredBookings = useMemo(() => {
-        return bookings.filter(b => {
+        return displayBookings.filter(b => {
             const matchSearch =
                 !searchTerm ||
                 b.customer_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -170,45 +251,29 @@ const TodayBookings = () => {
                 (filterStatus === 'partial' && b.payment_status === 'partially_paid' && b.status !== 'cancelled') ||
                 (filterStatus === 'paid' && b.payment_status === 'paid');
 
-            return matchSearch && matchFilter;
+            const matchCourt =
+                filterCourt === 'all' ||
+                b._groupDetails?.some(detail => detail.court_id === filterCourt);
+
+            return matchSearch && matchFilter && matchCourt;
         });
-    }, [bookings, searchTerm, filterStatus]);
+    }, [displayBookings, searchTerm, filterStatus, filterCourt]);
 
     const statusConfig = {
-        pending: {
-            dot: 'bg-amber-400',
-            text: 'text-amber-700',
-            bg: 'bg-amber-50',
-            label: 'Chờ duyệt'
-        },
-        confirmed: {
-            dot: 'bg-blue-500',
-            text: 'text-blue-700',
-            bg: 'bg-blue-50',
-            label: 'Đã chốt'
-        },
-        completed: {
-            dot: 'bg-emerald-500',
-            text: 'text-emerald-700',
-            bg: 'bg-emerald-50',
-            label: 'Check-in'
-        },
-        cancelled: {
-            dot: 'bg-zinc-400',
-            text: 'text-zinc-500',
-            bg: 'bg-zinc-100',
-            label: 'Đã hủy'
-        },
+        pending: { dot: 'bg-amber-400', text: 'text-amber-700', bg: 'bg-amber-50', label: 'Chờ duyệt' },
+        confirmed: { dot: 'bg-blue-500', text: 'text-blue-700', bg: 'bg-blue-50', label: 'Đã chốt' },
+        completed: { dot: 'bg-emerald-500', text: 'text-emerald-700', bg: 'bg-emerald-50', label: 'Check-in' },
+        cancelled: { dot: 'bg-zinc-400', text: 'text-zinc-500', bg: 'bg-zinc-100', label: 'Đã hủy' },
     };
 
-    const unpaidCount = bookings.filter(b => b.payment_status === 'unpaid' && b.status !== 'cancelled').length;
-    const partialCount = bookings.filter(b => b.payment_status === 'partially_paid' && b.status !== 'cancelled').length;
-    const paidCount = bookings.filter(b => b.payment_status === 'paid').length;
+    const unpaidCount = filteredBookings.filter(b => b.payment_status === 'unpaid' && b.status !== 'cancelled').length;
+    const partialCount = filteredBookings.filter(b => b.payment_status === 'partially_paid' && b.status !== 'cancelled').length;
+    const paidCount = filteredBookings.filter(b => b.payment_status === 'paid').length;
 
     const inputClass = "w-full bg-[#f8f8fa] border border-zinc-200 rounded-lg px-3.5 py-2.5 text-sm text-zinc-800 outline-none focus:border-zinc-400 focus:ring-1 focus:ring-zinc-200 transition-all";
 
     const filterTabs = [
-        { key: 'all', label: 'Tất cả', count: bookings.length },
+        { key: 'all', label: 'Tất cả', count: filteredBookings.length },
         { key: 'unpaid', label: 'Chưa thu', count: unpaidCount },
         { key: 'partial', label: 'Nợ Pro-shop', count: partialCount },
         { key: 'paid', label: 'Đã thu', count: paidCount },
@@ -226,8 +291,8 @@ const TodayBookings = () => {
 
                 <div className="flex gap-2.5">
                     <div className="bg-white border border-zinc-200/60 px-4 py-2 rounded-lg text-center min-w-[70px]">
-                        <p className="text-lg font-bold text-zinc-800">{bookings.length}</p>
-                        <p className="text-[10px] text-zinc-400 uppercase">Tổng ca</p>
+                        <p className="text-lg font-bold text-zinc-800">{filteredBookings.length}</p>
+                        <p className="text-[10px] text-zinc-400 uppercase">Đang xem</p>
                     </div>
 
                     {(unpaidCount > 0 || partialCount > 0) && (
@@ -246,10 +311,11 @@ const TodayBookings = () => {
                         initial={{ opacity: 0, y: -8 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -8 }}
-                        className={`p-3 rounded-lg text-xs font-medium ${message.type === 'success'
-                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                            : 'bg-red-50 text-red-600 border border-red-200'
-                            }`}
+                        className={`p-3 rounded-lg text-xs font-medium ${
+                            message.type === 'success'
+                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                : 'bg-red-50 text-red-600 border border-red-200'
+                        }`}
                     >
                         {message.text}
                     </motion.div>
@@ -258,46 +324,64 @@ const TodayBookings = () => {
 
             {/* TOOLBAR */}
             <div className="bg-white rounded-xl border border-zinc-200/60 p-4">
-                <div className="flex flex-col sm:flex-row gap-3 justify-between items-start sm:items-center">
-                    <div className="relative w-full sm:w-72">
-                        <svg
-                            className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                            strokeWidth={2}
-                        >
-                            <circle cx="11" cy="11" r="8" />
-                            <path d="m21 21-4.3-4.3" />
-                        </svg>
+                <div className="flex flex-col xl:flex-row gap-3 justify-between items-start xl:items-center">
+                    <div className="flex flex-col sm:flex-row gap-3 w-full xl:w-auto">
+                        <div className="relative w-full sm:w-72">
+                            <svg
+                                className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                                strokeWidth={2}
+                            >
+                                <circle cx="11" cy="11" r="8" />
+                                <path d="m21 21-4.3-4.3" />
+                            </svg>
 
-                        <input
-                            type="text"
-                            placeholder="Tìm tên hoặc SĐT..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full pl-10 pr-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-lg text-xs text-zinc-700 outline-none focus:border-zinc-300 focus:bg-white transition-all"
-                        />
+                            <input
+                                type="text"
+                                placeholder="Tìm tên hoặc SĐT..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="w-full pl-10 pr-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-lg text-xs text-zinc-700 outline-none focus:border-zinc-300 focus:bg-white transition-all"
+                            />
+                        </div>
+
+                        <select
+                            value={filterCourt}
+                            onChange={(e) => setFilterCourt(e.target.value)}
+                            className="w-full sm:w-44 px-3 py-2.5 bg-zinc-50 border border-zinc-200 rounded-lg text-xs text-zinc-700 outline-none focus:border-zinc-300 focus:bg-white transition-all"
+                        >
+                            <option value="all">Tất cả sân</option>
+
+                            {activeCourts.map(court => (
+                                <option key={court.id} value={court.id}>
+                                    {court.name}
+                                </option>
+                            ))}
+                        </select>
                     </div>
 
-                    <div className="flex items-center gap-1 bg-zinc-100 p-1 rounded-lg">
+                    <div className="flex items-center gap-1 bg-zinc-100 p-1 rounded-lg overflow-x-auto max-w-full">
                         {filterTabs.map(tab => (
                             <button
                                 key={tab.key}
                                 onClick={() => setFilterStatus(tab.key)}
-                                className={`px-3 py-1.5 rounded-md text-[11px] font-medium whitespace-nowrap transition-all ${filterStatus === tab.key
-                                    ? 'bg-white text-zinc-800 shadow-sm'
-                                    : 'text-zinc-500 hover:text-zinc-700'
-                                    }`}
+                                className={`px-3 py-1.5 rounded-md text-[11px] font-medium whitespace-nowrap transition-all ${
+                                    filterStatus === tab.key
+                                        ? 'bg-white text-zinc-800 shadow-sm'
+                                        : 'text-zinc-500 hover:text-zinc-700'
+                                }`}
                             >
                                 {tab.label}
 
                                 {tab.count > 0 && (
                                     <span
-                                        className={`ml-1.5 text-[9px] px-1.5 py-0.5 rounded-full ${filterStatus === tab.key
-                                            ? 'bg-zinc-900 text-white'
-                                            : 'bg-zinc-200 text-zinc-500'
-                                            }`}
+                                        className={`ml-1.5 text-[9px] px-1.5 py-0.5 rounded-full ${
+                                            filterStatus === tab.key
+                                                ? 'bg-zinc-900 text-white'
+                                                : 'bg-zinc-200 text-zinc-500'
+                                        }`}
                                     >
                                         {tab.count}
                                     </span>
@@ -322,32 +406,45 @@ const TodayBookings = () => {
             ) : (
                 <div className="bg-white rounded-xl border border-zinc-200/60 overflow-hidden">
                     <div className="overflow-x-auto">
-                        <table className="w-full min-w-[1000px]">
+                        <table className="w-full min-w-[1100px]">
                             <thead>
                                 <tr className="text-[10px] font-medium text-zinc-400 uppercase tracking-wider bg-zinc-50/60 border-b border-zinc-100">
                                     <th className="text-left py-3 px-5" style={{ width: '220px' }}>Khách hàng</th>
-                                    <th className="text-left py-3 px-3" style={{ width: '110px' }}>Khung giờ</th>
-                                    <th className="text-left py-3 px-3" style={{ width: '80px' }}>Sân</th>
+                                    <th className="text-left py-3 px-3" style={{ width: '130px' }}>Khung giờ</th>
+                                    <th className="text-left py-3 px-3" style={{ width: '90px' }}>Sân</th>
                                     <th className="text-left py-3 px-3" style={{ width: '100px' }}>Pro-shop</th>
-                                    <th className="text-right py-3 px-3" style={{ width: '100px' }}>Số tiền</th>
+                                    <th className="text-right py-3 px-3" style={{ width: '160px' }}>Thanh toán</th>
                                     <th className="text-center py-3 px-3" style={{ width: '90px' }}>Trạng thái</th>
-                                    <th className="text-right py-3 px-5" style={{ width: '200px' }}>Thao tác</th>
+                                    <th className="text-right py-3 px-5" style={{ width: '210px' }}>Thao tác</th>
                                 </tr>
                             </thead>
 
                             <tbody>
                                 {filteredBookings.map(b => {
-                                    const detail = b.details?.[0];
-                                    const courtName = detail?.court?.name || `Sân ${detail?.court_id?.slice(-2) || '...'}`;
-                                    const timeStr = detail ? `${detail.start_time.slice(0, 5)} – ${detail.end_time.slice(0, 5)}` : '—';
+                                    const timeStr = b._groupStart && b._groupEnd
+                                        ? `${b._groupStart.slice(0, 5)} – ${b._groupEnd.slice(0, 5)}`
+                                        : '—';
+
                                     const sc = statusConfig[b.status] || statusConfig.pending;
                                     const isCancelled = b.status === 'cancelled';
 
+                                    const courtAmount = Number(b._groupPrice || b.subtotal_court || 0);
+                                    const serviceAmount = Number(b.subtotal_service || 0);
+                                    const totalAmount = Number(b.total_price || 0);
+                                    const paidAmount = Number(b.deposit_amount || 0);
+                                    const remainingAmount = Number(b.remaining_amount || 0);
+
+                                    const isOnlyProshopDebt =
+                                        serviceAmount > 0 &&
+                                        remainingAmount > 0 &&
+                                        paidAmount >= Number(b.subtotal_court || 0);
+
                                     return (
                                         <tr
-                                            key={b.id}
-                                            className={`border-b border-zinc-100 last:border-b-0 hover:bg-zinc-50/40 transition-colors group ${isCancelled ? 'opacity-45' : ''
-                                                }`}
+                                            key={b._displayKey}
+                                            className={`border-b border-zinc-100 last:border-b-0 hover:bg-zinc-50/40 transition-colors group ${
+                                                isCancelled ? 'opacity-45' : ''
+                                            }`}
                                         >
                                             <td className="py-3.5 px-5">
                                                 <div className="flex items-center gap-3">
@@ -370,10 +467,16 @@ const TodayBookings = () => {
                                                 <span className="text-xs font-mono text-zinc-600">
                                                     {timeStr}
                                                 </span>
+
+                                                {b._groupDetails?.length > 1 && (
+                                                    <p className="text-[10px] text-lime-600 font-semibold mt-0.5">
+                                                        Gộp {b._groupDetails.length} khung liền nhau
+                                                    </p>
+                                                )}
                                             </td>
 
                                             <td className="py-3.5 px-3 text-xs text-zinc-600">
-                                                {courtName}
+                                                {b._groupCourtName}
                                             </td>
 
                                             <td className="py-3.5 px-3">
@@ -382,29 +485,67 @@ const TodayBookings = () => {
                                                         onClick={() => openAddItemModal(b)}
                                                         className="px-2.5 py-1 text-zinc-500 border border-dashed border-zinc-300 rounded text-[10px] hover:bg-zinc-50 hover:border-zinc-400 transition-colors"
                                                     >
-                                                        + Thêm món
+                                                        + Thêm dịch vụ sử dụng
                                                     </button>
+                                                )}
+
+                                                {serviceAmount > 0 && (
+                                                    <p className="mt-1 text-[10px] font-semibold text-violet-600">
+                                                        Pro-shop: {serviceAmount.toLocaleString()}₫
+                                                    </p>
                                                 )}
                                             </td>
 
                                             <td className="py-3.5 px-3 text-right">
-                                                <p className="text-sm font-semibold text-zinc-800">
-                                                    {Number(b.total_price).toLocaleString()}₫
-                                                </p>
+                                                <div className="space-y-0.5">
+                                                    <p className="text-[11px] text-zinc-500">
+                                                        Sân:{' '}
+                                                        <span className="font-semibold text-zinc-800">
+                                                            {courtAmount.toLocaleString()}₫
+                                                        </span>
+                                                    </p>
 
-                                                {b.payment_status === 'paid' ? (
-                                                    <p className="text-[10px] text-emerald-600">
-                                                        ✓ Đã thu đủ
+                                                    <p className="text-[11px] text-zinc-500">
+                                                        Pro-shop:{' '}
+                                                        <span className="font-semibold text-violet-600">
+                                                            {serviceAmount.toLocaleString()}₫
+                                                        </span>
                                                     </p>
-                                                ) : b.payment_status === 'partially_paid' ? (
-                                                    <p className="text-[10px] font-bold text-amber-600">
-                                                        ⚠ Nợ Pro-shop
+
+                                                    <p className="text-[11px] text-zinc-500">
+                                                        Đã thu:{' '}
+                                                        <span className="font-semibold text-emerald-600">
+                                                            {paidAmount.toLocaleString()}₫
+                                                        </span>
                                                     </p>
-                                                ) : (
-                                                    <p className="text-[10px] text-amber-500">
-                                                        ○ Chưa thu
+
+                                                    <p className="text-[11px] text-zinc-500">
+                                                        Còn thu:{' '}
+                                                        <span className={`font-bold ${
+                                                            remainingAmount > 0 ? 'text-amber-600' : 'text-zinc-400'
+                                                        }`}>
+                                                            {remainingAmount.toLocaleString()}₫
+                                                        </span>
                                                     </p>
-                                                )}
+
+                                                    <p className="pt-0.5 text-xs font-bold text-zinc-900">
+                                                        Tổng: {totalAmount.toLocaleString()}₫
+                                                    </p>
+
+                                                    {b.payment_status === 'paid' ? (
+                                                        <p className="text-[10px] text-emerald-600">✓ Đã thu đủ</p>
+                                                    ) : isOnlyProshopDebt ? (
+                                                        <p className="text-[10px] font-bold text-violet-600">
+                                                            Còn thu Pro-shop
+                                                        </p>
+                                                    ) : b.payment_status === 'partially_paid' ? (
+                                                        <p className="text-[10px] font-bold text-amber-600">
+                                                            ⚠ Thanh toán một phần
+                                                        </p>
+                                                    ) : (
+                                                        <p className="text-[10px] text-amber-500">○ Chưa thu</p>
+                                                    )}
+                                                </div>
                                             </td>
 
                                             <td className="py-3.5 px-3 text-center">
@@ -444,8 +585,10 @@ const TodayBookings = () => {
                                                             }
                                                             className="px-2.5 py-1 bg-lime-600 text-white rounded text-[10px] font-medium hover:bg-lime-700 transition-colors"
                                                         >
-                                                            {b.payment_status === 'partially_paid'
-                                                                ? 'Thu nợ DV'
+                                                            {isOnlyProshopDebt
+                                                                ? 'Thu Pro-shop'
+                                                                : b.payment_status === 'partially_paid'
+                                                                ? 'Thu phần còn lại'
                                                                 : 'Thu tiền'}
                                                         </button>
                                                     )}
@@ -640,7 +783,7 @@ const TodayBookings = () => {
                             animate={{ opacity: 1, scale: 1 }}
                             exit={{ opacity: 0, scale: 0.95 }}
                             onClick={e => e.stopPropagation()}
-                            className="bg-white w-full max-w-[340px] shadow-xl rounded-2xl p-6 relative font-mono text-zinc-900"
+                            className="bg-white w-full max-w-[360px] shadow-xl rounded-2xl p-6 relative font-mono text-zinc-900"
                         >
                             <div className="text-center mb-5">
                                 <h2 className="text-lg font-black tracking-tight uppercase leading-none mb-1">
@@ -689,23 +832,25 @@ const TodayBookings = () => {
                                 </thead>
 
                                 <tbody className="border-b border-dashed border-zinc-300">
-                                    <tr>
-                                        <td className="py-2 pr-2">
-                                            <strong className="block text-xs">
-                                                {selectedBill.details?.[0]?.court?.name || 'Sân thuê'}
-                                            </strong>
+                                    {selectedBill.details?.map((detail) => (
+                                        <tr key={detail.id}>
+                                            <td className="py-2 pr-2">
+                                                <strong className="block text-xs">
+                                                    {detail.court?.name || 'Sân thuê'}
+                                                </strong>
 
-                                            <span className="text-[10px] text-zinc-400">
-                                                {selectedBill.details?.[0]?.start_time?.slice(0, 5)} – {selectedBill.details?.[0]?.end_time?.slice(0, 5)}
-                                            </span>
-                                        </td>
+                                                <span className="text-[10px] text-zinc-400">
+                                                    {detail.start_time?.slice(0, 5)} – {detail.end_time?.slice(0, 5)}
+                                                </span>
+                                            </td>
 
-                                        <td className="py-2 text-center align-top text-xs">1</td>
+                                            <td className="py-2 text-center align-top text-xs">1</td>
 
-                                        <td className="py-2 text-right align-top font-semibold text-xs">
-                                            {Number(selectedBill.subtotal_court || selectedBill.total_price).toLocaleString()}
-                                        </td>
-                                    </tr>
+                                            <td className="py-2 text-right align-top font-semibold text-xs">
+                                                {Number(detail.price || 0).toLocaleString()}
+                                            </td>
+                                        </tr>
+                                    ))}
 
                                     {selectedBill.service_details?.map((item) => (
                                         <tr key={item.id} className="border-t border-dotted border-zinc-200">
@@ -736,17 +881,29 @@ const TodayBookings = () => {
                             <div className="space-y-1 text-xs mb-5">
                                 <div className="flex justify-between text-zinc-500">
                                     <span>Tiền sân:</span>
-                                    <span>{Number(selectedBill.subtotal_court || selectedBill.total_price).toLocaleString()}đ</span>
+                                    <span>{Number(selectedBill.subtotal_court || 0).toLocaleString()}đ</span>
                                 </div>
 
                                 <div className="flex justify-between text-zinc-500">
-                                    <span>Dịch vụ thêm:</span>
+                                    <span>Pro-shop:</span>
                                     <span>{Number(selectedBill.subtotal_service || 0).toLocaleString()}đ</span>
                                 </div>
 
+                                <div className="flex justify-between text-zinc-500">
+                                    <span>Đã thu:</span>
+                                    <span>{Number(selectedBill.deposit_amount || 0).toLocaleString()}đ</span>
+                                </div>
+
+                                <div className="flex justify-between text-zinc-500">
+                                    <span>Còn thu:</span>
+                                    <span className={Number(selectedBill.remaining_amount || 0) > 0 ? 'text-amber-600 font-bold' : ''}>
+                                        {Number(selectedBill.remaining_amount || 0).toLocaleString()}đ
+                                    </span>
+                                </div>
+
                                 <div className="flex justify-between text-sm mt-2 pt-2 border-t-2 border-zinc-800 font-bold">
-                                    <span>TỔNG THU:</span>
-                                    <span>{Number(selectedBill.total_price).toLocaleString()}đ</span>
+                                    <span>TỔNG BILL:</span>
+                                    <span>{Number(selectedBill.total_price || 0).toLocaleString()}đ</span>
                                 </div>
                             </div>
 
