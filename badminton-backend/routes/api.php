@@ -14,9 +14,12 @@ use App\Http\Controllers\Api\Admin\{
     InventoryTransactionController,
     ProductController,
     PurchaseOrderController,
-    SupplierController
+    SupplierController,
+    DashboardReportController,
+    PaymentManagementController
 };
 use App\Http\Controllers\Api\Payment\SePayController;
+
 
 /*
 |--------------------------------------------------------------------------
@@ -63,7 +66,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // --- PHÂN HỆ QUẢN TRỊ (ADMIN / LỄ TÂN) ---
     Route::prefix('admin')->group(function () {
-
+        Route::get('/dashboard-report', [DashboardReportController::class, 'index']);
         // Quản lý User / Nhân viên
         Route::controller(AdminUserController::class)->group(function () {
             Route::get('/users', 'index');
@@ -74,7 +77,13 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::patch('/users/{id}/status', 'updateStatus');
             Route::patch('/users/{id}/reset-password', 'resetPassword');
         });
-
+        // Quản lý Thanh toán / Doanh thu
+        Route::controller(PaymentManagementController::class)->group(function () {
+            Route::get('/payments', 'index');
+            Route::get('/payments/summary', 'summary');
+            Route::get('/payments/booking/{bookingId}', 'paymentsByBooking');
+            Route::get('/payments/{id}', 'show');
+        });
         // Quản lý Đơn đặt sân & Bán thêm món
         Route::controller(AdminBooking::class)->group(function () {
             Route::get('/bookings/today', 'getTodayBookings');
@@ -83,6 +92,7 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::get('/bookings/recurring/{id}/sessions', 'getRecurringSessions');
             Route::get('/bookings/search', 'searchBookings');
             Route::patch('/bookings/{id}/status', 'updateStatus');
+            Route::patch('/bookings/{id}/payment', 'updatePayment');
             Route::patch('/bookings/details/{detailId}/reschedule', 'reschedule');
             Route::post('/bookings/{id}/add-item', 'addItemToBooking');
             Route::post('/bookings/{id}/add-items', 'addItemsToBooking');

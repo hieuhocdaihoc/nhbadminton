@@ -29,4 +29,8 @@ class Court extends Model
             ->where('target_type', 'court')
             ->orderBy('sort_order', 'asc');
     }
+    public function bookingDetails()
+    {
+        return $this->hasMany(\App\Models\BookingDetail::class, 'court_id', 'id');
+    }
 }

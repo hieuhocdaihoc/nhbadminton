@@ -7,15 +7,16 @@ use App\Models\Booking;
 use App\Models\RecurringBooking;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
-use App\Models\Product;              
-use App\Models\AdditionalService;    
-use App\Models\BookingServiceDetail; 
-use App\Models\InventoryTransaction; 
+use App\Models\Product;
+use App\Models\AdditionalService;
+use App\Models\BookingServiceDetail;
+use App\Models\InventoryTransaction;
 use Illuminate\Support\Facades\DB;
-
+use App\Models\Payment;
+use Illuminate\Support\Str;
 
 class BookingController extends Controller
-{   
+{
     //xem  danh sách các ca chơi hôm nay (dành cho lễ tân)
     public function getTodayBookings()
     {
@@ -38,7 +39,7 @@ class BookingController extends Controller
             'data' => $bookings
         ]);
     }
-
+    // API ADMIN: Xem danh sách các ca chơi lẻ (không theo lịch đặt định kỳ)
     public function getSingleBookings(Request $request)
     {
         $query = Booking::whereNull('recurring_booking_id')->with(['details.court']);
@@ -57,9 +58,10 @@ class BookingController extends Controller
         return response()->json($bookings);
     }
 
+
+    // API ADMIN: Xem danh sách các lịch đặt định kỳ (Recurring Booking Masters)
     public function getRecurringMasters(Request $request)
     {
-        // Nạp thêm 'court' và 'user' (người đặt)
         $query = RecurringBooking::with(['court', 'user']);
 
         if ($request->has('search') && $request->search != '') {
@@ -77,6 +79,9 @@ class BookingController extends Controller
         return response()->json($masters);
     }
 
+
+
+    // API ADMIN: Xem chi tiết các buổi chơi con của một lịch đặt định kỳ
     public function getRecurringSessions(Request $request, $recurringId)
     {
         // 1. Dùng with(['details.court']) để lấy Tên sân cho từng buổi đá con
@@ -102,44 +107,122 @@ class BookingController extends Controller
         ]);
     }
 
-        public function updateStatus(Request $request, $bookingId)
-        {
+
+    /**
+     * -------------------------------------------------------------
+     * CẬP NHẬT TRẠNG THÁI ĐƠN ĐẶT SÂN
+     * -------------------------------------------------------------
+     */
+    public function updateStatus(Request $request, $bookingId)
+    {
+        // Validate trạng thái đơn
         $request->validate([
-            'status' => 'required|in:pending,confirmed,cancelled,completed,paid',
-            'payment_status' => 'nullable|in:unpaid,partially_paid,paid'
+            'status' => 'required|in:pending,confirmed,cancelled,completed',
         ]);
 
+        // Tìm đơn đặt sân
         $booking = Booking::findOrFail($bookingId);
 
+        // Cập nhật trạng thái xử lý đơn
         $booking->status = $request->status;
+        $booking->save();
 
-        if ($request->has('payment_status')) {
-            $booking->payment_status = $request->payment_status;
+        // Trả kết quả về frontend
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Cập nhật trạng thái đơn thành công!',
+            'data' => $booking
+        ]);
+    }
+    /**
+     * -------------------------------------------------------------
+     * XÁC NHẬN THANH TOÁN ĐƠN ĐẶT SÂN
+     * -------------------------------------------------------------
+     */
+    public function updatePayment(Request $request, $bookingId)
+    {
+        $request->validate([
+            'payment_status' => 'required|in:unpaid,partially_paid,paid',
+        ]);
 
-            // Nếu xác nhận đã thu đủ tiền
+        return DB::transaction(function () use ($request, $bookingId) {
+
+            $booking = Booking::findOrFail($bookingId);
+
+            /**
+             * Trường hợp lễ tân xác nhận khách đã thanh toán đủ
+             */
             if ($request->payment_status === 'paid') {
-                $booking->deposit_amount = $booking->total_price;
+
+                // Số tiền khách cần trả tại quầy
+                $cashAmount = $booking->remaining_amount;
+
+                // Nếu đơn đã thanh toán đủ rồi thì không tạo thêm payment nữa
+                if ($cashAmount <= 0) {
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => 'Đơn này đã thanh toán đủ, không cần xác nhận thêm!'
+                    ], 400);
+                }
+
+                // Tạo dòng thanh toán tiền mặt
+                Payment::create([
+                    'payment_code' => 'PAY-' . now()->format('YmdHis') . '-' . strtoupper(Str::random(6)),
+                    'booking_id' => $booking->id,
+                    'user_id' => $booking->user_id,
+                    'payment_method' => 'cash',
+                    'amount' => $cashAmount,
+                    'paid_at' => now(),
+                    'status' => 'success',
+                    'reference_code' => $booking->booking_code ?? null,
+                    'payment_content' => 'Lễ tân xác nhận khách thanh toán tiền mặt tại quầy',
+                    'sepay_transaction_id' => null,
+                    'bank_gateway' => null,
+                ]);
+
+                // Cập nhật lại tổng tiền đã thanh toán trong booking
+                $booking->deposit_amount = $booking->deposit_amount + $cashAmount;
                 $booking->remaining_amount = 0;
+                $booking->payment_status = 'paid';
+
+                // Nếu đơn đang chờ duyệt thì xác nhận luôn
+                if ($booking->status === 'pending') {
+                    $booking->status = 'confirmed';
+                }
             }
 
-            // Nếu đưa về chưa thanh toán
+            /**
+             * Trường hợp đưa về chưa thanh toán
+             */
             if ($request->payment_status === 'unpaid') {
+                $booking->payment_status = 'unpaid';
                 $booking->deposit_amount = 0;
                 $booking->remaining_amount = $booking->total_price;
             }
 
-            // Nếu chỉ mới thanh toán một phần thì giữ nguyên deposit_amount và remaining_amount
-            // Trạng thái này thường xảy ra khi khách đã trả tiền sân nhưng phát sinh thêm Pro-shop.
-        }
+            /**
+             * Trường hợp thanh toán một phần
+             */
+            if ($request->payment_status === 'partially_paid') {
+                $booking->payment_status = 'partially_paid';
+            }
 
-        $booking->save();
+            $booking->save();
 
-        return response()->json([
-            'status' => 'success',
-            'message' => 'Cập nhật trạng thái thành công!',
-            'data' => $booking
-        ]);
-        }
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Cập nhật thanh toán thành công!',
+                'data' => $booking
+            ]);
+        });
+    }
+
+
+
+
+
+
+
 
 
     // =========================================================================
@@ -213,7 +296,7 @@ class BookingController extends Controller
             ]);
         });
     }
-
+    // Hàm tính giá nội bộ dựa trên bảng Court_Pricing (có tính đến ngày hiệu lực và loại ngày)
     private function internalCalculatePrice($courtId, $date, $start, $end)
     {
         $dayOfWeek = date('N', strtotime($date));
@@ -245,6 +328,8 @@ class BookingController extends Controller
         }
         return $price;
     }
+
+
     // =========================================================================
     // API ADMIN: Tìm kiếm và Lọc hóa đơn đa năng
     // =========================================================================
@@ -290,6 +375,8 @@ class BookingController extends Controller
             'data' => $bookings
         ]);
     }
+
+
     // =========================================================================
     // LỄ TÂN: THÊM DỊCH VỤ / SẢN PHẨM VÀO HÓA ĐƠN ĐANG CHƠI
     // =========================================================================
