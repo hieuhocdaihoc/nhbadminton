@@ -1,9 +1,19 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { authService } from '../../services/auth/authService';
 
 const UserProfile = () => {
-    const [user, setUser] = useState({ full_name: '', phone: '', email: '', role: 'customer' });
+    const [user, setUser] = useState(() => {
+        const storedUser = localStorage.getItem('current_user');
+        if (!storedUser) return { full_name: '', phone: '', email: '', role: 'customer' };
+
+        try {
+            return JSON.parse(storedUser);
+        } catch (error) {
+            console.error('Loi doc du lieu user:', error);
+            return { full_name: '', phone: '', email: '', role: 'customer' };
+        }
+    });
     const [oldPassword, setOldPassword] = useState('');
     const [newPassword, setNewPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
@@ -14,8 +24,15 @@ const UserProfile = () => {
     const [activeTab, setActiveTab] = useState('profile');
 
     useEffect(() => {
-        const storedUser = localStorage.getItem('current_user');
-        if (storedUser) { setUser(JSON.parse(storedUser)); }
+        authService.getProfile()
+            .then((response) => {
+                const freshUser = response.data?.user;
+                if (freshUser) {
+                    localStorage.setItem('current_user', JSON.stringify(freshUser));
+                    setUser(freshUser);
+                }
+            })
+            .catch((error) => console.error('Khong the tai diem thanh vien:', error));
     }, []);
 
     const handleUpdateProfile = async (e) => {
@@ -110,6 +127,22 @@ const UserProfile = () => {
                                     <span className="text-[10px] font-extrabold text-lime-400 bg-lime-500/10 px-3 py-1 rounded-lg border border-lime-500/20 uppercase tracking-widest">
                                         {user.role === 'customer' ? '🏸 Hội viên' : user.role}
                                     </span>
+                                </div>
+                                <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                                    <div className="rounded-2xl border border-lime-500/20 bg-lime-500/10 px-4 py-3">
+                                        <p className="text-[10px] font-bold uppercase tracking-widest text-lime-400">Điểm tích lũy</p>
+                                        <p className="mt-1 text-2xl font-black text-white">{user.points || 0}</p>
+                                    </div>
+                                    <div className="rounded-2xl border border-zinc-700 bg-zinc-800/50 px-4 py-3">
+                                        <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Hạng thành viên</p>
+                                        <p className="mt-1 text-lg font-black text-white">{user.membership_level || 'Đồng'}</p>
+                                    </div>
+                                    <div className="rounded-2xl border border-zinc-700 bg-zinc-800/50 px-4 py-3">
+                                        <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Ưu đãi</p>
+                                        <p className="mt-1 text-sm font-bold text-zinc-200">
+                                            {(user.points || 0) >= 1000 ? 'Giảm 5.000đ/giờ chơi' : `Còn ${1000 - (user.points || 0)} điểm để mở ưu đãi`}
+                                        </p>
+                                    </div>
                                 </div>
                             </div>
 

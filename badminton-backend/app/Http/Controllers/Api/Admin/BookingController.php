@@ -14,6 +14,7 @@ use App\Models\InventoryTransaction;
 use Illuminate\Support\Facades\DB;
 use App\Models\Payment;
 use Illuminate\Support\Str;
+use App\Models\User;
 
 class BookingController extends Controller
 {
@@ -115,24 +116,111 @@ class BookingController extends Controller
      */
     public function updateStatus(Request $request, $bookingId)
     {
-        // Validate trạng thái đơn
         $request->validate([
             'status' => 'required|in:pending,confirmed,cancelled,completed',
         ]);
 
-        // Tìm đơn đặt sân
-        $booking = Booking::findOrFail($bookingId);
+        return DB::transaction(function () use ($request, $bookingId) {
+            // Khoa don de tranh cong diem hai lan neu nhieu nhan vien cap nhat cung luc.
+            $booking = Booking::with('details')->lockForUpdate()->findOrFail($bookingId);
+            $oldStatus = $booking->status;
 
-        // Cập nhật trạng thái xử lý đơn
-        $booking->status = $request->status;
-        $booking->save();
+            $booking->status = $request->status;
+            $booking->save();
 
-        // Trả kết quả về frontend
-        return response()->json([
-            'status' => 'success',
-            'message' => 'Cập nhật trạng thái đơn thành công!',
-            'data' => $booking
-        ]);
+            $reward = null;
+
+            // Chi cong diem khi don vua chuyen tu trang thai khac sang completed.
+            if ($oldStatus !== 'completed' && $booking->status === 'completed') {
+                $reward = $this->rewardCustomerForCompletedBooking($booking);
+            }
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Cap nhat trang thai don thanh cong!',
+                'data' => $booking->fresh(['details', 'user']),
+                'reward' => $reward,
+            ]);
+        });
+    }
+
+    /**
+     * Cong diem thanh vien sau khi don hoan thanh.
+     *
+     * Quy tac hien tai: moi 1 gio choi duoc 10 diem. Diem duoc tinh theo
+     * tong duration_minutes cua cac ca san trong booking.
+     */
+    private function rewardCustomerForCompletedBooking(Booking $booking): ?array
+    {
+        $totalMinutes = $this->calculateBookingPlayMinutes($booking);
+        $earnedPoints = (int) floor($totalMinutes / 60 * 10);
+
+        if ($earnedPoints <= 0) {
+            return null;
+        }
+
+        $normalizedPhone = preg_replace('/\D+/', '', (string) $booking->customer_phone);
+        $user = $booking->user_id
+            ? User::lockForUpdate()->find($booking->user_id)
+            : User::where('role', 'customer')
+                ->where(function ($query) use ($booking, $normalizedPhone) {
+                    $query->where('phone', $booking->customer_phone);
+
+                    if ($normalizedPhone !== '') {
+                        $query->orWhere('phone', $normalizedPhone);
+                    }
+                })
+                ->lockForUpdate()
+                ->first();
+
+        if (!$user || $user->role !== 'customer') {
+            return null;
+        }
+
+        if (!$booking->user_id) {
+            $booking->user_id = $user->id;
+            $booking->save();
+        }
+
+        $user->points = (int) $user->points + $earnedPoints;
+        $user->total_spent = (float) $user->total_spent + (float) $booking->total_price;
+        $user->membership_level = $this->resolveMembershipLevel((int) $user->points);
+        $user->save();
+
+        return [
+            'user_id' => $user->id,
+            'earned_points' => $earnedPoints,
+            'current_points' => (int) $user->points,
+            'membership_level' => $user->membership_level,
+        ];
+    }
+
+    private function calculateBookingPlayMinutes(Booking $booking): int
+    {
+        return (int) $booking->details->sum(function ($detail) {
+            if ((int) $detail->duration_minutes > 0) {
+                return (int) $detail->duration_minutes;
+            }
+
+            if ($detail->start_time && $detail->end_time) {
+                return max(0, Carbon::parse($detail->end_time)->diffInMinutes(Carbon::parse($detail->start_time)));
+            }
+
+            return 0;
+        });
+    }
+
+    private function resolveMembershipLevel(int $points): string
+    {
+        if ($points >= 3000) {
+            return 'Vang';
+        }
+
+        if ($points >= 1000) {
+            return 'Bac';
+        }
+
+        return 'Dong';
     }
     /**
      * -------------------------------------------------------------

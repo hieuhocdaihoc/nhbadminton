@@ -19,7 +19,8 @@ class InventoryTransactionController extends Controller
         $query = InventoryTransaction::with([
             'product' => function ($q) {
                 $q->select('id', 'name', 'sku');
-            }
+            },
+            'creator:id,full_name,phone,role'
         ]);
 
         // Lọc theo từng Sản phẩm cụ thể nếu Admin muốn xem riêng lịch sử của 1 món

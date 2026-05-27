@@ -12,7 +12,7 @@ class User extends Authenticatable
 {
     use HasApiTokens, Notifiable;
 
-    protected $table = 'Users';
+    protected $table = 'users';
     protected $keyType = 'string';
     public $incrementing = false; // Tắt tự tăng vì dùng UUID
 
@@ -25,6 +25,9 @@ class User extends Authenticatable
         'gender',
         'date_of_birth',
         'customer_code',
+        'membership_level',
+        'points',
+        'total_spent',
         'status'
     ];
 
@@ -49,5 +52,10 @@ class User extends Authenticatable
     public function bookings()
     {
         return $this->hasMany(Booking::class, 'user_id', 'id');
+    }
+
+    public function staffShifts()
+    {
+        return $this->hasMany(StaffShift::class, 'staff_id', 'id');
     }
 }

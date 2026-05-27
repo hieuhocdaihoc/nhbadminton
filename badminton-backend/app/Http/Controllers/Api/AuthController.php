@@ -16,8 +16,8 @@ class AuthController extends Controller
     {
         $request->validate([
             'full_name' => 'required|string|max:100',
-            'email' => 'required|email|unique:Users,email',
-            'phone' => 'required|string|unique:Users,phone',
+            'email' => 'required|email|unique:users,email',
+            'phone' => 'required|string|unique:users,phone',
             'password' => 'required|string|min:6',
         ]);
 
@@ -46,15 +46,52 @@ class AuthController extends Controller
             return response()->json(['message' => 'Thông tin đăng nhập không chính xác'], 401);
         }
 
+        if ($user->status !== 'active') {
+            return response()->json([
+                'message' => 'Tài khoản của bạn hiện đang bị khóa hoặc không hoạt động.'
+            ], 403);
+        }
+
         $token = $user->createToken('auth_token')->plainTextToken;
 
-        // BỔ SUNG: Trả về thêm biến $user
         return response()->json([
             'message' => 'Đăng nhập thành công',
             'access_token' => $token,
             'token_type' => 'Bearer',
-            'user' => $user
+            'user' => $user,
+            'role' => $user->role,
+            'redirect_to' => $this->getRedirectPathForRole($user->role),
+            'permissions' => $this->getPermissionsForRole($user->role),
         ]);
+    }
+
+    private function getRedirectPathForRole(string $role): string
+    {
+        return match ($role) {
+            'admin' => '/admin/dashboard',
+            'staff' => '/admin/bookings/today',
+            default => '/',
+        };
+    }
+
+    private function getPermissionsForRole(string $role): array
+    {
+        return match ($role) {
+            'admin' => ['admin:*'],
+            'staff' => [
+                'bookings:read',
+                'bookings:update',
+                'payments:collect',
+                'pos:sell',
+                'catalog:read',
+            ],
+            default => [
+                'profile:read',
+                'profile:update',
+                'bookings:create',
+                'bookings:own-read',
+            ],
+        };
     }
 
     // 3. Đổi mật khẩu (Cần đăng nhập mới làm được)

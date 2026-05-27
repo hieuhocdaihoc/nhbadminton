@@ -11,6 +11,23 @@ use Illuminate\Support\Str;
 
 class AdminUserController extends Controller
 {
+    private function isStaff(Request $request): bool
+    {
+        return $request->user()?->role === 'staff';
+    }
+
+    private function staffForbiddenResponse()
+    {
+        return response()->json([
+            'message' => 'Nhan vien chi duoc quan ly tai khoan khach hang.'
+        ], 403);
+    }
+
+    private function staffCannotManageUser(Request $request, User $user): bool
+    {
+        return $this->isStaff($request) && $user->role !== 'customer';
+    }
+
     /**
      * -------------------------------------------------------------
      * LẤY DANH SÁCH TÀI KHOẢN
@@ -20,7 +37,9 @@ class AdminUserController extends Controller
     {
         // Khởi tạo query lấy dữ liệu từ bảng users
         $query = User::query();
-        if ($request->filled('role')) {
+        if ($this->isStaff($request)) {
+            $query->where('role', 'customer');
+        } elseif ($request->filled('role')) {
             $query->where('role', $request->role);
         }
         if ($request->filled('status')) {
@@ -99,6 +118,10 @@ class AdminUserController extends Controller
             ],
         ]);
 
+        if ($this->isStaff($request) && $validated['role'] !== 'customer') {
+            return $this->staffForbiddenResponse();
+        }
+
         /**
          * Tạo user mới
          */
@@ -145,9 +168,12 @@ class AdminUserController extends Controller
      * XEM CHI TIẾT TÀI KHOẢN
      * -------------------------------------------------------------
      */
-    public function show($id)
+    public function show(Request $request, $id)
     {
         $user = User::findOrFail($id);
+        if ($this->staffCannotManageUser($request, $user)) {
+            return $this->staffForbiddenResponse();
+        }
 
         return response()->json([
             'message' => 'Lấy chi tiết tài khoản thành công',
@@ -164,6 +190,10 @@ class AdminUserController extends Controller
     {
         // Tìm user theo id
         $user = User::findOrFail($id);
+        if ($this->staffCannotManageUser($request, $user)) {
+            return $this->staffForbiddenResponse();
+        }
+
         if ($user->role === 'admin') {
 
             return response()->json([
@@ -219,6 +249,10 @@ class AdminUserController extends Controller
     public function updateStatus(Request $request, $id)
     {
         $user = User::findOrFail($id);
+        if ($this->staffCannotManageUser($request, $user)) {
+            return $this->staffForbiddenResponse();
+        }
+
         if ($user->role === 'admin') {
 
             return response()->json([
@@ -249,6 +283,10 @@ class AdminUserController extends Controller
     public function resetPassword(Request $request, $id)
     {
         $user = User::findOrFail($id);
+        if ($this->staffCannotManageUser($request, $user)) {
+            return $this->staffForbiddenResponse();
+        }
+
         if ($user->role === 'admin') {
 
             return response()->json([
@@ -275,10 +313,13 @@ class AdminUserController extends Controller
      * THỐNG KÊ ĐƠN ĐẶT SÂN CỦA TÀI KHOẢN
      * -------------------------------------------------------------
      */
-    public function bookingStats($id)
+    public function bookingStats(Request $request, $id)
     {
         // Tìm tài khoản theo id
         $user = User::findOrFail($id);
+        if ($this->staffCannotManageUser($request, $user)) {
+            return $this->staffForbiddenResponse();
+        }
 
         // Khởi tạo query lấy các đơn đặt sân của tài khoản này
         $bookingQuery = $user->bookings();

@@ -1,4 +1,3 @@
-import React from "react";
 import {
   BrowserRouter as Router,
   Routes,
@@ -23,6 +22,7 @@ import CourtManager from "./pages/admin/CourtManager";
 import ProductManager from "./pages/admin/ProductManager";
 import CustomerManager from "./pages/admin/CustomerManager";
 import StaffManager from "./pages/admin/StaffManager";
+import StaffShiftManager from "./pages/admin/StaffShiftManager";
 import PricingManager from "./pages/admin/PricingManager";
 import TodayBookings from "./pages/admin/TodayBookings";
 import SingleBookings from "./pages/admin/SingleBookings";
@@ -32,17 +32,60 @@ import AdditionalServiceManager from "./pages/admin/Services";
 import SupplierManager from "./pages/admin/SupplierManager";
 import InventoryManager from "./pages/admin/InventoryManager";
 import RevenueManager from "./pages/admin/RevenueManager";
-// RÀO CẢN BẢO VỆ GIAO DIỆN ADMIN
-const AdminRoute = ({ children }) => {
+
+const ADMIN_HOME_BY_ROLE = {
+  admin: "/admin/dashboard",
+  staff: "/admin/bookings/today",
+};
+
+const canAccessAdminPath = (role, allowedRoles) => {
+  if (!["admin", "staff"].includes(role)) return false;
+  if (!allowedRoles?.length) return true;
+  return allowedRoles.includes(role);
+};
+
+const readStoredUser = () => {
   const storedUser = localStorage.getItem("current_user");
-  if (!storedUser) return <Navigate to="/" replace />;
+  const storedRole = localStorage.getItem("current_role");
+  if (!storedUser) return null;
+
   try {
     const user = JSON.parse(storedUser);
-    if (user.role === "admin" || user.role === "staff") return children;
+    return {
+      ...user,
+      role: user.role || storedRole,
+    };
   } catch (err) {
     console.error(err);
+    return null;
   }
+};
+
+// RÀO CẢN BẢO VỆ GIAO DIỆN ADMIN
+const AdminRoute = ({ children, allowedRoles = ["admin", "staff"] }) => {
+  const user = readStoredUser();
+  if (!user) return <Navigate to="/" replace />;
+
+  if (canAccessAdminPath(user.role, allowedRoles)) return children;
+
+  if (user.role === "staff") {
+    return <Navigate to={ADMIN_HOME_BY_ROLE.staff} replace />;
+  }
+
   return <Navigate to="/" replace />;
+};
+
+const ProtectedAdminPage = ({ children, allowedRoles }) => (
+  <AdminRoute allowedRoles={allowedRoles}>
+    <AdminLayout>{children}</AdminLayout>
+  </AdminRoute>
+);
+
+const AdminEntryRedirect = () => {
+  const user = readStoredUser();
+  if (!user) return <Navigate to="/" replace />;
+
+  return <Navigate to={ADMIN_HOME_BY_ROLE[user.role] || "/"} replace />;
 };
 
 function App() {
@@ -84,152 +127,133 @@ function App() {
         />
 
         {/* LUỒNG QUẢN TRỊ VIÊN */}
-        <Route
-          path="/admin"
-          element={<Navigate to="/admin/dashboard" replace />}
-        />
+        <Route path="/admin" element={<AdminEntryRedirect />} />
         <Route
           path="/admin/dashboard"
           element={
-            <AdminRoute>
-              <AdminLayout>
-                <DashboardReport />
-              </AdminLayout>
-            </AdminRoute>
+            <ProtectedAdminPage allowedRoles={["admin", "staff"]}>
+              <DashboardReport />
+            </ProtectedAdminPage>
           }
         />
         <Route
           path="/admin/bookings"
           element={
-            <AdminRoute>
-              <AdminLayout>
-                <BookingManager />
-              </AdminLayout>
-            </AdminRoute>
+            <ProtectedAdminPage allowedRoles={["admin", "staff"]}>
+              <BookingManager />
+            </ProtectedAdminPage>
           }
         />
         <Route
           path="/admin/courts"
           element={
-            <AdminRoute>
-              <AdminLayout>
-                <CourtManager />
-              </AdminLayout>
-            </AdminRoute>
+            <ProtectedAdminPage allowedRoles={["admin", "staff"]}>
+              <CourtManager />
+            </ProtectedAdminPage>
           }
         />
         <Route
           path="/admin/products"
           element={
-            <AdminRoute>
-              <AdminLayout>
-                <ProductManager />
-              </AdminLayout>
-            </AdminRoute>
+            <ProtectedAdminPage allowedRoles={["admin", "staff"]}>
+              <ProductManager />
+            </ProtectedAdminPage>
           }
         />
         <Route
           path="/admin/customers"
           element={
-            <AdminRoute>
-              <AdminLayout>
-                <CustomerManager />
-              </AdminLayout>
-            </AdminRoute>
+            <ProtectedAdminPage allowedRoles={["admin", "staff"]}>
+              <CustomerManager />
+            </ProtectedAdminPage>
           }
         />
         <Route
           path="/admin/staffs"
           element={
-            <AdminRoute>
-              <AdminLayout>
-                <StaffManager />
-              </AdminLayout>
-            </AdminRoute>
+            <ProtectedAdminPage allowedRoles={["admin"]}>
+              <StaffManager />
+            </ProtectedAdminPage>
+          }
+        />
+        <Route
+          path="/admin/staff-shifts"
+          element={
+            <ProtectedAdminPage allowedRoles={["admin"]}>
+              <StaffShiftManager />
+            </ProtectedAdminPage>
           }
         />
         <Route
           path="/admin/pricings"
           element={
-            <AdminRoute>
-              <AdminLayout>
-                <PricingManager />
-              </AdminLayout>
-            </AdminRoute>
+            <ProtectedAdminPage allowedRoles={["admin", "staff"]}>
+              <PricingManager />
+            </ProtectedAdminPage>
           }
         />
         <Route
           path="/admin/bookings/today"
           element={
-            <AdminRoute>
-              <AdminLayout>
-                <TodayBookings />
-              </AdminLayout>
-            </AdminRoute>
+            <ProtectedAdminPage allowedRoles={["admin", "staff"]}>
+              <TodayBookings />
+            </ProtectedAdminPage>
           }
         />
         <Route
           path="/admin/bookings/single"
           element={
-            <AdminRoute>
-              <AdminLayout>
-                <SingleBookings />
-              </AdminLayout>
-            </AdminRoute>
+            <ProtectedAdminPage allowedRoles={["admin", "staff"]}>
+              <SingleBookings />
+            </ProtectedAdminPage>
           }
         />
         <Route
           path="/admin/bookings/recurring"
           element={
-            <AdminRoute>
-              <AdminLayout>
-                <RecurringBookings />
-              </AdminLayout>
-            </AdminRoute>
+            <ProtectedAdminPage allowedRoles={["admin", "staff"]}>
+              <RecurringBookings />
+            </ProtectedAdminPage>
           }
         />
         <Route
           path="/admin/categories"
           element={
-            <AdminLayout>
+            <ProtectedAdminPage allowedRoles={["admin", "staff"]}>
               <Categories />
-            </AdminLayout>
+            </ProtectedAdminPage>
           }
         />
         <Route
           path="/admin/services"
           element={
-            <AdminRoute>
-              <AdminLayout>
-                <AdditionalServiceManager />
-              </AdminLayout>
-            </AdminRoute>
+            <ProtectedAdminPage allowedRoles={["admin", "staff"]}>
+              <AdditionalServiceManager />
+            </ProtectedAdminPage>
           }
         />
         <Route
           path="/admin/suppliers"
           element={
-            <AdminLayout>
+            <ProtectedAdminPage allowedRoles={["admin", "staff"]}>
               <SupplierManager />
-            </AdminLayout>
+            </ProtectedAdminPage>
           }
         />
         <Route
           path="/admin/inventory-transactions"
           element={
-            <AdminLayout>
+            <ProtectedAdminPage allowedRoles={["admin", "staff"]}>
               <InventoryManager />
-            </AdminLayout>
+            </ProtectedAdminPage>
           }
         />
         <Route
           path="/admin/revenue"
           element={
-            <AdminRoute>
-              <AdminLayout>
-                <RevenueManager />
-              </AdminLayout>
-            </AdminRoute>
+            <ProtectedAdminPage allowedRoles={["admin", "staff"]}>
+              <RevenueManager />
+            </ProtectedAdminPage>
           }
         />
 

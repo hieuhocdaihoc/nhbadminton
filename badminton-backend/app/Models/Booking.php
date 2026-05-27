@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Traits\HasUuid;
 use Illuminate\Database\Eloquent\Model;
+use App\Models\User;
 
 class Booking extends Model
 {
@@ -18,7 +19,7 @@ class Booking extends Model
     protected $fillable = [
         'booking_code',
         'user_id',
-        'recurring_booking_id', // Bổ sung trường gán hợp đồng định kỳ
+        'recurring_booking_id',
         'staff_id',
         'promotion_id',
         'subtotal_court',
@@ -70,5 +71,10 @@ class Booking extends Model
     public function payments()
     {
         return $this->hasMany(Payment::class, 'booking_id', 'id');
+    }
+
+    public function user()
+    {
+        return $this->belongsTo(User::class, 'user_id', 'id');
     }
 }

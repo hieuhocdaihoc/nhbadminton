@@ -7,6 +7,7 @@ use App\Models\Booking;
 use App\Models\BookingDetail;
 use App\Models\RecurringBooking;
 use App\Models\CourtPricing;
+use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -163,7 +164,7 @@ class BookingController extends Controller
                 }
             }
 
-            return DB::transaction(function () use ($request, $userId) {
+            return DB::transaction(function () use ($request, $userId, $user) {
                 // Khóa sân để hạn chế race condition khi nhiều người đặt cùng lúc
                 DB::table('courts')
                     ->where('id', $request->court_id)
@@ -190,6 +191,7 @@ class BookingController extends Controller
                     $bookingId = (string) Str::uuid();
                     $bookingCode = 'BILL_' . strtoupper(Str::random(6));
                     $bookingTotal = 0;
+                    $bookingMinutes = 0;
                     $detailsToInsert = [];
 
                     foreach ($group as $slot) {
@@ -204,6 +206,7 @@ class BookingController extends Controller
                         $grandTotal += $slotPrice;
 
                         $minutes = (strtotime($slot['end']) - strtotime($slot['start'])) / 60;
+                        $bookingMinutes += $minutes;
 
                         $detailsToInsert[] = [
                             'id' => (string) Str::uuid(),
@@ -218,6 +221,10 @@ class BookingController extends Controller
                         ];
                     }
 
+                    $discountAmount = $this->calculateLoyaltyDiscount($user, $bookingMinutes);
+                    $payableTotal = max(0, $bookingTotal - $discountAmount);
+                    $grandTotal -= $discountAmount;
+
                     Booking::insert([
                         'id' => $bookingId,
                         'booking_code' => $bookingCode,
@@ -225,10 +232,10 @@ class BookingController extends Controller
                         'recurring_booking_id' => null,
                         'subtotal_court' => $bookingTotal,
                         'subtotal_service' => 0,
-                        'discount_amount' => 0,
-                        'total_price' => $bookingTotal,
+                        'discount_amount' => $discountAmount,
+                        'total_price' => $payableTotal,
                         'deposit_amount' => 0,
-                        'remaining_amount' => $bookingTotal,
+                        'remaining_amount' => $payableTotal,
                         'customer_name' => $request->customer_name,
                         'customer_phone' => $request->customer_phone,
                         'status' => 'pending',
@@ -245,7 +252,8 @@ class BookingController extends Controller
                     $createdBookings[] = [
                         'booking_id' => $bookingId,
                         'booking_code' => $bookingCode,
-                        'total_price' => $bookingTotal,
+                        'total_price' => $payableTotal,
+                        'discount_amount' => $discountAmount,
                         'slots_count' => count($group),
                         'start_time' => $group[0]['start'],
                         'end_time' => $group[count($group) - 1]['end'],
@@ -309,7 +317,7 @@ class BookingController extends Controller
                 }
             }
 
-            return DB::transaction(function () use ($request, $userId, $targetDates) {
+            return DB::transaction(function () use ($request, $userId, $user, $targetDates) {
                 DB::table('courts')
                     ->where('id', $request->court_id)
                     ->lockForUpdate()
@@ -351,7 +359,10 @@ class BookingController extends Controller
                         $request->end_time
                     );
 
-                    $totalContractAmount += $slotPrice;
+                    $discountAmount = $this->calculateLoyaltyDiscount($user, $minutes);
+                    $payableTotal = max(0, $slotPrice - $discountAmount);
+
+                    $totalContractAmount += $payableTotal;
 
                     $bookingsToInsert[] = [
                         'id' => $bookingId,
@@ -360,10 +371,10 @@ class BookingController extends Controller
                         'recurring_booking_id' => $recurring->id,
                         'subtotal_court' => $slotPrice,
                         'subtotal_service' => 0,
-                        'discount_amount' => 0,
-                        'total_price' => $slotPrice,
+                        'discount_amount' => $discountAmount,
+                        'total_price' => $payableTotal,
                         'deposit_amount' => 0,
-                        'remaining_amount' => $slotPrice,
+                        'remaining_amount' => $payableTotal,
                         'customer_name' => $request->customer_name,
                         'customer_phone' => $request->customer_phone,
                         'status' => 'pending',
@@ -530,6 +541,20 @@ class BookingController extends Controller
                 $q->where('status', '!=', 'cancelled');
             })
             ->exists();
+    }
+
+    // =========================================================================
+    // HÀM PHỤ: TÍNH ƯU ĐÃI ĐIỂM THÀNH VIÊN
+    // =========================================================================
+    private function calculateLoyaltyDiscount(?User $user, int|float $totalMinutes): float
+    {
+        if (!$user || $user->role !== 'customer' || (int) $user->points < 1000) {
+            return 0;
+        }
+
+        $hours = $totalMinutes / 60;
+
+        return max(0, $hours * 5000);
     }
 
     // =========================================================================

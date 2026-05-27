@@ -32,4 +32,9 @@ class InventoryTransaction extends Model
     {
         return $this->belongsTo(Product::class, 'product_id', 'id');
     }
+
+    public function creator()
+    {
+        return $this->belongsTo(User::class, 'created_by', 'id');
+    }
 }

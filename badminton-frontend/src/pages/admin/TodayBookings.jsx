@@ -704,6 +704,23 @@ const TodayBookings = () => {
                                   : "Thu tiền"}
                             </button>
                           )}
+                          {b.status === "confirmed" &&
+                            b.payment_status === "paid" && (
+                              <button
+                                onClick={() => {
+                                  if (
+                                    window.confirm(
+                                      "Xác nhận hoàn thành ca chơi này?",
+                                    )
+                                  ) {
+                                    handleUpdateStatus(b.id, "completed");
+                                  }
+                                }}
+                                className="px-2.5 py-1 bg-emerald-600 text-white rounded text-[10px] font-medium hover:bg-emerald-700 transition-colors"
+                              >
+                                Hoàn thành
+                              </button>
+                            )}
                         </div>
                       </td>
                     </tr>

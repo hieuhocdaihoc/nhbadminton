@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { authService } from '../../services/auth/authService';
@@ -21,11 +21,18 @@ const AuthModal = ({ isOpen, onClose, initialMode = 'login', onLoginSuccess }) =
         if (mode === 'login') {
             try {
                 const response = await authService.login(phone, password);
-                const { access_token, user } = response.data;
+                const { access_token, redirect_to } = response.data;
+                const user = {
+                    ...response.data.user,
+                    role: response.data.user?.role || response.data.role,
+                };
                 localStorage.setItem('access_token', access_token);
                 localStorage.setItem('current_user', JSON.stringify(user));
+                localStorage.setItem('current_role', user.role);
+                localStorage.setItem('permissions', JSON.stringify(response.data.permissions || []));
+
                 if (user.role === 'admin' || user.role === 'staff') {
-                    window.location.href = '/admin';
+                    window.location.href = redirect_to || (user.role === 'staff' ? '/admin/bookings/today' : '/admin/dashboard');
                 } else {
                     onLoginSuccess(user);
                     onClose();

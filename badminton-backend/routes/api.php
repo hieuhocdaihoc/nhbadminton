@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\Admin\{
     InventoryTransactionController,
     ProductController,
     PurchaseOrderController,
+    StaffShiftController,
     SupplierController,
     DashboardReportController,
     PaymentManagementController
@@ -52,7 +53,8 @@ Route::post('/bookings', [UserBooking::class, 'store']);
 Route::middleware('auth:sanctum')->group(function () {
 
     // --- PHÂN HỆ KHÁCH HÀNG THÀNH VIÊN ---
-    Route::get('/user/bookings', [UserBooking::class, 'getUserBookings']);
+    Route::get('/user/bookings', [UserBooking::class, 'getUserBookings'])
+        ->middleware('role:customer');
 
     Route::controller(AuthController::class)->group(function () {
         Route::get('/profile', 'getProfile');
@@ -65,26 +67,8 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
     // --- PHÂN HỆ QUẢN TRỊ (ADMIN / LỄ TÂN) ---
-    Route::prefix('admin')->group(function () {
-        Route::get('/dashboard-report', [DashboardReportController::class, 'index']);
-        // Quản lý User / Nhân viên
-        Route::controller(AdminUserController::class)->group(function () {
-            Route::get('/users', 'index');
-            Route::post('/users', 'store');
-            Route::get('/users/{id}', 'show');
-            Route::put('/users/{id}', 'update');
-            Route::get('/users/{id}/booking-stats', 'bookingStats');
-            Route::patch('/users/{id}/status', 'updateStatus');
-            Route::patch('/users/{id}/reset-password', 'resetPassword');
-        });
-        // Quản lý Thanh toán / Doanh thu
-        Route::controller(PaymentManagementController::class)->group(function () {
-            Route::get('/payments', 'index');
-            Route::get('/payments/summary', 'summary');
-            Route::get('/payments/booking/{bookingId}', 'paymentsByBooking');
-            Route::get('/payments/{id}', 'show');
-        });
-        // Quản lý Đơn đặt sân & Bán thêm món
+    Route::prefix('admin')->middleware('role:admin,staff')->group(function () {
+        // Lễ tân và admin được vận hành lịch đặt, thu tiền và bán thêm món.
         Route::controller(AdminBooking::class)->group(function () {
             Route::get('/bookings/today', 'getTodayBookings');
             Route::get('/bookings/single', 'getSingleBookings');
@@ -98,34 +82,60 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::post('/bookings/{id}/add-items', 'addItemsToBooking');
         });
 
-        // Quản lý Nhập kho (Phiếu nhập)
+        // Dữ liệu đọc cần cho lễ tân chọn sân, sản phẩm và dịch vụ khi bán hàng.
+        Route::apiResource('courts', CourtController::class)->only(['index', 'show']);
+        Route::apiResource('court-pricing', CourtPricingController::class)->only(['index', 'show']);
+        Route::apiResource('services', AdditionalServiceController::class)->only(['index', 'show']);
+        Route::apiResource('categories', CategoryController::class)->only(['index', 'show']);
+        Route::apiResource('suppliers', SupplierController::class)->only(['index', 'show']);
+        Route::apiResource('products', ProductController::class)->only(['index', 'show']);
+        Route::post('court-pricing/calculate', [CourtPricingController::class, 'calculatePrice']);
+
+        // Admin va staff duoc van hanh cac module nghiep vu; controller se chan vung tai khoan nhay cam.
+        Route::get('/dashboard-report', [DashboardReportController::class, 'index']);
+
+        Route::controller(AdminUserController::class)->group(function () {
+            Route::get('/users', 'index');
+            Route::post('/users', 'store');
+            Route::get('/users/{id}', 'show');
+            Route::put('/users/{id}', 'update');
+            Route::get('/users/{id}/booking-stats', 'bookingStats');
+            Route::patch('/users/{id}/status', 'updateStatus');
+            Route::patch('/users/{id}/reset-password', 'resetPassword');
+        });
+
+        Route::controller(PaymentManagementController::class)->group(function () {
+            Route::get('/payments', 'index');
+            Route::get('/payments/summary', 'summary');
+            Route::get('/payments/booking/{bookingId}', 'paymentsByBooking');
+            Route::get('/payments/{id}', 'show');
+        });
+
         Route::controller(PurchaseOrderController::class)->group(function () {
             Route::get('purchase-orders', 'index');
             Route::get('purchase-orders/{id}', 'show');
             Route::post('purchase-orders', 'store');
         });
 
-        // Quản lý Sổ cái kho & Kiểm kho thủ công
         Route::controller(InventoryTransactionController::class)->group(function () {
             Route::get('inventory-history', 'index');
             Route::post('inventory-adjustment', 'store');
         });
 
-        // Quản lý Hình ảnh
         Route::post('images', [ImageController::class, 'store']);
         Route::delete('images/{id}', [ImageController::class, 'destroy']);
 
-        // Tính giá sân (Nút bấm thử cho Admin)
-        Route::post('court-pricing/calculate', [CourtPricingController::class, 'calculatePrice']);
+        Route::apiResource('courts', CourtController::class)->except(['index', 'show']);
+        Route::apiResource('court-pricing', CourtPricingController::class)->except(['index', 'show']);
+        Route::apiResource('services', AdditionalServiceController::class)->except(['index', 'show']);
+        Route::apiResource('categories', CategoryController::class)->except(['index', 'show']);
+        Route::apiResource('suppliers', SupplierController::class)->except(['index', 'show']);
+        Route::apiResource('products', ProductController::class)->except(['index', 'show']);
 
-        // Các bộ API CRUD nền tảng (Sân, Giá, Dịch vụ, Danh mục, Đối tác, Sản phẩm)
-        Route::apiResources([
-            'courts' => CourtController::class,
-            'court-pricing' => CourtPricingController::class,
-            'services' => AdditionalServiceController::class,
-            'categories' => CategoryController::class,
-            'suppliers' => SupplierController::class,
-            'products' => ProductController::class,
-        ]);
+        Route::middleware('role:admin')->group(function () {
+            Route::patch('staff-shifts/{id}/check-in', [StaffShiftController::class, 'checkIn']);
+            Route::patch('staff-shifts/{id}/check-out', [StaffShiftController::class, 'checkOut']);
+            Route::apiResource('staff-shifts', StaffShiftController::class);
+        });
     });
 });

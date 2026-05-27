@@ -18,8 +18,11 @@ class PurchaseOrderController extends Controller
     // =========================================================================
     public function index()
     {
-        // Lấy danh sách phiếu nhập kèm tên Nhà cung cấp
-        $orders = PurchaseOrder::with('supplier:id,name')->orderBy('created_at', 'desc')->paginate(15);
+        // Lay danh sach phieu nhap kem nha cung cap va nhan vien thuc hien.
+        $orders = PurchaseOrder::with([
+            'supplier:id,name',
+            'creator:id,full_name,phone,role'
+        ])->orderBy('created_at', 'desc')->paginate(15);
         return response()->json(['status' => 'success', 'data' => $orders]);
     }
 
@@ -28,7 +31,11 @@ class PurchaseOrderController extends Controller
     // =========================================================================
     public function show($id)
     {
-        $order = PurchaseOrder::with(['supplier', 'details.product'])->find($id);
+        $order = PurchaseOrder::with([
+            'supplier',
+            'details.product',
+            'creator:id,full_name,phone,role'
+        ])->find($id);
         if (!$order)
             return response()->json(['status' => 'error', 'message' => 'Không tìm thấy phiếu nhập!'], 404);
         return response()->json(['status' => 'success', 'data' => $order]);
@@ -107,7 +114,7 @@ class PurchaseOrderController extends Controller
             return response()->json([
                 'status' => 'success',
                 'message' => 'Nhập kho thành công!',
-                'data' => $po->load('details')
+                'data' => $po->load(['details', 'creator:id,full_name,phone,role'])
             ], 201);
         });
     }

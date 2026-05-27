@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import AuthModal from './AuthModal';
 import { authService } from '../../services/auth/authService';
@@ -6,7 +6,17 @@ import { authService } from '../../services/auth/authService';
 const Header = () => {
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const [activeLink, setActiveLink] = useState('Trang chủ');
-    const [currentUser, setCurrentUser] = useState(null);
+    const [currentUser, setCurrentUser] = useState(() => {
+        const storedUser = localStorage.getItem('current_user');
+        if (!storedUser) return null;
+
+        try {
+            return JSON.parse(storedUser);
+        } catch (error) {
+            console.error('Loi doc du lieu user:', error);
+            return null;
+        }
+    });
     const [userDropdownOpen, setUserDropdownOpen] = useState(false);
     const [authModalOpen, setAuthModalOpen] = useState(false);
     const [authMode, setAuthMode] = useState('login');
@@ -14,10 +24,16 @@ const Header = () => {
 
     // PERSIST SESSION
     useEffect(() => {
-        const storedUser = localStorage.getItem('current_user');
-        if (storedUser) {
-            try { setCurrentUser(JSON.parse(storedUser)); }
-            catch (e) { console.error('Lỗi đọc dữ liệu user:', e); }
+        if (localStorage.getItem('access_token')) {
+            authService.getProfile()
+                .then((response) => {
+                    const freshUser = response.data?.user;
+                    if (freshUser) {
+                        localStorage.setItem('current_user', JSON.stringify(freshUser));
+                        setCurrentUser(freshUser);
+                    }
+                })
+                .catch((error) => console.error('Khong the dong bo diem thanh vien:', error));
         }
     }, []);
 
@@ -143,6 +159,21 @@ const Header = () => {
                                                 <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">Tài khoản của bạn</p>
                                                 <p className="text-sm font-bold text-white truncate">{currentUser.phone}</p>
                                                 {currentUser.email && <p className="text-xs text-zinc-400 truncate">{currentUser.email}</p>}
+                                                <div className="mt-2 grid grid-cols-2 gap-2">
+                                                    <div className="rounded-lg bg-lime-500/10 px-2.5 py-2">
+                                                        <p className="text-[10px] font-bold uppercase text-lime-400">Điểm</p>
+                                                        <p className="text-sm font-black text-white">{currentUser.points || 0}</p>
+                                                    </div>
+                                                    <div className="rounded-lg bg-zinc-800/80 px-2.5 py-2">
+                                                        <p className="text-[10px] font-bold uppercase text-zinc-500">Hạng</p>
+                                                        <p className="text-sm font-black text-white">{currentUser.membership_level || 'Đồng'}</p>
+                                                    </div>
+                                                </div>
+                                                {(currentUser.points || 0) >= 1000 && (
+                                                    <p className="mt-2 rounded-lg border border-lime-500/20 bg-lime-500/10 px-2.5 py-2 text-[11px] font-semibold text-lime-300">
+                                                        Ưu đãi: giảm 5.000đ mỗi giờ chơi
+                                                    </p>
+                                                )}
                                             </div>
                                             <a href="/profile" className="flex items-center gap-2 px-4 py-2 text-sm text-zinc-400 hover:bg-lime-500/10 hover:text-lime-400 font-medium transition-colors">
                                                 <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M12 12C14.21 12 16 10.21 16 8C16 5.79 14.21 4 12 4C9.79 4 8 5.79 8 8C8 10.21 9.79 12 12 12ZM12 14C9.33 14 4 15.34 4 18V20H20V18C20 15.34 14.67 14 12 14Z" /></svg> Thông tin cá nhân
