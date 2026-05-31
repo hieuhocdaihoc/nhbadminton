@@ -1,8 +1,10 @@
-import React, { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
+import { useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { adminBookingService } from "../../services/admin/bookingService";
 
 const SingleBookings = () => {
+  const location = useLocation();
   const [bookings, setBookings] = useState([]);
   const [courts, setCourts] = useState([]);
   const [pagination, setPagination] = useState({
@@ -37,10 +39,10 @@ const SingleBookings = () => {
   });
 
   // --- TẢI DỮ LIỆU ---
-  const fetchData = async (page) => {
+  const fetchData = useCallback(async (page, search = "") => {
     setIsLoading(true);
     try {
-      const res = await adminBookingService.getSingleBookings(page);
+      const res = await adminBookingService.getSingleBookings(page, search);
       setBookings(res.data?.data || []);
       setPagination({
         current_page: res.data?.current_page || 1,
@@ -49,6 +51,7 @@ const SingleBookings = () => {
       const courtRes = await adminBookingService.getAllCourts();
       setCourts(courtRes.data?.data || courtRes.data || []);
     } catch (error) {
+      console.error(error);
       setMessage({
         type: "error",
         text: "Lỗi tải dữ liệu. Vui lòng kiểm tra API.",
@@ -56,11 +59,27 @@ const SingleBookings = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    fetchData(1);
-  }, []);
+    const codeFromNotification = location.state?.notificationBookingCode;
+    const timer = setTimeout(() => {
+      if (codeFromNotification) {
+        setSearchTerm(codeFromNotification);
+        setFilterStatus("all");
+      }
+    }, 0);
+
+    return () => clearTimeout(timer);
+  }, [location.state?.notificationBookingCode]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchData(1, searchTerm);
+    }, 350);
+
+    return () => clearTimeout(timer);
+  }, [fetchData, searchTerm]);
 
   // --- LỌC TÌM KIẾM ---
   const filteredBookings = useMemo(() => {
@@ -133,8 +152,9 @@ const SingleBookings = () => {
         message: "",
         actionData: null,
       });
-      fetchData(pagination.current_page);
+      fetchData(pagination.current_page, searchTerm);
     } catch (error) {
+      console.error(error);
       alert("❌ Có lỗi xảy ra trong quá trình xử lý!");
     } finally {
       setIsProcessing(false);
@@ -168,7 +188,7 @@ const SingleBookings = () => {
         text: "Đổi lịch thành công! Hệ thống đã tự động tính lại giá.",
       });
       setRescheduleModal({ isOpen: false, detailId: null, booking: null });
-      fetchData(pagination.current_page);
+      fetchData(pagination.current_page, searchTerm);
     } catch (error) {
       const errorMsg =
         error.response?.data?.message || "Có lỗi xảy ra khi đổi lịch!";
@@ -373,11 +393,19 @@ const SingleBookings = () => {
                     : "—";
                   const sc = statusConfig[b.status] || statusConfig.pending;
                   const isCancelled = b.status === "cancelled";
+                  const isNotificationTarget =
+                    location.state?.notificationBookingCode === b.booking_code;
 
                   return (
                     <tr
                       key={b.id}
-                      className={`border-b border-zinc-100 last:border-b-0 hover:bg-zinc-50/40 transition-colors group ${isCancelled ? "opacity-45" : ""}`}
+                      className={`border-b border-zinc-100 last:border-b-0 hover:bg-zinc-50/40 transition-colors group ${
+                        isCancelled ? "opacity-45" : ""
+                      } ${
+                        isNotificationTarget
+                          ? "bg-lime-50 ring-1 ring-inset ring-lime-300"
+                          : ""
+                      }`}
                     >
                       <td className="py-3.5 px-5">
                         <div className="flex items-center gap-3">
@@ -481,14 +509,14 @@ const SingleBookings = () => {
           <div className="flex gap-2">
             <button
               disabled={pagination.current_page === 1}
-              onClick={() => fetchData(pagination.current_page - 1)}
+              onClick={() => fetchData(pagination.current_page - 1, searchTerm)}
               className="px-3.5 py-2 border border-zinc-200 rounded-lg text-xs text-zinc-600 hover:bg-zinc-50 disabled:opacity-40 transition-colors"
             >
               ← Trước
             </button>
             <button
               disabled={pagination.current_page === pagination.last_page}
-              onClick={() => fetchData(pagination.current_page + 1)}
+              onClick={() => fetchData(pagination.current_page + 1, searchTerm)}
               className="px-3.5 py-2 border border-zinc-200 rounded-lg text-xs text-zinc-600 hover:bg-zinc-50 disabled:opacity-40 transition-colors"
             >
               Tiếp →

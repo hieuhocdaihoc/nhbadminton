@@ -58,6 +58,7 @@ const Header = () => {
 
     const navLinks = [
         { name: 'Trang chủ', href: '/' },
+        { name: 'Tra cứu đơn', href: '/guest-booking-lookup' },
         { name: 'Tiện ích', href: '/#utilities' },
         { name: 'Sơ đồ sân', href: '/#courts' },
         { name: 'Quy trình', href: '/#steps' },

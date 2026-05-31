@@ -7,13 +7,17 @@ export const adminBookingService = {
   },
 
   // 2. Lấy danh sách đặt lẻ
-  getSingleBookings: (page = 1) => {
-    return axiosClient.get(`/admin/bookings/single?page=${page}`);
+  getSingleBookings: (page = 1, search = "") => {
+    return axiosClient.get("/admin/bookings/single", {
+      params: { page, search: search || undefined },
+    });
   },
 
   // 3. Lấy danh sách hợp đồng gốc định kỳ
-  getRecurringMasters: (page = 1) => {
-    return axiosClient.get(`/admin/bookings/recurring?page=${page}`);
+  getRecurringMasters: (page = 1, search = "") => {
+    return axiosClient.get("/admin/bookings/recurring", {
+      params: { page, search: search || undefined },
+    });
   },
 
   // 4. Lấy chi tiết các buổi chơi con thuộc 1 hợp đồng định kỳ

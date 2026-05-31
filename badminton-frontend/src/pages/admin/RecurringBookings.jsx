@@ -1,8 +1,10 @@
-import React, { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
+import { useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { adminBookingService } from "../../services/admin/bookingService";
 
 const RecurringBookings = () => {
+  const location = useLocation();
   const [masters, setMasters] = useState([]);
   const [selectedMaster, setSelectedMaster] = useState(null);
   const [sessions, setSessions] = useState([]);
@@ -46,25 +48,41 @@ const RecurringBookings = () => {
   ];
 
   // --- FETCH ---
-  const fetchInitData = async () => {
+  const fetchInitData = useCallback(async (search = "") => {
     setIsLoading(true);
     try {
       const [mastersRes, courtsRes] = await Promise.all([
-        adminBookingService.getRecurringMasters(1),
+        adminBookingService.getRecurringMasters(1, search),
         adminBookingService.getAllCourts(),
       ]);
       setMasters(mastersRes.data?.data || mastersRes.data || []);
       setCourts(courtsRes.data?.data || courtsRes.data || []);
     } catch (e) {
+      console.error(e);
       setMessage({ type: "error", text: "Lỗi tải dữ liệu." });
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    fetchInitData();
-  }, []);
+    const codeFromNotification = location.state?.notificationBookingCode;
+    const timer = setTimeout(() => {
+      if (codeFromNotification) {
+        setSearchTerm(codeFromNotification);
+      }
+    }, 0);
+
+    return () => clearTimeout(timer);
+  }, [location.state?.notificationBookingCode]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchInitData(searchTerm);
+    }, 350);
+
+    return () => clearTimeout(timer);
+  }, [fetchInitData, searchTerm]);
 
   const handleSelectMaster = async (master) => {
     setSelectedMaster(master);
@@ -294,11 +312,21 @@ const RecurringBookings = () => {
             ) : (
               filteredMasters.map((m) => {
                 const isSelected = selectedMaster?.id === m.id;
+                const isNotificationTarget =
+                  location.state?.notificationBookingCode === m.recurring_code;
                 return (
                   <button
                     key={m.id}
                     onClick={() => handleSelectMaster(m)}
-                    className={`w-full p-3 rounded-lg border text-left transition-all duration-150 ${isSelected ? "bg-zinc-900 border-zinc-900 text-white" : "bg-white border-zinc-100 hover:border-zinc-200"}`}
+                    className={`w-full p-3 rounded-lg border text-left transition-all duration-150 ${
+                      isSelected
+                        ? "bg-zinc-900 border-zinc-900 text-white"
+                        : "bg-white border-zinc-100 hover:border-zinc-200"
+                    } ${
+                      isNotificationTarget && !isSelected
+                        ? "ring-2 ring-lime-300 bg-lime-50"
+                        : ""
+                    }`}
                   >
                     <div className="flex justify-between items-center mb-1">
                       <span

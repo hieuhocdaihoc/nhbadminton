@@ -77,4 +77,9 @@ class Booking extends Model
     {
         return $this->belongsTo(User::class, 'user_id', 'id');
     }
+
+    public function promotion()
+    {
+        return $this->belongsTo(Promotion::class, 'promotion_id', 'id');
+    }
 }

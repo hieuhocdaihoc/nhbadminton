@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 
 // DỮ LIỆU KHỞI TẠO HỆ THỐNG
 const MOCK_COURTS = [
@@ -453,8 +453,6 @@ const BookingManager = () => {
 
                         const isPending = booking.status === "pending";
                         const isConfirmed = booking.status === "confirmed";
-                        const isCheckedIn = booking.status === "checked-in";
-
                         return (
                           <td
                             key={slotKey}

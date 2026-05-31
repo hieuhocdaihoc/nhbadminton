@@ -14,6 +14,7 @@ import HomePage from "./pages/user/HomePage";
 import UserProfile from "./pages/user/UserProfile";
 import BookingHistory from "./pages/user/BookingHistory";
 import BookingPage from "./pages/user/BookingPage";
+import GuestBookingLookup from "./pages/user/GuestBookingLookup";
 
 // Admin Pages
 import DashboardReport from "./pages/admin/DashboardReport";
@@ -32,6 +33,7 @@ import AdditionalServiceManager from "./pages/admin/Services";
 import SupplierManager from "./pages/admin/SupplierManager";
 import InventoryManager from "./pages/admin/InventoryManager";
 import RevenueManager from "./pages/admin/RevenueManager";
+import PromotionManager from "./pages/admin/PromotionManager";
 
 const ADMIN_HOME_BY_ROLE = {
   admin: "/admin/dashboard",
@@ -122,6 +124,14 @@ function App() {
           element={
             <UserLayout>
               <BookingPage />
+            </UserLayout>
+          }
+        />
+        <Route
+          path="/guest-booking-lookup"
+          element={
+            <UserLayout>
+              <GuestBookingLookup />
             </UserLayout>
           }
         />
@@ -253,6 +263,14 @@ function App() {
           element={
             <ProtectedAdminPage allowedRoles={["admin", "staff"]}>
               <RevenueManager />
+            </ProtectedAdminPage>
+          }
+        />
+        <Route
+          path="/admin/promotions"
+          element={
+            <ProtectedAdminPage allowedRoles={["admin", "staff"]}>
+              <PromotionManager />
             </ProtectedAdminPage>
           }
         />

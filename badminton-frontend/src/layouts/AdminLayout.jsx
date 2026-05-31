@@ -1,8 +1,9 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   BadgeDollarSign,
+  Bell,
   Boxes,
   CalendarCheck2,
   CalendarClock,
@@ -20,6 +21,7 @@ import {
   PanelLeftOpen,
   RefreshCcw,
   ShieldCheck,
+  TicketPercent,
   Truck,
   Users,
   UserCog,
@@ -27,6 +29,7 @@ import {
   X,
 } from "lucide-react";
 import { authService } from "../services/auth/authService";
+import { adminNotificationService } from "../services/admin/notificationService";
 
 const menuGroups = [
   {
@@ -44,6 +47,13 @@ const menuGroups = [
         path: "/admin/revenue",
         icon: CircleDollarSign,
         desc: "Giao dịch và đối soát thanh toán",
+        roles: ["admin", "staff"],
+      },
+      {
+        name: "Mã giảm giá",
+        path: "/admin/promotions",
+        icon: TicketPercent,
+        desc: "Voucher và điều kiện ưu đãi",
         roles: ["admin", "staff"],
       },
     ],
@@ -193,9 +203,84 @@ const AdminLayout = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [adminUser] = useState(readStoredAdminUser);
+  const [notificationOpen, setNotificationOpen] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [notificationError, setNotificationError] = useState("");
+  const notificationRequestRef = useRef(null);
+  const lastNotificationFetchAtRef = useRef(0);
   const navigate = useNavigate();
   const location = useLocation();
   const currentRole = adminUser?.role || "admin";
+
+  const fetchNotifications = async ({ force = false } = {}) => {
+    const now = Date.now();
+
+    if (!force && now - lastNotificationFetchAtRef.current < 800) {
+      return notificationRequestRef.current;
+    }
+
+    if (notificationRequestRef.current) {
+      return notificationRequestRef.current;
+    }
+
+    lastNotificationFetchAtRef.current = now;
+    notificationRequestRef.current = adminNotificationService
+      .getNotifications(10)
+      .then((response) => {
+        const data = response.data?.data || {};
+        setNotifications(data.notifications || []);
+        setUnreadCount(data.unread_count || 0);
+        setNotificationError("");
+      })
+      .catch((error) => {
+        console.error("Không thể tải thông báo admin:", error);
+        setNotificationError("Không thể tải thông báo.");
+      })
+      .finally(() => {
+        notificationRequestRef.current = null;
+      });
+
+    return notificationRequestRef.current;
+  };
+
+  useEffect(() => {
+    let stopped = false;
+    let timeoutId;
+
+    const scheduleNextPoll = () => {
+      if (!stopped) {
+        timeoutId = window.setTimeout(pollNotifications, 5000);
+      }
+    };
+
+    const pollNotifications = async () => {
+      if (!document.hidden) {
+        await fetchNotifications();
+      }
+
+      scheduleNextPoll();
+    };
+
+    pollNotifications();
+
+    const handleFocus = () => fetchNotifications({ force: true });
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        fetchNotifications({ force: true });
+      }
+    };
+
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      stopped = true;
+      window.clearTimeout(timeoutId);
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, []);
 
   const visibleMenuGroups = useMemo(
     () =>
@@ -250,6 +335,61 @@ const AdminLayout = ({ children }) => {
   const handleNavigate = (path) => {
     setMobileMenuOpen(false);
     navigate(path);
+  };
+
+  const getNotificationBookingCode = (notification) => {
+    const text = `${notification.title || ""} ${notification.content || ""}`;
+    return text.match(/\b(?:BILL|REC)_[A-Z0-9]+\b/i)?.[0]?.toUpperCase() || "";
+  };
+
+  const handleMarkNotificationRead = async (notification) => {
+    if (!notification.is_read) {
+      try {
+        await adminNotificationService.markAsRead(notification.id);
+        await fetchNotifications({ force: true });
+      } catch (error) {
+        console.error("Không thể đánh dấu thông báo:", error);
+      }
+    }
+
+    setNotificationOpen(false);
+    const bookingCode = getNotificationBookingCode(notification);
+
+    if (bookingCode.startsWith("REC_")) {
+      navigate("/admin/bookings/recurring", {
+        state: { notificationBookingCode: bookingCode },
+      });
+      return;
+    }
+
+    if (bookingCode.startsWith("BILL_")) {
+      navigate("/admin/bookings/single", {
+        state: { notificationBookingCode: bookingCode },
+      });
+      return;
+    }
+
+    navigate("/admin/bookings/single");
+  };
+
+  const handleMarkAllNotificationsRead = async () => {
+    try {
+      await adminNotificationService.markAllAsRead();
+      await fetchNotifications({ force: true });
+    } catch (error) {
+      console.error("Không thể đánh dấu tất cả thông báo:", error);
+    }
+  };
+
+  const formatNotificationTime = (value) => {
+    if (!value) return "";
+
+    return new Date(value).toLocaleString("vi-VN", {
+      hour: "2-digit",
+      minute: "2-digit",
+      day: "2-digit",
+      month: "2-digit",
+    });
   };
 
   const renderSidebar = (forceExpanded = false) => {
@@ -456,6 +596,109 @@ const AdminLayout = ({ children }) => {
             </div>
 
             <div className="flex shrink-0 items-center gap-2">
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await fetchNotifications({ force: true });
+                    setNotificationOpen((value) => !value);
+                  }}
+                  className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+                  title="Thông báo"
+                >
+                  <Bell className="h-4.5 w-4.5" />
+                  {unreadCount > 0 && (
+                    <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-black text-white shadow-sm">
+                      {unreadCount > 99 ? "99+" : unreadCount}
+                    </span>
+                  )}
+                </button>
+
+                <AnimatePresence>
+                  {notificationOpen && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 8, scale: 0.98 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 8, scale: 0.98 }}
+                      transition={{ duration: 0.16 }}
+                      className="absolute right-0 top-12 z-50 w-[min(92vw,360px)] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-slate-950/15"
+                    >
+                      <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+                        <div>
+                          <p className="text-sm font-black text-slate-950">
+                            Thông báo
+                          </p>
+                          <p className="text-[11px] font-semibold text-slate-400">
+                            {unreadCount} thông báo chưa đọc
+                          </p>
+                        </div>
+                        {unreadCount > 0 && (
+                          <button
+                            type="button"
+                            onClick={handleMarkAllNotificationsRead}
+                            className="rounded-lg px-2 py-1 text-[11px] font-bold text-lime-700 hover:bg-lime-50"
+                          >
+                            Đọc tất cả
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="max-h-[360px] overflow-y-auto">
+                        {notificationError ? (
+                          <div className="px-4 py-10 text-center">
+                            <p className="text-sm font-bold text-red-400">
+                              {notificationError}
+                            </p>
+                          </div>
+                        ) : notifications.length === 0 ? (
+                          <div className="px-4 py-10 text-center">
+                            <p className="text-sm font-bold text-slate-400">
+                              Chưa có thông báo
+                            </p>
+                          </div>
+                        ) : (
+                          notifications.map((notification) => (
+                            <button
+                              key={notification.id}
+                              type="button"
+                              onClick={() =>
+                                handleMarkNotificationRead(notification)
+                              }
+                              className={`block w-full border-b border-slate-100 px-4 py-3 text-left transition-colors last:border-b-0 hover:bg-slate-50 ${
+                                notification.is_read ? "bg-white" : "bg-lime-50/60"
+                              }`}
+                            >
+                              <div className="flex items-start gap-3">
+                                <span
+                                  className={`mt-1 h-2 w-2 shrink-0 rounded-full ${
+                                    notification.is_read
+                                      ? "bg-slate-200"
+                                      : "bg-lime-500"
+                                  }`}
+                                />
+                                <span className="min-w-0 flex-1">
+                                  <span className="block text-sm font-black text-slate-900">
+                                    {notification.title}
+                                  </span>
+                                  <span className="mt-1 block text-xs leading-5 text-slate-500">
+                                    {notification.content}
+                                  </span>
+                                  <span className="mt-2 block text-[11px] font-semibold text-slate-400">
+                                    {formatNotificationTime(
+                                      notification.created_at,
+                                    )}
+                                  </span>
+                                </span>
+                              </div>
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+
               <div className="hidden items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700 sm:flex">
                 <ShieldCheck className="h-4 w-4" />
                 Hệ thống hoạt động

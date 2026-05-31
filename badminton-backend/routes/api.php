@@ -12,8 +12,10 @@ use App\Http\Controllers\Api\Admin\{
     CourtPricingController,
     ImageController,
     InventoryTransactionController,
+    NotificationController,
     ProductController,
     PurchaseOrderController,
+    PromotionController,
     StaffShiftController,
     SupplierController,
     DashboardReportController,
@@ -44,6 +46,8 @@ Route::get('/bookings/{id}/payment-info', [SePayController::class, 'paymentInfo'
 // Lịch trống & Đặt sân lẻ
 Route::get('/courts/{id}/availability', [UserBooking::class, 'getCourtAvailability']);
 Route::post('/bookings', [UserBooking::class, 'store']);
+Route::post('/bookings/guest-lookup', [UserBooking::class, 'lookupGuestBooking']);
+Route::post('/bookings/validate-promotion', [UserBooking::class, 'validatePromotion']);
 
 /*
 |--------------------------------------------------------------------------
@@ -89,6 +93,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::apiResource('categories', CategoryController::class)->only(['index', 'show']);
         Route::apiResource('suppliers', SupplierController::class)->only(['index', 'show']);
         Route::apiResource('products', ProductController::class)->only(['index', 'show']);
+        Route::apiResource('promotions', PromotionController::class)->only(['index', 'show']);
         Route::post('court-pricing/calculate', [CourtPricingController::class, 'calculatePrice']);
 
         // Admin va staff duoc van hanh cac module nghiep vu; controller se chan vung tai khoan nhay cam.
@@ -111,6 +116,12 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::get('/payments/{id}', 'show');
         });
 
+        Route::controller(NotificationController::class)->group(function () {
+            Route::get('/notifications', 'index');
+            Route::patch('/notifications/read-all', 'markAllAsRead');
+            Route::patch('/notifications/{id}/read', 'markAsRead');
+        });
+
         Route::controller(PurchaseOrderController::class)->group(function () {
             Route::get('purchase-orders', 'index');
             Route::get('purchase-orders/{id}', 'show');
@@ -131,6 +142,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::apiResource('categories', CategoryController::class)->except(['index', 'show']);
         Route::apiResource('suppliers', SupplierController::class)->except(['index', 'show']);
         Route::apiResource('products', ProductController::class)->except(['index', 'show']);
+        Route::apiResource('promotions', PromotionController::class)->except(['index', 'show']);
 
         Route::middleware('role:admin')->group(function () {
             Route::patch('staff-shifts/{id}/check-in', [StaffShiftController::class, 'checkIn']);

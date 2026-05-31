@@ -7,6 +7,8 @@ use App\Models\Booking;
 use App\Models\BookingDetail;
 use App\Models\RecurringBooking;
 use App\Models\CourtPricing;
+use App\Models\Notification;
+use App\Models\Promotion;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -120,6 +122,7 @@ class BookingController extends Controller
             'court_id' => 'required|exists:courts,id',
             'customer_name' => 'required|string|max:100',
             'customer_phone' => 'required|string|max:20',
+            'promotion_code' => 'nullable|string|max:50',
 
             // Đặt lẻ
             'slots' => 'required_if:booking_type,single|array',
@@ -138,6 +141,11 @@ class BookingController extends Controller
         // Lấy user nếu có token
         $user = $request->user('sanctum');
         $userId = $user ? $user->id : null;
+        $promotion = $this->resolvePromotionForBooking(
+            $request->promotion_code,
+            $user,
+            $request->customer_phone
+        );
 
         // ---------------------------------------------------------------------
         // KỊCH BẢN A: ĐẶT LẺ
@@ -164,7 +172,7 @@ class BookingController extends Controller
                 }
             }
 
-            return DB::transaction(function () use ($request, $userId, $user) {
+            return DB::transaction(function () use ($request, $userId, $user, $promotion) {
                 // Khóa sân để hạn chế race condition khi nhiều người đặt cùng lúc
                 DB::table('courts')
                     ->where('id', $request->court_id)
@@ -186,6 +194,7 @@ class BookingController extends Controller
                 $createdBookings = [];
                 $paymentBookingId = null;
                 $grandTotal = 0;
+                $promotionApplied = false;
 
                 foreach ($slotGroups as $group) {
                     $bookingId = (string) Str::uuid();
@@ -221,15 +230,22 @@ class BookingController extends Controller
                         ];
                     }
 
-                    $discountAmount = $this->calculateLoyaltyDiscount($user, $bookingMinutes);
+                    $loyaltyDiscount = $this->calculateLoyaltyDiscount($user, $bookingMinutes);
+                    $promotionDiscount = (!$promotionApplied && $promotion)
+                        ? $this->calculatePromotionDiscount($promotion, $bookingTotal)
+                        : 0;
+                    $discountAmount = min($bookingTotal, $loyaltyDiscount + $promotionDiscount);
                     $payableTotal = max(0, $bookingTotal - $discountAmount);
                     $grandTotal -= $discountAmount;
+                    $currentPromotionId = $promotionDiscount > 0 ? $promotion->id : null;
+                    $promotionApplied = $promotionApplied || $promotionDiscount > 0;
 
                     Booking::insert([
                         'id' => $bookingId,
                         'booking_code' => $bookingCode,
                         'user_id' => $userId,
                         'recurring_booking_id' => null,
+                        'promotion_id' => $currentPromotionId,
                         'subtotal_court' => $bookingTotal,
                         'subtotal_service' => 0,
                         'discount_amount' => $discountAmount,
@@ -254,11 +270,20 @@ class BookingController extends Controller
                         'booking_code' => $bookingCode,
                         'total_price' => $payableTotal,
                         'discount_amount' => $discountAmount,
+                        'promotion_discount' => $promotionDiscount,
                         'slots_count' => count($group),
                         'start_time' => $group[0]['start'],
                         'end_time' => $group[count($group) - 1]['end'],
                     ];
                 }
+
+                $this->notifyAdminsAboutNewBookings(
+                    $createdBookings,
+                    $request->customer_name,
+                    $request->customer_phone,
+                    $user,
+                    'Đặt sân lẻ'
+                );
 
                 return response()->json([
                     'status' => 'success',
@@ -317,7 +342,7 @@ class BookingController extends Controller
                 }
             }
 
-            return DB::transaction(function () use ($request, $userId, $user, $targetDates) {
+            return DB::transaction(function () use ($request, $userId, $user, $promotion, $targetDates) {
                 DB::table('courts')
                     ->where('id', $request->court_id)
                     ->lockForUpdate()
@@ -341,6 +366,7 @@ class BookingController extends Controller
 
                 $paymentBookingId = null;
                 $totalContractAmount = 0;
+                $promotionApplied = false;
 
                 $minutes = (strtotime($request->end_time) - strtotime($request->start_time)) / 60;
 
@@ -359,8 +385,14 @@ class BookingController extends Controller
                         $request->end_time
                     );
 
-                    $discountAmount = $this->calculateLoyaltyDiscount($user, $minutes);
+                    $loyaltyDiscount = $this->calculateLoyaltyDiscount($user, $minutes);
+                    $promotionDiscount = (!$promotionApplied && $promotion)
+                        ? $this->calculatePromotionDiscount($promotion, $slotPrice)
+                        : 0;
+                    $discountAmount = min($slotPrice, $loyaltyDiscount + $promotionDiscount);
                     $payableTotal = max(0, $slotPrice - $discountAmount);
+                    $currentPromotionId = $promotionDiscount > 0 ? $promotion->id : null;
+                    $promotionApplied = $promotionApplied || $promotionDiscount > 0;
 
                     $totalContractAmount += $payableTotal;
 
@@ -369,6 +401,7 @@ class BookingController extends Controller
                         'booking_code' => 'BILL_' . strtoupper(Str::random(6)),
                         'user_id' => $userId,
                         'recurring_booking_id' => $recurring->id,
+                        'promotion_id' => $currentPromotionId,
                         'subtotal_court' => $slotPrice,
                         'subtotal_service' => 0,
                         'discount_amount' => $discountAmount,
@@ -397,6 +430,20 @@ class BookingController extends Controller
 
                 Booking::insert($bookingsToInsert);
                 BookingDetail::insert($detailsToInsert);
+
+                $this->notifyAdminsAboutNewBookings(
+                    [
+                        [
+                            'booking_code' => $recurring->recurring_code,
+                            'total_price' => $totalContractAmount,
+                            'slots_count' => count($targetDates),
+                        ]
+                    ],
+                    $request->customer_name,
+                    $request->customer_phone,
+                    $user,
+                    'Lịch định kỳ'
+                );
 
                 return response()->json([
                     'status' => 'success',
@@ -483,6 +530,133 @@ class BookingController extends Controller
     }
 
     // =========================================================================
+    // 4. API CONG KHAI: KHACH VANG LAI TRA CUU DON BANG MA DON + SO DIEN THOAI
+    // =========================================================================
+    public function lookupGuestBooking(Request $request)
+    {
+        $validated = $request->validate([
+            'booking_code' => 'required|string|max:50',
+            'customer_phone' => 'required|string|max:20',
+        ]);
+
+        $bookingCode = strtoupper(trim($validated['booking_code']));
+        $rawPhone = trim($validated['customer_phone']);
+        $normalizedPhone = preg_replace('/\D+/', '', $rawPhone);
+
+        $booking = Booking::with([
+            'details' => function ($query) {
+                $query->with('court')
+                    ->orderBy('booking_date', 'asc')
+                    ->orderBy('start_time', 'asc');
+            },
+            'serviceDetails.product',
+            'serviceDetails.service',
+        ])
+            ->whereRaw('UPPER(booking_code) = ?', [$bookingCode])
+            ->where(function ($query) use ($rawPhone, $normalizedPhone) {
+                $query->where('customer_phone', $rawPhone);
+
+                if ($normalizedPhone !== '') {
+                    $query->orWhere('customer_phone', $normalizedPhone);
+                }
+            })
+            ->first();
+
+        if (!$booking) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Khong tim thay don dat san phu hop voi ma don va so dien thoai.',
+            ], 404);
+        }
+
+        $firstDetail = $booking->details->first();
+        $lastDetail = $booking->details->last();
+
+        return response()->json([
+            'status' => 'success',
+            'data' => [
+                'booking_id' => $booking->id,
+                'booking_code' => $booking->booking_code,
+                'customer_name' => $booking->customer_name,
+                'customer_phone' => $booking->customer_phone,
+                'type_label' => $booking->recurring_booking_id ? 'Lich dinh ky' : 'Dat le',
+                'status' => $booking->status,
+                'payment_status' => $booking->payment_status,
+                'subtotal_court' => (float) $booking->subtotal_court,
+                'subtotal_service' => (float) $booking->subtotal_service,
+                'discount_amount' => (float) $booking->discount_amount,
+                'deposit_amount' => (float) $booking->deposit_amount,
+                'remaining_amount' => (float) $booking->remaining_amount,
+                'total_price' => (float) $booking->total_price,
+                'created_at' => $booking->created_at
+                    ? Carbon::parse($booking->created_at)->format('d/m/Y H:i')
+                    : null,
+                'summary' => $firstDetail ? [
+                    'play_date' => Carbon::parse($firstDetail->booking_date)->format('d/m/Y'),
+                    'time_slot' => substr($firstDetail->start_time, 0, 5) . ' - ' . substr($lastDetail->end_time, 0, 5),
+                    'court_name' => $firstDetail->court?->name,
+                ] : null,
+                'details' => $booking->details->map(function ($detail) {
+                    return [
+                        'id' => $detail->id,
+                        'court_name' => $detail->court?->name,
+                        'court_code' => $detail->court?->court_code,
+                        'booking_date' => Carbon::parse($detail->booking_date)->format('d/m/Y'),
+                        'start_time' => substr($detail->start_time, 0, 5),
+                        'end_time' => substr($detail->end_time, 0, 5),
+                        'duration_minutes' => (int) $detail->duration_minutes,
+                        'price_per_hour' => (float) $detail->price_per_hour,
+                        'price' => (float) $detail->price,
+                        'overtime_minutes' => (int) $detail->overtime_minutes,
+                        'overtime_fee' => (float) $detail->overtime_fee,
+                    ];
+                })->values(),
+                'services' => $booking->serviceDetails->map(function ($item) {
+                    return [
+                        'id' => $item->id,
+                        'name' => $item->product?->name ?? $item->service?->name ?? 'Mat hang / dich vu',
+                        'quantity' => (int) $item->quantity,
+                        'unit_price' => (float) $item->unit_price,
+                        'total_price' => (float) $item->total_price,
+                        'note' => $item->note,
+                    ];
+                })->values(),
+            ],
+        ]);
+    }
+
+    public function validatePromotion(Request $request)
+    {
+        $validated = $request->validate([
+            'promotion_code' => 'required|string|max:50',
+            'customer_phone' => 'nullable|string|max:20',
+            'total_amount' => 'required|numeric|min:0',
+        ]);
+
+        $user = $request->user('sanctum');
+        $promotion = $this->resolvePromotionForBooking(
+            $validated['promotion_code'],
+            $user,
+            $validated['customer_phone'] ?? null
+        );
+
+        $discountAmount = $this->calculatePromotionDiscount($promotion, (float) $validated['total_amount']);
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Ma giam gia hop le.',
+            'data' => [
+                'id' => $promotion->id,
+                'code' => $promotion->code,
+                'name' => $promotion->name,
+                'discount_type' => $promotion->discount_type,
+                'discount_value' => (float) $promotion->discount_value,
+                'discount_amount' => $discountAmount,
+            ],
+        ]);
+    }
+
+    // =========================================================================
     // HÀM PHỤ: CHIA SLOT ĐẶT LẺ THÀNH CÁC NHÓM LIỀN NHAU
     // =========================================================================
     private function groupContinuousSlots(array $slots)
@@ -555,6 +729,113 @@ class BookingController extends Controller
         $hours = $totalMinutes / 60;
 
         return max(0, $hours * 5000);
+    }
+
+    private function resolvePromotionForBooking(?string $code, ?User $user, ?string $customerPhone): ?Promotion
+    {
+        $code = strtoupper(trim((string) $code));
+
+        if ($code === '') {
+            return null;
+        }
+
+        $promotion = Promotion::whereRaw('UPPER(code) = ?', [$code])
+            ->where('status', 'active')
+            ->first();
+
+        if (!$promotion) {
+            abort(response()->json([
+                'status' => 'error',
+                'message' => 'Ma giam gia khong ton tai hoac da ngung ap dung.',
+            ], 422));
+        }
+
+        $currentPoints = $user ? (int) $user->points : 0;
+        if ($currentPoints < (int) $promotion->min_points_required) {
+            abort(response()->json([
+                'status' => 'error',
+                'message' => 'Tai khoan chua du diem tich luy de dung ma giam gia nay.',
+            ], 422));
+        }
+
+        $limit = (int) $promotion->per_user_limit;
+        if ($limit > 0) {
+            $usedCount = Booking::where('promotion_id', $promotion->id)
+                ->where(function ($query) use ($user, $customerPhone) {
+                    if ($user) {
+                        $query->where('user_id', $user->id);
+                    } else {
+                        $query->where('customer_phone', $customerPhone);
+                    }
+                })
+                ->count();
+
+            if ($usedCount >= $limit) {
+                abort(response()->json([
+                    'status' => 'error',
+                    'message' => 'Ban da dung het so luot cua ma giam gia nay.',
+                ], 422));
+            }
+        }
+
+        return $promotion;
+    }
+
+    private function calculatePromotionDiscount(?Promotion $promotion, int|float $baseAmount): float
+    {
+        if (!$promotion || $baseAmount <= 0) {
+            return 0;
+        }
+
+        if ($promotion->discount_type === 'percent') {
+            return min($baseAmount, $baseAmount * ((float) $promotion->discount_value / 100));
+        }
+
+        return min($baseAmount, (float) $promotion->discount_value);
+    }
+
+    private function notifyAdminsAboutNewBookings(
+        array $bookings,
+        ?string $customerName,
+        ?string $customerPhone,
+        ?User $sender,
+        string $bookingType
+    ): void {
+        $receiverIds = User::whereIn('role', ['admin', 'staff'])
+            ->where('status', 'active')
+            ->pluck('id');
+
+        if ($receiverIds->isEmpty()) {
+            return;
+        }
+
+        $rows = [];
+        $senderId = $sender?->id ?? $customerPhone;
+        $now = now();
+
+        foreach ($bookings as $booking) {
+            $code = $booking['booking_code'] ?? 'Đơn mới';
+            $amount = number_format((float) ($booking['total_price'] ?? 0), 0, ',', '.');
+            $slotsCount = (int) ($booking['slots_count'] ?? 1);
+            $displayName = $customerName ?: 'Khách hàng';
+            $displayPhone = $customerPhone ?: 'chưa có SĐT';
+            $title = 'Có đơn đặt sân mới';
+            $content = "{$bookingType} {$code} từ {$displayName} ({$displayPhone}), {$slotsCount} ca, tổng {$amount}đ.";
+
+            foreach ($receiverIds as $receiverId) {
+                $rows[] = [
+                    'id' => (string) Str::uuid(),
+                    'receiver_id' => $receiverId,
+                    'sender_id' => $senderId,
+                    'title' => $title,
+                    'content' => $content,
+                    'is_read' => false,
+                    'created_at' => $now,
+                ];
+            }
+        }
+
+        Notification::insert($rows);
     }
 
     // =========================================================================

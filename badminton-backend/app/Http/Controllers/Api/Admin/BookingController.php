@@ -123,17 +123,10 @@ class BookingController extends Controller
         return DB::transaction(function () use ($request, $bookingId) {
             // Khoa don de tranh cong diem hai lan neu nhieu nhan vien cap nhat cung luc.
             $booking = Booking::with('details')->lockForUpdate()->findOrFail($bookingId);
-            $oldStatus = $booking->status;
-
             $booking->status = $request->status;
             $booking->save();
 
             $reward = null;
-
-            // Chi cong diem khi don vua chuyen tu trang thai khac sang completed.
-            if ($oldStatus !== 'completed' && $booking->status === 'completed') {
-                $reward = $this->rewardCustomerForCompletedBooking($booking);
-            }
 
             return response()->json([
                 'status' => 'success',
@@ -235,7 +228,8 @@ class BookingController extends Controller
 
         return DB::transaction(function () use ($request, $bookingId) {
 
-            $booking = Booking::findOrFail($bookingId);
+            $booking = Booking::with('details')->lockForUpdate()->findOrFail($bookingId);
+            $oldPaymentStatus = $booking->payment_status;
 
             /**
              * Trường hợp lễ tân xác nhận khách đã thanh toán đủ
@@ -297,10 +291,19 @@ class BookingController extends Controller
 
             $booking->save();
 
+            $reward = null;
+
+            // Cong diem ngay khi don vua duoc thu tien du, vi nut "Thu tien"
+            // cua frontend di qua luong payment chu khong di qua luong completed.
+            if ($oldPaymentStatus !== 'paid' && $booking->payment_status === 'paid') {
+                $reward = $this->rewardCustomerForCompletedBooking($booking);
+            }
+
             return response()->json([
                 'status' => 'success',
                 'message' => 'Cập nhật thanh toán thành công!',
-                'data' => $booking
+                'data' => $booking->fresh(['details', 'user']),
+                'reward' => $reward,
             ]);
         });
     }
