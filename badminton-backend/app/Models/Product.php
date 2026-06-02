@@ -30,6 +30,9 @@ class Product extends Model
     ];
 
     // Tạo mối quan hệ: 1 Sản phẩm thuộc về 1 Danh mục
+    /**
+     * Chức năng: Khai báo quan hệ sản phẩm thuộc về một danh mục.
+     */
     public function category()
     {
         return $this->belongsTo(Category::class, 'category_id', 'id');

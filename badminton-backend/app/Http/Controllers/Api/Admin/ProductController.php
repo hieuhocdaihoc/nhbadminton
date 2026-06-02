@@ -11,6 +11,9 @@ class ProductController extends Controller
     // =========================================================================
     // 1. XEM DANH SÁCH (Lấy danh sách sản phẩm, có kèm tên Danh mục)
     // =========================================================================
+    /**
+     * Chức năng: Lấy danh sách sản phẩm/hàng hóa, có hỗ trợ lọc danh mục, trạng thái và tồn kho thấp.
+     */
     public function index(Request $request)
     {
         // Dùng with('category') để tự động nối bảng lấy tên danh mục, tránh lỗi N+1 Query làm chậm server
@@ -41,6 +44,9 @@ class ProductController extends Controller
     // =========================================================================
     // 2. THÊM MỚI SẢN PHẨM (Mặc định số lượng kho ban đầu luôn = 0)
     // =========================================================================
+    /**
+     * Chức năng: Tạo mới sản phẩm với thông tin SKU, mô tả và tồn kho ban đầu.
+     */
     public function store(Request $request)
     {
         // Kiểm tra dữ liệu đầu vào khắt khe khi tạo mới sản phẩm
@@ -75,6 +81,9 @@ class ProductController extends Controller
     // =========================================================================
     // 3. XEM CHI TIẾT SẢN PHẨM (Dùng để lấy data fill lên form sửa ở Frontend)
     // =========================================================================
+    /**
+     * Chức năng: Lấy chi tiết một sản phẩm kèm danh mục liên quan.
+     */
     public function show($id)
     {
         // Tìm sản phẩm kèm theo thông tin danh mục của nó
@@ -89,6 +98,9 @@ class ProductController extends Controller
     // =========================================================================
     // 4. CẬP NHẬT THÔNG TIN SẢN PHẨM (Đổi tên, giá bán, hoặc MỞ HOẠT ĐỘNG TRỞ LẠI)
     // =========================================================================
+    /**
+     * Chức năng: Cập nhật thông tin sản phẩm và cấu hình cảnh báo tồn kho.
+     */
     public function update(Request $request, $id)
     {
         $product = Product::find($id);
@@ -117,6 +129,9 @@ class ProductController extends Controller
     // =========================================================================
     // 5. TẠM NGƯNG KINH DOANH (XÓA MỀM)
     // =========================================================================
+    /**
+     * Chức năng: Tạm ngưng kinh doanh sản phẩm bằng cách đổi trạng thái.
+     */
     public function destroy($id)
     {
         $product = Product::find($id);

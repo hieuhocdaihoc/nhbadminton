@@ -9,6 +9,9 @@ use Illuminate\Http\Request;
 class CourtPricingController extends Controller
 {
     // 1. Lấy toàn bộ danh sách cấu hình giá
+    /**
+     * Chức năng: Lấy danh sách bảng giá sân theo sân, loại ngày và khung giờ.
+     */
     public function index()
     {
         $pricings = CourtPricing::with('court:id,name')
@@ -23,6 +26,9 @@ class CourtPricingController extends Controller
     }
 
     // 2. Thêm cấu hình giá mới
+    /**
+     * Chức năng: Tạo mới khung giá sân sau khi validate dữ liệu thời gian và giá.
+     */
     public function store(Request $request)
     {
         $request->validate([
@@ -45,6 +51,9 @@ class CourtPricingController extends Controller
     }
 
     // 3. Xem chi tiết 1 cấu hình giá
+    /**
+     * Chức năng: Lấy chi tiết một cấu hình giá sân.
+     */
     public function show($id)
     {
         $pricing = CourtPricing::with('court:id,name')->find($id);
@@ -57,6 +66,9 @@ class CourtPricingController extends Controller
     }
 
     // 4. Cập nhật giá hoặc khung giờ
+    /**
+     * Chức năng: Cập nhật bảng giá sân.
+     */
     public function update(Request $request, $id)
     {
         $pricing = CourtPricing::find($id);
@@ -85,6 +97,9 @@ class CourtPricingController extends Controller
     }
 
     // 5. Xóa cấu hình giá
+    /**
+     * Chức năng: Xóa cấu hình giá sân không còn áp dụng.
+     */
     public function destroy($id)
     {
         $pricing = CourtPricing::find($id);
@@ -99,6 +114,9 @@ class CourtPricingController extends Controller
     }
 
     // Hàm tính tiền cộng dồn thông minh (Đã xử lý lỗi ghi đè giá)
+    /**
+     * Chức năng: Tính thử giá thuê sân theo sân, ngày và khung giờ khách chọn.
+     */
     public function calculatePrice(Request $request)
     {
         $request->validate([
@@ -166,6 +184,9 @@ class CourtPricingController extends Controller
 
 
     // API PUBLIC: Lấy bảng giá chi tiết của 1 sân cụ thể cho Khách hàng xem
+    /**
+     * Chức năng: Trả bảng giá public của một sân cho frontend khách hàng.
+     */
     public function getPublicPricing($courtId)
     {
         $pricings = CourtPricing::where('court_id', $courtId)

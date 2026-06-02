@@ -10,6 +10,9 @@ use Illuminate\Validation\Rule;
 class PromotionController extends Controller
 {
     // Lay danh sach voucher de admin theo doi va loc theo trang thai.
+    /**
+     * Chức năng: Lấy danh sách voucher/mã giảm giá, có hỗ trợ lọc trạng thái và tìm kiếm.
+     */
     public function index(Request $request)
     {
         $query = Promotion::query();
@@ -33,6 +36,9 @@ class PromotionController extends Controller
     }
 
     // Tao voucher moi cho khach nhap khi dat san.
+    /**
+     * Chức năng: Tạo mới voucher với loại giảm giá, giá trị giảm và điều kiện điểm nếu có.
+     */
     public function store(Request $request)
     {
         $data = $this->validatedData($request);
@@ -51,6 +57,9 @@ class PromotionController extends Controller
     }
 
     // Xem chi tiet mot voucher.
+    /**
+     * Chức năng: Lấy chi tiết một voucher.
+     */
     public function show($id)
     {
         $promotion = Promotion::find($id);
@@ -69,6 +78,9 @@ class PromotionController extends Controller
     }
 
     // Cap nhat thong tin voucher, cho phep giu nguyen code hien tai.
+    /**
+     * Chức năng: Cập nhật thông tin voucher và điều kiện áp dụng.
+     */
     public function update(Request $request, $id)
     {
         $promotion = Promotion::find($id);
@@ -96,6 +108,9 @@ class PromotionController extends Controller
     }
 
     // An voucher thay vi xoa cung de giu lich su booking da ap dung ma.
+    /**
+     * Chức năng: Ẩn hoặc ngưng áp dụng voucher bằng trạng thái inactive.
+     */
     public function destroy($id)
     {
         $promotion = Promotion::find($id);
@@ -116,6 +131,9 @@ class PromotionController extends Controller
         ]);
     }
 
+    /**
+     * Chức năng: Validate và chuẩn hóa dữ liệu voucher dùng chung cho tạo mới và cập nhật.
+     */
     private function validatedData(Request $request, ?string $ignoreId = null): array
     {
         return $request->validate([

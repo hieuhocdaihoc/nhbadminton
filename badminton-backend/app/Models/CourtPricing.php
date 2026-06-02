@@ -36,11 +36,17 @@ class CourtPricing extends Model
     ];
 
     // Quan hệ: Một mức giá này thuộc về một Sân cụ thể
+    /**
+     * Chức năng: Khai báo quan hệ bản ghi thuộc về một sân.
+     */
     public function court()
     {
         return $this->belongsTo(Court::class, 'court_id', 'id');
     }
     // Bổ sung Quan hệ: Một Hợp đồng định kỳ sẽ sinh ra nhiều Hóa đơn (Buổi chơi)
+    /**
+     * Chức năng: Khai báo quan hệ model có nhiều đơn đặt sân liên quan.
+     */
     public function bookings()
     {
         return $this->hasMany(Booking::class, 'recurring_booking_id', 'id');

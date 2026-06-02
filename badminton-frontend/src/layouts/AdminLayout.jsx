@@ -15,6 +15,7 @@ import {
   LayoutDashboard,
   LogOut,
   Menu,
+  MessageSquare,
   Package,
   PackageSearch,
   PanelLeftClose,
@@ -54,6 +55,13 @@ const menuGroups = [
         path: "/admin/promotions",
         icon: TicketPercent,
         desc: "Voucher và điều kiện ưu đãi",
+        roles: ["admin", "staff"],
+      },
+      {
+        name: "Quản lý đánh giá",
+        path: "/admin/reviews",
+        icon: MessageSquare,
+        desc: "Phản hồi và xử lý đánh giá sân",
         roles: ["admin", "staff"],
       },
     ],
@@ -353,6 +361,14 @@ const AdminLayout = ({ children }) => {
     }
 
     setNotificationOpen(false);
+    const notificationText =
+      `${notification.title || ""} ${notification.content || ""}`.toLowerCase();
+
+    if (notificationText.includes("danh gia") || notificationText.includes("đánh giá")) {
+      navigate("/admin/reviews");
+      return;
+    }
+
     const bookingCode = getNotificationBookingCode(notification);
 
     if (bookingCode.startsWith("REC_")) {

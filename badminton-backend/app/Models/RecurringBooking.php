@@ -32,11 +32,17 @@ class RecurringBooking extends Model
         'start_date' => 'date:Y-m-d',
         'end_date' => 'date:Y-m-d',
     ];
+    /**
+     * Chức năng: Khai báo quan hệ bản ghi thuộc về một sân.
+     */
     public function court()
     {
         return $this->belongsTo(Court::class, 'court_id', 'id');
     }
     // Thêm hàm này để lấy thông tin người đặt (User)
+    /**
+     * Chức năng: Khai báo quan hệ bản ghi thuộc về một người dùng.
+     */
     public function user()
     {
         return $this->belongsTo(User::class, 'user_id', 'id');

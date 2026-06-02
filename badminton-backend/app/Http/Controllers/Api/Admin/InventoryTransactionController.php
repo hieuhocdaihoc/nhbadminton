@@ -13,6 +13,9 @@ class InventoryTransactionController extends Controller
     // =========================================================================
     // 1. XEM LỊCH SỬ BIẾN ĐỘNG KHO (Báo cáo Xuất - Nhập - Tồn)
     // =========================================================================
+    /**
+     * Chức năng: Lấy lịch sử biến động kho, có hỗ trợ lọc theo sản phẩm, loại giao dịch và người tạo.
+     */
     public function index(Request $request)
     {
         // Kéo theo thông tin sản phẩm (id, tên, sku) để hiển thị lên bảng báo cáo
@@ -45,6 +48,9 @@ class InventoryTransactionController extends Controller
     // =========================================================================
     // 2. ĐIỀU CHỈNH KHO THỦ CÔNG (Kiểm kho: Báo hao hụt, mất mát, hỏng hóc)
     // =========================================================================
+    /**
+     * Chức năng: Tạo phiếu điều chỉnh kho thủ công và cập nhật tồn kho sản phẩm.
+     */
     public function store(Request $request)
     {
         // Phân loại kiểm kho thủ công chỉ được chọn: export (xuất hủy) hoặc adjustment (điều chỉnh cân bằng)

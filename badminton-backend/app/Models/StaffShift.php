@@ -30,6 +30,9 @@ class StaffShift extends Model
         'check_out_time' => 'datetime:Y-m-d H:i:s',
     ];
 
+    /**
+     * Chức năng: Khai báo quan hệ ca làm thuộc về một nhân viên.
+     */
     public function staff()
     {
         return $this->belongsTo(User::class, 'staff_id', 'id');

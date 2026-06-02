@@ -29,6 +29,9 @@ class Promotion extends Model
         'min_points_required' => 'integer',
     ];
 
+    /**
+     * Chức năng: Khai báo quan hệ model có nhiều đơn đặt sân liên quan.
+     */
     public function bookings()
     {
         return $this->hasMany(Booking::class, 'promotion_id', 'id');

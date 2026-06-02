@@ -9,6 +9,9 @@ use Illuminate\Http\Request;
 class CourtController extends Controller
 {
     // Lấy danh sách sân (Admin quản lý)
+    /**
+     * Chức năng: Lấy danh sách sân cho khu vực quản trị.
+     */
     public function index()
     {
         $courts = Court::all();
@@ -19,6 +22,9 @@ class CourtController extends Controller
     }
 
     // Thêm sân mới
+    /**
+     * Chức năng: Tạo mới sân với mã sân, thông tin mặt sân, sức chứa và trạng thái vận hành.
+     */
     public function store(Request $request)
     {
         $request->validate([
@@ -40,6 +46,9 @@ class CourtController extends Controller
     }
 
     // Xem chi tiết
+    /**
+     * Chức năng: Lấy chi tiết một sân.
+     */
     public function show($id)
     {
         $court = Court::find($id);
@@ -49,6 +58,9 @@ class CourtController extends Controller
     }
 
     // Cập nhật sân
+    /**
+     * Chức năng: Cập nhật thông tin cấu hình và trạng thái của sân.
+     */
     public function update(Request $request, $id)
     {
         $court = Court::find($id);
@@ -74,6 +86,9 @@ class CourtController extends Controller
     }
 
     // Xóa sân
+    /**
+     * Chức năng: Ngưng hoạt động sân bằng cách chuyển trạng thái thay vì xóa dữ liệu.
+     */
     public function destroy($id)
     {
         $court = Court::find($id);
@@ -88,6 +103,9 @@ class CourtController extends Controller
 
     // API PUBLIC: Lấy danh sách sân cho Khách hàng (Chỉ lấy sân Active kèm ảnh)
     // API PUBLIC: Lấy danh sách sân đang hoạt động cho Khách hàng
+    /**
+     * Chức năng: Lấy danh sách sân đang public cho khách xem và đặt lịch.
+     */
     public function getPublicCourts()
     {
         // Truy vấn lấy các sân có status = 'active'

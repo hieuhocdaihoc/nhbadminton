@@ -29,6 +29,9 @@ class Notification extends Model
         'created_at' => 'datetime',
     ];
 
+    /**
+     * Chức năng: Khai báo quan hệ thông báo thuộc về người nhận.
+     */
     public function receiver()
     {
         return $this->belongsTo(User::class, 'receiver_id', 'id');

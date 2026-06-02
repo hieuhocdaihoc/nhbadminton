@@ -20,6 +20,9 @@ class BookingController extends Controller
     // =========================================================================
     // 1. API CÔNG KHAI: Tra cứu lưới giờ khả dụng
     // =========================================================================
+    /**
+     * Chức năng: Tra cứu lịch trống/bận của một sân theo ngày để khách chọn khung giờ đặt.
+     */
     public function getCourtAvailability(Request $request, $courtId)
     {
         $request->validate([
@@ -115,6 +118,9 @@ class BookingController extends Controller
     // =========================================================================
     // 2. API CHỐT ĐẶT SÂN
     // =========================================================================
+    /**
+     * Chức năng: Chốt đặt sân lẻ hoặc định kỳ, tính giá, giảm giá, chống trùng lịch và tạo booking.
+     */
     public function store(Request $request)
     {
         $request->validate([
@@ -162,22 +168,21 @@ class BookingController extends Controller
                 }
             }
 
-            // Kiểm tra trùng lịch trước khi tạo đơn
-            foreach ($request->slots as $slot) {
-                if ($this->checkSlotBusy($request->court_id, $slot['date'], $slot['start'], $slot['end'])) {
-                    return response()->json([
-                        'status' => 'error',
-                        'message' => "Khung giờ {$slot['start']}-{$slot['end']} đã có người đặt!"
-                    ], 400);
-                }
-            }
-
             return DB::transaction(function () use ($request, $userId, $user, $promotion) {
                 // Khóa sân để hạn chế race condition khi nhiều người đặt cùng lúc
                 DB::table('courts')
                     ->where('id', $request->court_id)
                     ->lockForUpdate()
                     ->first();
+
+                foreach ($request->slots as $slot) {
+                    if ($this->checkSlotBusy($request->court_id, $slot['date'], $slot['start'], $slot['end'])) {
+                        return response()->json([
+                            'status' => 'error',
+                            'message' => "Khung giờ {$slot['start']}-{$slot['end']} đã có người đặt!"
+                        ], 400);
+                    }
+                }
 
                 /**
                  * Chia slot thành các nhóm liên tiếp.
@@ -332,21 +337,20 @@ class BookingController extends Controller
                 ], 400);
             }
 
-            // Nếu 1 ngày trong chuỗi bị trùng lịch thì hủy toàn bộ
-            foreach ($targetDates as $playDate) {
-                if ($this->checkSlotBusy($request->court_id, $playDate, $request->start_time, $request->end_time)) {
-                    return response()->json([
-                        'status' => 'error',
-                        'message' => "Ngày {$playDate} đã có lịch đặt. Không thể đăng ký chuỗi định kỳ!"
-                    ], 400);
-                }
-            }
-
             return DB::transaction(function () use ($request, $userId, $user, $promotion, $targetDates) {
                 DB::table('courts')
                     ->where('id', $request->court_id)
                     ->lockForUpdate()
                     ->first();
+
+                foreach ($targetDates as $playDate) {
+                    if ($this->checkSlotBusy($request->court_id, $playDate, $request->start_time, $request->end_time)) {
+                        return response()->json([
+                            'status' => 'error',
+                            'message' => "Ngày {$playDate} đã có lịch đặt. Không thể đăng ký chuỗi định kỳ!"
+                        ], 400);
+                    }
+                }
 
                 // Tạo hợp đồng định kỳ gốc
                 $recurring = RecurringBooking::create([
@@ -463,6 +467,9 @@ class BookingController extends Controller
     // =========================================================================
     // 3. API LỊCH SỬ CÁ NHÂN
     // =========================================================================
+    /**
+     * Chức năng: Lấy lịch sử đặt sân của khách hàng đang đăng nhập.
+     */
     public function getUserBookings(Request $request)
     {
         $user = $request->user('sanctum');
@@ -532,6 +539,9 @@ class BookingController extends Controller
     // =========================================================================
     // 4. API CONG KHAI: KHACH VANG LAI TRA CUU DON BANG MA DON + SO DIEN THOAI
     // =========================================================================
+    /**
+     * Chức năng: Cho khách vãng lai tra cứu đơn bằng mã booking và số điện thoại.
+     */
     public function lookupGuestBooking(Request $request)
     {
         $validated = $request->validate([
@@ -625,6 +635,9 @@ class BookingController extends Controller
         ]);
     }
 
+    /**
+     * Chức năng: Kiểm tra mã voucher khi khách nhập trước lúc chốt đặt sân.
+     */
     public function validatePromotion(Request $request)
     {
         $validated = $request->validate([
@@ -659,6 +672,9 @@ class BookingController extends Controller
     // =========================================================================
     // HÀM PHỤ: CHIA SLOT ĐẶT LẺ THÀNH CÁC NHÓM LIỀN NHAU
     // =========================================================================
+    /**
+     * Chức năng: Gom các khung giờ liên tiếp thành cùng một hóa đơn và tách khung giờ rời nhau.
+     */
     private function groupContinuousSlots(array $slots)
     {
         usort($slots, function ($a, $b) {
@@ -703,6 +719,9 @@ class BookingController extends Controller
     // =========================================================================
     // HÀM PHỤ: KIỂM TRA TRÙNG LỊCH
     // =========================================================================
+    /**
+     * Chức năng: Kiểm tra một khung giờ có bị trùng với booking chưa hủy hay không.
+     */
     private function checkSlotBusy($courtId, $date, $start, $end)
     {
         return BookingDetail::where('court_id', $courtId)
@@ -720,6 +739,9 @@ class BookingController extends Controller
     // =========================================================================
     // HÀM PHỤ: TÍNH ƯU ĐÃI ĐIỂM THÀNH VIÊN
     // =========================================================================
+    /**
+     * Chức năng: Tính giảm giá theo điểm thành viên dựa trên số phút khách đặt sân.
+     */
     private function calculateLoyaltyDiscount(?User $user, int|float $totalMinutes): float
     {
         if (!$user || $user->role !== 'customer' || (int) $user->points < 1000) {
@@ -731,6 +753,9 @@ class BookingController extends Controller
         return max(0, $hours * 5000);
     }
 
+    /**
+     * Chức năng: Tìm và kiểm tra điều kiện voucher theo mã, tài khoản hoặc số điện thoại khách.
+     */
     private function resolvePromotionForBooking(?string $code, ?User $user, ?string $customerPhone): ?Promotion
     {
         $code = strtoupper(trim((string) $code));
@@ -781,6 +806,9 @@ class BookingController extends Controller
         return $promotion;
     }
 
+    /**
+     * Chức năng: Tính số tiền được giảm từ voucher theo loại fixed hoặc percent.
+     */
     private function calculatePromotionDiscount(?Promotion $promotion, int|float $baseAmount): float
     {
         if (!$promotion || $baseAmount <= 0) {
@@ -794,6 +822,9 @@ class BookingController extends Controller
         return min($baseAmount, (float) $promotion->discount_value);
     }
 
+    /**
+     * Chức năng: Tạo thông báo cho admin/staff khi có đơn đặt sân mới.
+     */
     private function notifyAdminsAboutNewBookings(
         array $bookings,
         ?string $customerName,
@@ -841,6 +872,9 @@ class BookingController extends Controller
     // =========================================================================
     // HÀM PHỤ: TÍNH GIÁ THEO BẢNG GIÁ
     // =========================================================================
+    /**
+     * Chức năng: Tính giá thuê sân theo bảng giá nội bộ cho khung giờ khách chọn.
+     */
     private function internalCalculatePrice($courtId, $date, $start, $end)
     {
         $dayOfWeek = date('N', strtotime($date));

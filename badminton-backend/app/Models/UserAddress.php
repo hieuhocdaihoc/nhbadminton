@@ -23,6 +23,9 @@ class UserAddress extends Model
     ];
 
     // Thiết lập quan hệ ngược lại với User
+    /**
+     * Chức năng: Khai báo quan hệ bản ghi thuộc về một người dùng.
+     */
     public function user()
     {
         return $this->belongsTo(User::class, 'user_id', 'id');

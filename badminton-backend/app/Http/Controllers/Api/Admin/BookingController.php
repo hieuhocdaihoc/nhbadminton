@@ -12,13 +12,16 @@ use App\Models\AdditionalService;
 use App\Models\BookingServiceDetail;
 use App\Models\InventoryTransaction;
 use Illuminate\Support\Facades\DB;
-use App\Models\Payment;
+use App\Services\PaymentService;
 use Illuminate\Support\Str;
 use App\Models\User;
 
 class BookingController extends Controller
 {
     //xem  danh sách các ca chơi hôm nay (dành cho lễ tân)
+    /**
+     * Chức năng: Lấy danh sách các đơn có ca chơi trong ngày hiện tại cho lễ tân/admin theo dõi.
+     */
     public function getTodayBookings()
     {
         $today = \Carbon\Carbon::now()->format('Y-m-d');
@@ -41,6 +44,9 @@ class BookingController extends Controller
         ]);
     }
     // API ADMIN: Xem danh sách các ca chơi lẻ (không theo lịch đặt định kỳ)
+    /**
+     * Chức năng: Lấy danh sách đơn đặt sân lẻ, có hỗ trợ tìm theo tên, số điện thoại hoặc mã đơn.
+     */
     public function getSingleBookings(Request $request)
     {
         $query = Booking::whereNull('recurring_booking_id')->with(['details.court']);
@@ -61,6 +67,9 @@ class BookingController extends Controller
 
 
     // API ADMIN: Xem danh sách các lịch đặt định kỳ (Recurring Booking Masters)
+    /**
+     * Chức năng: Lấy danh sách hợp đồng/lịch đặt định kỳ gốc để quản lý lịch cố định.
+     */
     public function getRecurringMasters(Request $request)
     {
         $query = RecurringBooking::with(['court', 'user']);
@@ -83,6 +92,9 @@ class BookingController extends Controller
 
 
     // API ADMIN: Xem chi tiết các buổi chơi con của một lịch đặt định kỳ
+    /**
+     * Chức năng: Lấy các buổi chơi con thuộc một lịch đặt định kỳ.
+     */
     public function getRecurringSessions(Request $request, $recurringId)
     {
         // 1. Dùng with(['details.court']) để lấy Tên sân cho từng buổi đá con
@@ -114,6 +126,9 @@ class BookingController extends Controller
      * CẬP NHẬT TRẠNG THÁI ĐƠN ĐẶT SÂN
      * -------------------------------------------------------------
      */
+    /**
+     * Chức năng: Cập nhật trạng thái đơn đặt sân và kích hoạt cộng điểm khi đơn completed + paid.
+     */
     public function updateStatus(Request $request, $bookingId)
     {
         $request->validate([
@@ -123,10 +138,23 @@ class BookingController extends Controller
         return DB::transaction(function () use ($request, $bookingId) {
             // Khoa don de tranh cong diem hai lan neu nhieu nhan vien cap nhat cung luc.
             $booking = Booking::with('details')->lockForUpdate()->findOrFail($bookingId);
+            $oldStatus = $booking->status;
+
+            if ($request->status === 'completed' && $booking->payment_status !== 'paid') {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Chỉ có thể hoàn thành đơn sau khi khách đã thanh toán đủ.',
+                ], 422);
+            }
+
             $booking->status = $request->status;
             $booking->save();
 
             $reward = null;
+
+            if ($oldStatus !== 'completed' && $booking->status === 'completed') {
+                $reward = $this->rewardCustomerForCompletedBooking($booking);
+            }
 
             return response()->json([
                 'status' => 'success',
@@ -143,8 +171,19 @@ class BookingController extends Controller
      * Quy tac hien tai: moi 1 gio choi duoc 10 diem. Diem duoc tinh theo
      * tong duration_minutes cua cac ca san trong booking.
      */
+    /**
+     * Chức năng: Cộng điểm thành viên cho khách sau khi đơn đã hoàn thành và đã thanh toán, đồng thời chống cộng trùng.
+     */
     private function rewardCustomerForCompletedBooking(Booking $booking): ?array
     {
+        if ($booking->points_awarded_at !== null) {
+            return null;
+        }
+
+        if ($booking->status !== 'completed' || $booking->payment_status !== 'paid') {
+            return null;
+        }
+
         $totalMinutes = $this->calculateBookingPlayMinutes($booking);
         $earnedPoints = (int) floor($totalMinutes / 60 * 10);
 
@@ -180,6 +219,9 @@ class BookingController extends Controller
         $user->membership_level = $this->resolveMembershipLevel((int) $user->points);
         $user->save();
 
+        $booking->points_awarded_at = now();
+        $booking->save();
+
         return [
             'user_id' => $user->id,
             'earned_points' => $earnedPoints,
@@ -188,6 +230,9 @@ class BookingController extends Controller
         ];
     }
 
+    /**
+     * Chức năng: Mô tả nghiệp vụ của hàm calculateBookingPlayMinutes.
+     */
     private function calculateBookingPlayMinutes(Booking $booking): int
     {
         return (int) $booking->details->sum(function ($detail) {
@@ -203,6 +248,9 @@ class BookingController extends Controller
         });
     }
 
+    /**
+     * Chức năng: Xác định hạng thành viên dựa trên tổng điểm tích lũy hiện tại.
+     */
     private function resolveMembershipLevel(int $points): string
     {
         if ($points >= 3000) {
@@ -220,6 +268,9 @@ class BookingController extends Controller
      * XÁC NHẬN THANH TOÁN ĐƠN ĐẶT SÂN
      * -------------------------------------------------------------
      */
+    /**
+     * Chức năng: Cập nhật trạng thái thanh toán thủ công tại quầy và ghi nhận payment tiền mặt.
+     */
     public function updatePayment(Request $request, $bookingId)
     {
         $request->validate([
@@ -229,7 +280,6 @@ class BookingController extends Controller
         return DB::transaction(function () use ($request, $bookingId) {
 
             $booking = Booking::with('details')->lockForUpdate()->findOrFail($bookingId);
-            $oldPaymentStatus = $booking->payment_status;
 
             /**
              * Trường hợp lễ tân xác nhận khách đã thanh toán đủ
@@ -247,30 +297,14 @@ class BookingController extends Controller
                     ], 400);
                 }
 
-                // Tạo dòng thanh toán tiền mặt
-                Payment::create([
+                app(PaymentService::class)->recordSuccessfulPayment($booking, [
                     'payment_code' => 'PAY-' . now()->format('YmdHis') . '-' . strtoupper(Str::random(6)),
-                    'booking_id' => $booking->id,
-                    'user_id' => $booking->user_id,
                     'payment_method' => 'cash',
                     'amount' => $cashAmount,
                     'paid_at' => now(),
-                    'status' => 'success',
                     'reference_code' => $booking->booking_code ?? null,
                     'payment_content' => 'Lễ tân xác nhận khách thanh toán tiền mặt tại quầy',
-                    'sepay_transaction_id' => null,
-                    'bank_gateway' => null,
                 ]);
-
-                // Cập nhật lại tổng tiền đã thanh toán trong booking
-                $booking->deposit_amount = $booking->deposit_amount + $cashAmount;
-                $booking->remaining_amount = 0;
-                $booking->payment_status = 'paid';
-
-                // Nếu đơn đang chờ duyệt thì xác nhận luôn
-                if ($booking->status === 'pending') {
-                    $booking->status = 'confirmed';
-                }
             }
 
             /**
@@ -291,19 +325,11 @@ class BookingController extends Controller
 
             $booking->save();
 
-            $reward = null;
-
-            // Cong diem ngay khi don vua duoc thu tien du, vi nut "Thu tien"
-            // cua frontend di qua luong payment chu khong di qua luong completed.
-            if ($oldPaymentStatus !== 'paid' && $booking->payment_status === 'paid') {
-                $reward = $this->rewardCustomerForCompletedBooking($booking);
-            }
-
             return response()->json([
                 'status' => 'success',
                 'message' => 'Cập nhật thanh toán thành công!',
                 'data' => $booking->fresh(['details', 'user']),
-                'reward' => $reward,
+                'reward' => null,
             ]);
         });
     }
@@ -319,6 +345,9 @@ class BookingController extends Controller
     // =========================================================================
     // API ADMIN: Đổi lịch (Ngày, Giờ, Sân) cho một ca chơi cụ thể
     // =========================================================================
+    /**
+     * Chức năng: Đổi ngày, giờ hoặc sân cho một chi tiết ca chơi sau khi kiểm tra trùng lịch.
+     */
     public function reschedule(Request $request, $detailId)
     {
         // 1. Validate dữ liệu đầu vào
@@ -388,6 +417,9 @@ class BookingController extends Controller
         });
     }
     // Hàm tính giá nội bộ dựa trên bảng Court_Pricing (có tính đến ngày hiệu lực và loại ngày)
+    /**
+     * Chức năng: Tính tiền sân nội bộ theo ngày chơi, khung giờ và bảng giá đang áp dụng.
+     */
     private function internalCalculatePrice($courtId, $date, $start, $end)
     {
         $dayOfWeek = date('N', strtotime($date));
@@ -424,6 +456,9 @@ class BookingController extends Controller
     // =========================================================================
     // API ADMIN: Tìm kiếm và Lọc hóa đơn đa năng
     // =========================================================================
+    /**
+     * Chức năng: Tìm kiếm nhanh đơn đặt sân theo mã đơn, tên khách hoặc số điện thoại.
+     */
     public function searchBookings(Request $request)
     {
         // Khởi tạo Query Builder nạp sẵn các ca chơi con
@@ -471,6 +506,9 @@ class BookingController extends Controller
     // =========================================================================
     // LỄ TÂN: THÊM DỊCH VỤ / SẢN PHẨM VÀO HÓA ĐƠN ĐANG CHƠI
     // =========================================================================
+    /**
+     * Chức năng: Thêm một sản phẩm hoặc dịch vụ phát sinh vào bill của đơn đặt sân.
+     */
     public function addItemToBooking(Request $request, $bookingId)
     {
         $request->validate([
@@ -570,6 +608,9 @@ class BookingController extends Controller
     // =========================================================================
 // LỄ TÂN: THÊM NHIỀU DỊCH VỤ / SẢN PHẨM VÀO HÓA ĐƠN ĐANG CHƠI
 // =========================================================================
+    /**
+     * Chức năng: Thêm nhiều sản phẩm/dịch vụ phát sinh vào bill trong một lần thao tác.
+     */
     public function addItemsToBooking(Request $request, $bookingId)
     {
         $request->validate([

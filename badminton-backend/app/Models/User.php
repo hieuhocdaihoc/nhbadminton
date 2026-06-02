@@ -45,17 +45,34 @@ class User extends Authenticatable
     }
 
     // Ghi đè để Laravel hiểu password_hash là cột mật khẩu[cite: 1]
+    /**
+     * Chức năng: Trả về cột password_hash để Laravel Sanctum xác thực mật khẩu đúng cột database.
+     */
     public function getAuthPassword()
     {
         return $this->password_hash;
     }
+    /**
+     * Chức năng: Khai báo quan hệ người dùng có nhiều đơn đặt sân.
+     */
     public function bookings()
     {
         return $this->hasMany(Booking::class, 'user_id', 'id');
     }
 
+    /**
+     * Chức năng: Khai báo quan hệ người dùng có nhiều ca làm nhân viên.
+     */
     public function staffShifts()
     {
         return $this->hasMany(StaffShift::class, 'staff_id', 'id');
+    }
+
+    /**
+     * Chức năng: Khai báo quan hệ model có nhiều đánh giá liên quan.
+     */
+    public function reviews()
+    {
+        return $this->hasMany(Review::class, 'user_id', 'id');
     }
 }

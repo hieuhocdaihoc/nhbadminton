@@ -13,6 +13,9 @@ class EnsureUserHasRole
      *
      * Usage: middleware('role:admin,staff')
      */
+    /**
+     * Chức năng: Kiểm tra token đăng nhập và đảm bảo người dùng có một trong các role được phép truy cập route.
+     */
     public function handle(Request $request, Closure $next, string ...$roles): Response
     {
         $user = $request->user();

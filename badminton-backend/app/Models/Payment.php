@@ -38,6 +38,9 @@ class Payment extends Model
      * QUAN HỆ VỚI ĐƠN ĐẶT SÂN
      * -------------------------------------------------------------
      */
+    /**
+     * Chức năng: Khai báo quan hệ bản ghi thuộc về một đơn đặt sân.
+     */
     public function booking()
     {
         return $this->belongsTo(Booking::class, 'booking_id', 'id');
@@ -47,6 +50,9 @@ class Payment extends Model
      * -------------------------------------------------------------
      * QUAN HỆ VỚI NGƯỜI THANH TOÁN
      * -------------------------------------------------------------
+     */
+    /**
+     * Chức năng: Khai báo quan hệ bản ghi thuộc về một người dùng.
      */
     public function user()
     {

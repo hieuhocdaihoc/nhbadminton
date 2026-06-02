@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { bookingService } from '../../services/user/bookingService';
+import { reviewService } from '../../services/user/reviewService';
 
 const BookingHistory = () => {
     const [bookings, setBookings] = useState([]);
@@ -8,6 +9,13 @@ const BookingHistory = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('upcoming');
     const [errorMessage, setErrorMessage] = useState('');
+    const [reviewModal, setReviewModal] = useState({
+        isOpen: false,
+        booking: null,
+        rating: 5,
+        comment: '',
+        isSubmitting: false,
+    });
 
     const fetchHistoryData = async (tab, page) => {
         setIsLoading(true);
@@ -25,10 +33,48 @@ const BookingHistory = () => {
         } finally { setIsLoading(false); }
     };
 
-    useEffect(() => { fetchHistoryData(activeTab, 1); }, [activeTab]);
+    useEffect(() => {
+        const timer = setTimeout(() => fetchHistoryData(activeTab, 1), 0);
+        return () => clearTimeout(timer);
+    }, [activeTab]);
 
     const handlePageChange = (p) => {
         if (p >= 1 && p <= pagination.last_page) fetchHistoryData(activeTab, p);
+    };
+
+    const openReviewModal = (booking) => {
+        setReviewModal({
+            isOpen: true,
+            booking,
+            rating: 5,
+            comment: '',
+            isSubmitting: false,
+        });
+    };
+
+    const closeReviewModal = () => {
+        setReviewModal({ isOpen: false, booking: null, rating: 5, comment: '', isSubmitting: false });
+    };
+
+    const submitReview = async () => {
+        if (!reviewModal.booking?.summary?.court_id) return;
+
+        setReviewModal((prev) => ({ ...prev, isSubmitting: true }));
+        try {
+            await reviewService.createReview({
+                target_type: 'court',
+                target_id: reviewModal.booking.summary.court_id,
+                booking_id: reviewModal.booking.booking_id,
+                rating: reviewModal.rating,
+                comment: reviewModal.comment,
+            });
+            closeReviewModal();
+            setErrorMessage('Đã gửi đánh giá sân.');
+        } catch (error) {
+            console.error('Lỗi gửi đánh giá:', error);
+            setErrorMessage(error.response?.data?.message || 'Không thể gửi đánh giá.');
+            setReviewModal((prev) => ({ ...prev, isSubmitting: false }));
+        }
     };
 
     const getStatusStyle = (status, paymentStatus) => {
@@ -143,6 +189,15 @@ const BookingHistory = () => {
                                             {/* Row 3: Meta */}
                                             <div className="mt-3 pt-3 border-t border-zinc-800/40 flex items-center justify-between">
                                                 <span className="text-[10px] text-zinc-600">{item.details_count || 1} block · Đặt lúc {item.created_at}</span>
+                                                {item.status === 'completed' && item.payment_status === 'paid' && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => openReviewModal(item)}
+                                                        className="rounded-lg border border-lime-500/20 px-3 py-1.5 text-[11px] font-bold text-lime-400 hover:bg-lime-500/10"
+                                                    >
+                                                        Đánh giá sân
+                                                    </button>
+                                                )}
                                             </div>
                                         </motion.div>
                                     );
@@ -173,6 +228,62 @@ const BookingHistory = () => {
                             className={`px-3 py-2 rounded-lg text-xs font-semibold transition-colors ${pagination.current_page === pagination.last_page ? 'text-zinc-700 cursor-not-allowed' : 'text-zinc-400 hover:text-white hover:bg-zinc-800'}`}>
                             →
                         </button>
+                    </div>
+                )}
+
+                {reviewModal.isOpen && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4">
+                        <div className="w-full max-w-md rounded-2xl border border-zinc-800 bg-zinc-950 p-5 shadow-2xl">
+                            <h3 className="text-lg font-extrabold text-white">Đánh giá sân</h3>
+                            <p className="mt-1 text-xs text-zinc-500">
+                                Mã đơn {reviewModal.booking?.booking_code}
+                            </p>
+
+                            <div className="mt-5">
+                                <p className="mb-2 text-xs font-bold uppercase tracking-widest text-zinc-500">Số sao</p>
+                                <div className="flex gap-2">
+                                    {[1, 2, 3, 4, 5].map((rating) => (
+                                        <button
+                                            key={rating}
+                                            type="button"
+                                            onClick={() => setReviewModal((prev) => ({ ...prev, rating }))}
+                                            className={`text-3xl ${rating <= reviewModal.rating ? 'text-amber-300' : 'text-zinc-700'}`}
+                                        >
+                                            ★
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="mt-5">
+                                <p className="mb-2 text-xs font-bold uppercase tracking-widest text-zinc-500">Nội dung</p>
+                                <textarea
+                                    value={reviewModal.comment}
+                                    onChange={(event) => setReviewModal((prev) => ({ ...prev, comment: event.target.value }))}
+                                    rows={4}
+                                    placeholder="Cảm nhận về chất lượng sân, ánh sáng, dịch vụ..."
+                                    className="w-full resize-none rounded-xl border border-zinc-800 bg-zinc-900 p-3 text-sm text-white outline-none focus:border-lime-400"
+                                />
+                            </div>
+
+                            <div className="mt-5 flex justify-end gap-2">
+                                <button
+                                    type="button"
+                                    onClick={closeReviewModal}
+                                    className="rounded-xl px-4 py-2 text-sm font-bold text-zinc-400 hover:bg-zinc-900"
+                                >
+                                    Hủy
+                                </button>
+                                <button
+                                    type="button"
+                                    disabled={reviewModal.isSubmitting || reviewModal.comment.trim().length < 5}
+                                    onClick={submitReview}
+                                    className="rounded-xl bg-lime-500 px-4 py-2 text-sm font-extrabold text-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                    Gửi đánh giá
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 )}
             </div>

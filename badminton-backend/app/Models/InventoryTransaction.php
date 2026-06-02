@@ -28,11 +28,17 @@ class InventoryTransaction extends Model
     // =========================================================================
     // THÊM MỐI QUAN HỆ: 1 Lịch sử biến động phải thuộc về 1 Sản phẩm cụ thể
     // =========================================================================
+    /**
+     * Chức năng: Khai báo quan hệ bản ghi thuộc về một sản phẩm.
+     */
     public function product()
     {
         return $this->belongsTo(Product::class, 'product_id', 'id');
     }
 
+    /**
+     * Chức năng: Khai báo quan hệ bản ghi được tạo bởi một người dùng trong hệ thống.
+     */
     public function creator()
     {
         return $this->belongsTo(User::class, 'created_by', 'id');

@@ -34,6 +34,7 @@ import SupplierManager from "./pages/admin/SupplierManager";
 import InventoryManager from "./pages/admin/InventoryManager";
 import RevenueManager from "./pages/admin/RevenueManager";
 import PromotionManager from "./pages/admin/PromotionManager";
+import ReviewManager from "./pages/admin/ReviewManager";
 
 const ADMIN_HOME_BY_ROLE = {
   admin: "/admin/dashboard",
@@ -271,6 +272,14 @@ function App() {
           element={
             <ProtectedAdminPage allowedRoles={["admin", "staff"]}>
               <PromotionManager />
+            </ProtectedAdminPage>
+          }
+        />
+        <Route
+          path="/admin/reviews"
+          element={
+            <ProtectedAdminPage allowedRoles={["admin", "staff"]}>
+              <ReviewManager />
             </ProtectedAdminPage>
           }
         />

@@ -21,6 +21,9 @@ class PurchaseOrderDetail extends Model
         'total_price'
     ];
 
+    /**
+     * Chức năng: Khai báo quan hệ bản ghi thuộc về một sản phẩm.
+     */
     public function product()
     {
         return $this->belongsTo(Product::class, 'product_id', 'id');

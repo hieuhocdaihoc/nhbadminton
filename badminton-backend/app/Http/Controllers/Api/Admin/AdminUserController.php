@@ -11,11 +11,17 @@ use Illuminate\Support\Str;
 
 class AdminUserController extends Controller
 {
+    /**
+     * Chức năng: Kiểm tra người đang thao tác có phải staff hay không để giới hạn quyền nhạy cảm.
+     */
     private function isStaff(Request $request): bool
     {
         return $request->user()?->role === 'staff';
     }
 
+    /**
+     * Chức năng: Trả về response từ chối khi staff thực hiện chức năng chỉ dành cho admin.
+     */
     private function staffForbiddenResponse()
     {
         return response()->json([
@@ -23,6 +29,9 @@ class AdminUserController extends Controller
         ], 403);
     }
 
+    /**
+     * Chức năng: Mô tả nghiệp vụ của hàm staffCannotManageUser.
+     */
     private function staffCannotManageUser(Request $request, User $user): bool
     {
         return $this->isStaff($request) && $user->role !== 'customer';
@@ -32,6 +41,9 @@ class AdminUserController extends Controller
      * -------------------------------------------------------------
      * LẤY DANH SÁCH TÀI KHOẢN
      * -------------------------------------------------------------
+     */
+    /**
+     * Chức năng: Lấy danh sách tài khoản, hỗ trợ lọc theo role, trạng thái và từ khóa tìm kiếm.
      */
     public function index(Request $request)
     {
@@ -73,6 +85,9 @@ class AdminUserController extends Controller
      * -------------------------------------------------------------
      * TẠO TÀI KHOẢN MỚI
      * -------------------------------------------------------------
+     */
+    /**
+     * Chức năng: Tạo tài khoản mới cho admin, staff hoặc customer theo quyền của người thao tác.
      */
     public function store(Request $request)
     {
@@ -168,6 +183,9 @@ class AdminUserController extends Controller
      * XEM CHI TIẾT TÀI KHOẢN
      * -------------------------------------------------------------
      */
+    /**
+     * Chức năng: Lấy chi tiết một tài khoản để xem hồ sơ và dữ liệu quản trị liên quan.
+     */
     public function show(Request $request, $id)
     {
         $user = User::findOrFail($id);
@@ -185,6 +203,9 @@ class AdminUserController extends Controller
      * -------------------------------------------------------------
      * CẬP NHẬT TÀI KHOẢN
      * -------------------------------------------------------------
+     */
+    /**
+     * Chức năng: Cập nhật thông tin tài khoản và bảo vệ các vùng dữ liệu nhạy cảm theo role.
      */
     public function update(Request $request, $id)
     {
@@ -246,6 +267,9 @@ class AdminUserController extends Controller
      * KHÓA / MỞ KHÓA TÀI KHOẢN
      * -------------------------------------------------------------
      */
+    /**
+     * Chức năng: Khóa hoặc mở khóa tài khoản người dùng theo quyền quản trị.
+     */
     public function updateStatus(Request $request, $id)
     {
         $user = User::findOrFail($id);
@@ -280,6 +304,9 @@ class AdminUserController extends Controller
      * RESET MẬT KHẨU
      * -------------------------------------------------------------
      */
+    /**
+     * Chức năng: Đặt lại mật khẩu cho tài khoản được chọn theo quyền của người thao tác.
+     */
     public function resetPassword(Request $request, $id)
     {
         $user = User::findOrFail($id);
@@ -312,6 +339,9 @@ class AdminUserController extends Controller
      * -------------------------------------------------------------
      * THỐNG KÊ ĐƠN ĐẶT SÂN CỦA TÀI KHOẢN
      * -------------------------------------------------------------
+     */
+    /**
+     * Chức năng: Tổng hợp thống kê đặt sân và chi tiêu của một khách hàng.
      */
     public function bookingStats(Request $request, $id)
     {

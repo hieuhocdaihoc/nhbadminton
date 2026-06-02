@@ -16,6 +16,9 @@ class PurchaseOrderController extends Controller
     // =========================================================================
     // 1. XEM LỊCH SỬ NHẬP KHO
     // =========================================================================
+    /**
+     * Chức năng: Lấy danh sách phiếu nhập kho kèm nhà cung cấp và người tạo.
+     */
     public function index()
     {
         // Lay danh sach phieu nhap kem nha cung cap va nhan vien thuc hien.
@@ -29,6 +32,9 @@ class PurchaseOrderController extends Controller
     // =========================================================================
     // 2. XEM CHI TIẾT 1 PHIẾU NHẬP
     // =========================================================================
+    /**
+     * Chức năng: Lấy chi tiết phiếu nhập kho và các dòng sản phẩm nhập.
+     */
     public function show($id)
     {
         $order = PurchaseOrder::with([
@@ -44,6 +50,9 @@ class PurchaseOrderController extends Controller
     // =========================================================================
     // 3. THỰC HIỆN NHẬP KHO (TRANSACTION ĐA BẢNG)
     // =========================================================================
+    /**
+     * Chức năng: Tạo phiếu nhập kho, tăng tồn sản phẩm và ghi lịch sử inventory transaction.
+     */
     public function store(Request $request)
     {
         $request->validate([

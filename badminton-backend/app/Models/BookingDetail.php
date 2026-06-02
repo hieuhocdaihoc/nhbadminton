@@ -36,10 +36,16 @@ class BookingDetail extends Model
         'overtime_minutes' => 'integer',
     ];
 
+    /**
+     * Chức năng: Khai báo quan hệ bản ghi thuộc về một đơn đặt sân.
+     */
     public function booking()
     {
         return $this->belongsTo(Booking::class, 'booking_id', 'id');
     }
+    /**
+     * Chức năng: Khai báo quan hệ chi tiết đặt sân thuộc về một sân.
+     */
     public function court()
     {
         return $this->belongsTo(Court::class, 'court_id', 'id');

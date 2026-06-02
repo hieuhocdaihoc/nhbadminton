@@ -10,6 +10,9 @@ use Illuminate\Support\Facades\Storage;
 class ImageController extends Controller
 {
     // 1. Upload hình ảnh mới
+    /**
+     * Chức năng: Upload và lưu thông tin ảnh gắn với sân, sản phẩm, danh mục, dịch vụ hoặc người dùng.
+     */
     public function store(Request $request)
     {
         $request->validate([
@@ -66,6 +69,9 @@ class ImageController extends Controller
     }
 
     // 2. Xóa hình ảnh
+    /**
+     * Chức năng: Xóa bản ghi ảnh và file vật lý nếu còn tồn tại trong storage.
+     */
     public function destroy($id)
     {
         $image = Image::find($id);

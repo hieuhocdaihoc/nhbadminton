@@ -32,18 +32,27 @@ class BookingServiceDetail extends Model
     // =========================================================================
 
     // 1. Chi tiết này phải thuộc về 1 Đơn đặt sân (Booking) cụ thể
+    /**
+     * Chức năng: Khai báo quan hệ bản ghi thuộc về một đơn đặt sân.
+     */
     public function booking()
     {
         return $this->belongsTo(Booking::class, 'booking_id', 'id');
     }
 
     // 2. Nếu món hàng thêm vào là Sản phẩm (Nước uống, quả cầu...)
+    /**
+     * Chức năng: Khai báo quan hệ bản ghi thuộc về một sản phẩm.
+     */
     public function product()
     {
         return $this->belongsTo(Product::class, 'product_id', 'id');
     }
 
     // 3. Nếu món hàng thêm vào là Dịch vụ (Thuê vợt, dạy cầu...)
+    /**
+     * Chức năng: Khai báo quan hệ dòng bill thuộc về một dịch vụ bổ sung.
+     */
     public function service()
     {
         return $this->belongsTo(AdditionalService::class, 'service_id', 'id');

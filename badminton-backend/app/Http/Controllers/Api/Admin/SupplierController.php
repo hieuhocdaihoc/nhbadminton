@@ -11,6 +11,9 @@ class SupplierController extends Controller
     // =========================================================================
     // 1. LẤY DANH SÁCH & TÌM KIẾM NHÀ CUNG CẤP
     // =========================================================================
+    /**
+     * Chức năng: Lấy danh sách nhà cung cấp, hỗ trợ tìm kiếm theo tên, điện thoại hoặc email.
+     */
     public function index(Request $request)
     {
         // Lấy từ khóa tìm kiếm từ url (?keyword=...)
@@ -32,6 +35,9 @@ class SupplierController extends Controller
     // =========================================================================
     // 2. THÊM MỚI NHÀ CUNG CẤP
     // =========================================================================
+    /**
+     * Chức năng: Tạo mới thông tin nhà cung cấp.
+     */
     public function store(Request $request)
     {
         // Kiểm tra dữ liệu đầu vào: Tên là bắt buộc, các thông tin khác có thể trống
@@ -52,6 +58,9 @@ class SupplierController extends Controller
     // =========================================================================
     // 3. XEM CHI TIẾT MỘT NHÀ CUNG CẤP
     // =========================================================================
+    /**
+     * Chức năng: Lấy chi tiết nhà cung cấp.
+     */
     public function show($id)
     {
         // Tìm nhà cung cấp theo mã ID (UUID)
@@ -67,6 +76,9 @@ class SupplierController extends Controller
     // =========================================================================
     // 4. CẬP NHẬT THÔNG TIN NHÀ CUNG CẤP
     // =========================================================================
+    /**
+     * Chức năng: Cập nhật thông tin nhà cung cấp.
+     */
     public function update(Request $request, $id)
     {
         // Kiểm tra xem nhà cung cấp có tồn tại trước khi sửa không
@@ -92,6 +104,9 @@ class SupplierController extends Controller
     // =========================================================================
     // 5. XÓA CỨNG NHÀ CUNG CẤP (CÓ CHẶN LỖI FOREIGN KEY)
     // =========================================================================
+    /**
+     * Chức năng: Xóa nhà cung cấp khi không còn dùng trong nghiệp vụ.
+     */
     public function destroy($id)
     {
         $supplier = Supplier::find($id);

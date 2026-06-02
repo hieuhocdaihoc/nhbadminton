@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import { Fragment, useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { courtService } from '../../services/user/courtService';
+import { reviewService } from '../../services/user/reviewService';
 
 /* ═══════════════════════════════════════════════════════════
    DỮ LIỆU TĨNH - GIỮ NGUYÊN TỪ BẢN GỐC
@@ -44,8 +46,11 @@ const floatSlow = {
    HOMEPAGE COMPONENT
    ═══════════════════════════════════════════════════════════ */
 const HomePage = () => {
+    const navigate = useNavigate();
     // ─── STATES GIỮ NGUYÊN ───
     const [publicCourts, setPublicCourts] = useState([]);
+    const [publicReviews, setPublicReviews] = useState([]);
+    const [reviewSummary, setReviewSummary] = useState({ average_rating: 0, total_reviews: 0 });
     const [isLoadingCourts, setIsLoadingCourts] = useState(false);
     const [searchDate, setSearchDate] = useState(new Date().toLocaleDateString('sv-SE'));
 
@@ -66,10 +71,25 @@ const HomePage = () => {
         fetchCourts();
     }, []);
 
+    useEffect(() => {
+        const fetchReviews = async () => {
+            try {
+                const response = await reviewService.getPublicReviews({ target_type: 'court', limit: 6 });
+                const payload = response.data?.data || {};
+                setPublicReviews(payload.reviews || []);
+                setReviewSummary(payload.summary || { average_rating: 0, total_reviews: 0 });
+            } catch (error) {
+                console.error('Lỗi tải đánh giá trang chủ:', error);
+            }
+        };
+
+        fetchReviews();
+    }, []);
+
     // ─── ĐIỀU HƯỚNG CHỌN SÂN ───
     const handleSelectCourtToBook = (court) => {
         if (!searchDate) { alert('Vui lòng chọn ngày thi đấu trước!'); return; }
-        window.location.href = `/booking-page?courtId=${court.id}&date=${searchDate}`;
+        navigate(`/booking-page?courtId=${court.id}&date=${searchDate}`);
     };
 
     return (
@@ -285,7 +305,7 @@ const HomePage = () => {
                                     const isCenterHub = publicCourts.length === 5 && index === 4;
 
                                     return (
-                                        <React.Fragment key={court.id}>
+                                        <Fragment key={court.id}>
                                             {isCenterHub && (
                                                 <div className="hidden lg:flex flex-col justify-between border border-zinc-700/40 rounded-2xl p-4 text-center bg-zinc-800/30 overflow-hidden relative">
                                                     <div className="pb-3 border-b border-zinc-700/30">
@@ -339,9 +359,50 @@ const HomePage = () => {
                                                     </span>
                                                 </div>
                                             </motion.div>
-                                        </React.Fragment>
+                                        </Fragment>
                                     );
                                 })}
+                            </div>
+                        )}
+                    </motion.div>
+
+                    {/* ĐÁNH GIÁ KHÁCH HÀNG */}
+                    <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="max-w-6xl mx-auto mt-12">
+                        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-5">
+                            <div>
+                                <p className="text-xs font-bold text-lime-400 uppercase tracking-widest mb-1">[ Đánh giá sân ]</p>
+                                <h3 className="text-xl sm:text-2xl font-extrabold text-white tracking-tight uppercase">Khách hàng nói gì</h3>
+                            </div>
+                            <div className="text-sm font-bold text-amber-300">
+                                ★ {reviewSummary.average_rating || 0}/5 · {reviewSummary.total_reviews || 0} đánh giá
+                            </div>
+                        </div>
+
+                        {publicReviews.length === 0 ? (
+                            <div className="rounded-3xl border border-zinc-800 bg-zinc-900/50 p-8 text-center text-sm font-semibold text-zinc-500">
+                                Chưa có đánh giá sân.
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                {publicReviews.map((review) => (
+                                    <div key={review.id} className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-5">
+                                        <div className="flex items-center justify-between gap-3 mb-3">
+                                            <div className="text-amber-300 text-sm">
+                                                {'★'.repeat(review.rating)}<span className="text-zinc-700">{'★'.repeat(5 - review.rating)}</span>
+                                            </div>
+                                            <span className="text-[10px] font-bold text-lime-400 bg-lime-500/10 px-2 py-1 rounded">
+                                                {review.court?.name || 'Sân'}
+                                            </span>
+                                        </div>
+                                        <p className="text-sm leading-6 text-zinc-300 line-clamp-4">{review.comment}</p>
+                                        <p className="mt-4 text-xs font-bold text-white">{review.user?.full_name || 'Khách hàng'}</p>
+                                        {review.staff_reply && (
+                                            <div className="mt-3 rounded-xl bg-lime-500/10 p-3 text-xs leading-5 text-lime-200">
+                                                <strong>NH Badminton:</strong> {review.staff_reply}
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
                             </div>
                         )}
                     </motion.div>

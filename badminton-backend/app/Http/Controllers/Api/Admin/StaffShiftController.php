@@ -18,6 +18,9 @@ class StaffShiftController extends Controller
      * Ho tro loc theo nhan vien, trang thai, khoang ngay va tu khoa.
      * Ket qua tra ve dang phan trang de frontend hien thi bang du lieu.
      */
+    /**
+     * Chức năng: Lấy danh sách ca làm nhân viên, hỗ trợ lọc theo nhân viên, ngày và trạng thái.
+     */
     public function index(Request $request)
     {
         $query = StaffShift::with(['staff:id,full_name,phone,email,status'])
@@ -54,6 +57,9 @@ class StaffShiftController extends Controller
      * Ham nay validate nhan vien phai co role staff, kiem tra gio bat dau/ket thuc
      * va chan truong hop nhan vien bi xep trung ca trong cung mot ngay.
      */
+    /**
+     * Chức năng: Tạo ca làm mới cho nhân viên sau khi kiểm tra trùng ca.
+     */
     public function store(Request $request)
     {
         $validated = $this->validatedShift($request);
@@ -83,6 +89,9 @@ class StaffShiftController extends Controller
      *
      * Dung khi frontend can xem day du thong tin ca va thong tin nhan vien duoc phan ca.
      */
+    /**
+     * Chức năng: Lấy chi tiết một ca làm.
+     */
     public function show($id)
     {
         $shift = StaffShift::with('staff:id,full_name,phone,email,status')->findOrFail($id);
@@ -98,6 +107,9 @@ class StaffShiftController extends Controller
      *
      * Cho phep sua nhan vien, ngay, ten ca, khung gio, trang thai va ghi chu.
      * Neu thay doi ngay/gio/nhan vien thi van kiem tra trung ca truoc khi luu.
+     */
+    /**
+     * Chức năng: Cập nhật thông tin ca làm và kiểm tra lại trùng ca nếu đổi lịch.
      */
     public function update(Request $request, $id)
     {
@@ -129,6 +141,9 @@ class StaffShiftController extends Controller
      * Chi cho xoa ca chua dang dien ra; ca co trang thai working bi chan de
      * tranh mat du lieu cham cong khi nhan vien dang lam viec.
      */
+    /**
+     * Chức năng: Xóa ca làm chưa hoặc không cần quản lý nữa.
+     */
     public function destroy($id)
     {
         $shift = StaffShift::findOrFail($id);
@@ -151,6 +166,9 @@ class StaffShiftController extends Controller
      *
      * Khi admin bam check-in, he thong ghi thoi diem vao ca thuc te va doi
      * trang thai sang working. Neu ca da co check_in_time thi giu lai moc cu.
+     */
+    /**
+     * Chức năng: Ghi nhận thời điểm nhân viên bắt đầu ca làm thực tế.
      */
     public function checkIn($id)
     {
@@ -178,6 +196,9 @@ class StaffShiftController extends Controller
      *
      * Chi ap dung cho ca dang working. He thong ghi thoi diem ra ca, cap nhat
      * trang thai completed va luu ghi chu ban giao neu admin nhap them.
+     */
+    /**
+     * Chức năng: Ghi nhận thời điểm nhân viên kết thúc ca và lưu ghi chú bàn giao.
      */
     public function checkOut(Request $request, $id)
     {
@@ -212,6 +233,9 @@ class StaffShiftController extends Controller
      * de chi validate nhung truong frontend gui len. staff_id bat buoc ton tai
      * trong bang users va phai co role staff.
      */
+    /**
+     * Chức năng: Mô tả nghiệp vụ của hàm validatedShift.
+     */
     private function validatedShift(Request $request, bool $isUpdate = false): array
     {
         $required = $isUpdate ? 'sometimes' : 'required';
@@ -238,6 +262,9 @@ class StaffShiftController extends Controller
      *
      * Quy tac trung ca: cung nhan vien, cung ngay, ca cu chua bi huy va khoang
      * thoi gian moi giao nhau voi khoang thoi gian da ton tai.
+     */
+    /**
+     * Chức năng: Tìm ca làm bị chồng thời gian với nhân viên được phân ca.
      */
     private function findOverlappingShift(
         string $staffId,

@@ -11,6 +11,9 @@ class CategoryController extends Controller
     // =========================================================================
     // 1. LẤY DANH SÁCH DANH MỤC (Có lọc theo trạng thái)
     // =========================================================================
+    /**
+     * Chức năng: Lấy danh sách danh mục sản phẩm/dịch vụ, có hỗ trợ lọc trạng thái.
+     */
     public function index(Request $request)
     {
         $query = Category::query();
@@ -29,6 +32,9 @@ class CategoryController extends Controller
     // =========================================================================
     // 2. THÊM MỚI DANH MỤC SẢN PHẨM
     // =========================================================================
+    /**
+     * Chức năng: Tạo mới danh mục để nhóm sản phẩm hoặc hàng hóa.
+     */
     public function store(Request $request)
     {
         // Kiểm tra dữ liệu: 'unique:categories,name' đảm bảo không có 2 danh mục trùng tên nhau
@@ -51,6 +57,9 @@ class CategoryController extends Controller
     // =========================================================================
     // 3. XEM CHI TIẾT MỘT DANH MỤC
     // =========================================================================
+    /**
+     * Chức năng: Lấy chi tiết một danh mục.
+     */
     public function show($id)
     {
         $category = Category::find($id);
@@ -63,6 +72,9 @@ class CategoryController extends Controller
     // =========================================================================
     // 4. CẬP NHẬT DANH MỤC (CHỐNG TRÙNG TÊN CHÍNH NÓ)
     // =========================================================================
+    /**
+     * Chức năng: Cập nhật tên, mô tả hoặc trạng thái danh mục.
+     */
     public function update(Request $request, $id)
     {
         $category = Category::find($id);
@@ -86,6 +98,9 @@ class CategoryController extends Controller
     // =========================================================================
     // 5. XÓA MỀM DANH MỤC (ẨN KHỎI MENU BÁN HÀNG)
     // =========================================================================
+    /**
+     * Chức năng: Tạm ngưng danh mục bằng trạng thái inactive để giữ dữ liệu cũ.
+     */
     public function destroy($id)
     {
         $category = Category::find($id);

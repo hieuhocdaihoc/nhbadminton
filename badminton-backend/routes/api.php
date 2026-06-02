@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\User\BookingController as UserBooking;
+use App\Http\Controllers\Api\User\ReviewController as UserReviewController;
 use App\Http\Controllers\Api\Admin\{
     AdminUserController,
     AdditionalServiceController,
@@ -21,6 +22,7 @@ use App\Http\Controllers\Api\Admin\{
     DashboardReportController,
     PaymentManagementController
 };
+use App\Http\Controllers\Api\Admin\ReviewController as AdminReviewController;
 use App\Http\Controllers\Api\Payment\SePayController;
 
 
@@ -48,6 +50,7 @@ Route::get('/courts/{id}/availability', [UserBooking::class, 'getCourtAvailabili
 Route::post('/bookings', [UserBooking::class, 'store']);
 Route::post('/bookings/guest-lookup', [UserBooking::class, 'lookupGuestBooking']);
 Route::post('/bookings/validate-promotion', [UserBooking::class, 'validatePromotion']);
+Route::get('/reviews', [UserReviewController::class, 'index']);
 
 /*
 |--------------------------------------------------------------------------
@@ -58,6 +61,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // --- PHÂN HỆ KHÁCH HÀNG THÀNH VIÊN ---
     Route::get('/user/bookings', [UserBooking::class, 'getUserBookings'])
+        ->middleware('role:customer');
+    Route::post('/reviews', [UserReviewController::class, 'store'])
         ->middleware('role:customer');
 
     Route::controller(AuthController::class)->group(function () {
@@ -120,6 +125,13 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::get('/notifications', 'index');
             Route::patch('/notifications/read-all', 'markAllAsRead');
             Route::patch('/notifications/{id}/read', 'markAsRead');
+        });
+
+        Route::controller(AdminReviewController::class)->group(function () {
+            Route::get('/reviews', 'index');
+            Route::patch('/reviews/{id}/reply', 'reply');
+            Route::patch('/reviews/{id}/status', 'updateStatus');
+            Route::delete('/reviews/{id}', 'destroy');
         });
 
         Route::controller(PurchaseOrderController::class)->group(function () {

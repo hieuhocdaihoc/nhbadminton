@@ -19,6 +19,9 @@ class DashboardReportController extends Controller
      * BÁO CÁO TỔNG QUAN DASHBOARD ADMIN
      * -------------------------------------------------------------
      */
+    /**
+     * Chức năng: Tổng hợp KPI dashboard admin như doanh thu, booking, hiệu suất sân và dữ liệu vận hành.
+     */
     public function index(Request $request)
     {
         $fromDate = $request->from_date
@@ -275,6 +278,9 @@ class DashboardReportController extends Controller
         ]);
     }
 
+    /**
+     * Chức năng: Mô tả nghiệp vụ của hàm countBookingsByTimeRange.
+     */
     private function countBookingsByTimeRange($fromDate, $toDate, $start, $end)
     {
         return BookingDetail::whereBetween('booking_date', [$fromDate, $toDate])

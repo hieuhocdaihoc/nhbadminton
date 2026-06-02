@@ -21,16 +21,25 @@ class PurchaseOrder extends Model
         'created_by'
     ];
 
+    /**
+     * Chức năng: Khai báo quan hệ booking có nhiều dòng chi tiết sân đã đặt.
+     */
     public function details()
     {
         return $this->hasMany(PurchaseOrderDetail::class, 'purchase_order_id', 'id');
     }
 
+    /**
+     * Chức năng: Khai báo quan hệ phiếu nhập thuộc về một nhà cung cấp.
+     */
     public function supplier()
     {
         return $this->belongsTo(Supplier::class, 'supplier_id', 'id');
     }
 
+    /**
+     * Chức năng: Khai báo quan hệ bản ghi được tạo bởi một người dùng trong hệ thống.
+     */
     public function creator()
     {
         return $this->belongsTo(User::class, 'created_by', 'id');

@@ -12,6 +12,9 @@ use App\Models\UserAddress;
 class AuthController extends Controller
 {
     // 1. Đăng ký
+    /**
+     * Chức năng: Đăng ký tài khoản khách hàng mới, mã hóa mật khẩu và cấp token đăng nhập.
+     */
     public function register(Request $request)
     {
         $request->validate([
@@ -33,6 +36,9 @@ class AuthController extends Controller
         return response()->json(['message' => 'Đăng ký thành công', 'user' => $user], 201);
     }
     // 2. Đăng nhập bằng Số điện thoại
+    /**
+     * Chức năng: Đăng nhập bằng email hoặc số điện thoại, kiểm tra trạng thái tài khoản và trả về token theo role.
+     */
     public function login(Request $request)
     {
         $request->validate([
@@ -65,6 +71,9 @@ class AuthController extends Controller
         ]);
     }
 
+    /**
+     * Chức năng: Mô tả nghiệp vụ của hàm getRedirectPathForRole.
+     */
     private function getRedirectPathForRole(string $role): string
     {
         return match ($role) {
@@ -74,6 +83,9 @@ class AuthController extends Controller
         };
     }
 
+    /**
+     * Chức năng: Mô tả nghiệp vụ của hàm getPermissionsForRole.
+     */
     private function getPermissionsForRole(string $role): array
     {
         return match ($role) {
@@ -95,6 +107,9 @@ class AuthController extends Controller
     }
 
     // 3. Đổi mật khẩu (Cần đăng nhập mới làm được)
+    /**
+     * Chức năng: Cho người dùng đang đăng nhập đổi mật khẩu sau khi xác thực mật khẩu hiện tại.
+     */
     public function changePassword(Request $request)
     {
         $request->validate([
@@ -116,6 +131,9 @@ class AuthController extends Controller
     }
 
     // 4. Cập nhật thông tin cá nhân
+    /**
+     * Chức năng: Cập nhật thông tin cá nhân của tài khoản đang đăng nhập.
+     */
     public function updateProfile(Request $request)
     {
         // Lấy thông tin user đang đăng nhập (nhờ Token)
@@ -146,6 +164,9 @@ class AuthController extends Controller
     }
 
     // 5. Thêm mới địa chỉ (Create)
+    /**
+     * Chức năng: Thêm địa chỉ nhận hàng/liên hệ cho người dùng và xử lý địa chỉ mặc định.
+     */
     public function addAddress(Request $request)
     {
         $user = Auth::user();
@@ -191,6 +212,9 @@ class AuthController extends Controller
     }
 
     // 6. Cập nhật một địa chỉ cụ thể
+    /**
+     * Chức năng: Cập nhật địa chỉ thuộc tài khoản hiện tại và đồng bộ lại cờ mặc định nếu cần.
+     */
     public function updateAddress(Request $request, $id)
     {
         $user = Auth::user();
@@ -222,6 +246,9 @@ class AuthController extends Controller
     }
 
     // 7. Lấy thông tin cá nhân của người dùng đang đăng nhập
+    /**
+     * Chức năng: Lấy hồ sơ tài khoản đang đăng nhập kèm dữ liệu cần hiển thị ở frontend.
+     */
     public function getProfile()
     {
         // Auth::user() sẽ tự động lấy User dựa trên Token gửi lên
@@ -234,6 +261,9 @@ class AuthController extends Controller
     }
 
     // 8. Đăng xuất (Xóa token hiện tại)
+    /**
+     * Chức năng: Đăng xuất thiết bị hiện tại bằng cách xóa token đang sử dụng.
+     */
     public function logout(Request $request)
     {
         // Lấy user hiện tại và xóa chính xác cái Token đang dùng để gọi API này
@@ -245,6 +275,9 @@ class AuthController extends Controller
     }
 
     // (TẶNG THÊM) 9. Đăng xuất khỏi TẤT CẢ các thiết bị
+    /**
+     * Chức năng: Đăng xuất tất cả thiết bị bằng cách xóa toàn bộ token của người dùng.
+     */
     public function logoutAllDevices(Request $request)
     {
         // Xóa toàn bộ token của user này trong DB (Đăng xuất cả trên Web lẫn App)

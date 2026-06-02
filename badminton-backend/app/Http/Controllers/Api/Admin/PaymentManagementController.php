@@ -13,6 +13,9 @@ class PaymentManagementController extends Controller
      * DANH SÁCH THANH TOÁN CHO ADMIN
      * -------------------------------------------------------------
      */
+    /**
+     * Chức năng: Lấy danh sách giao dịch thanh toán để quản trị đối soát doanh thu.
+     */
     public function index(Request $request)
     {
         $query = Payment::with([
@@ -75,6 +78,9 @@ class PaymentManagementController extends Controller
      * CHI TIẾT MỘT THANH TOÁN
      * -------------------------------------------------------------
      */
+    /**
+     * Chức năng: Lấy chi tiết một giao dịch thanh toán.
+     */
     public function show($id)
     {
         $payment = Payment::with([
@@ -93,6 +99,9 @@ class PaymentManagementController extends Controller
      * -------------------------------------------------------------
      * THỐNG KÊ DOANH THU
      * -------------------------------------------------------------
+     */
+    /**
+     * Chức năng: Tổng hợp doanh thu thanh toán theo thời gian, phương thức và trạng thái.
      */
     public function summary(Request $request)
     {
@@ -143,6 +152,9 @@ class PaymentManagementController extends Controller
      * -------------------------------------------------------------
      * LỊCH SỬ THANH TOÁN THEO ĐƠN
      * -------------------------------------------------------------
+     */
+    /**
+     * Chức năng: Lấy toàn bộ giao dịch thanh toán thuộc một đơn đặt sân.
      */
     public function paymentsByBooking($bookingId)
     {

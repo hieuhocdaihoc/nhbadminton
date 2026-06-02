@@ -76,6 +76,7 @@ CREATE TABLE IF NOT EXISTS `bookings` (
   `check_out_at` datetime DEFAULT NULL COMMENT 'Thời gian trả sân thực tế',
   `status` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT 'pending' COMMENT 'Trạng thái đơn (chờ, đã chơi, hủy)',
   `payment_status` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT 'unpaid' COMMENT 'Tình trạng thanh toán',
+  `points_awarded_at` datetime DEFAULT NULL COMMENT 'Thời điểm đơn đã được cộng điểm thành viên',
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `booking_code` (`booking_code`),
@@ -729,6 +730,7 @@ CREATE TABLE IF NOT EXISTS `reviews` (
   `rating` int DEFAULT NULL COMMENT 'Số sao (1-5)',
   `comment` text COLLATE utf8mb4_unicode_ci COMMENT 'Nội dung phản hồi của khách',
   `staff_reply` text COLLATE utf8mb4_unicode_ci COMMENT 'Phản hồi lại của trung tâm',
+  `status` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT 'pending' COMMENT 'Trạng thái kiểm duyệt: pending, approved, hidden',
   PRIMARY KEY (`id`),
   KEY `fk_rv_user` (`user_id`),
   KEY `fk_rv_booking` (`booking_id`)
