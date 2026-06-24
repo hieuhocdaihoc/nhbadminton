@@ -11,9 +11,6 @@ class AdditionalServiceController extends Controller
     // =========================================================================
     // 1. LẤY DANH SÁCH DỊCH VỤ (Có hỗ trợ lọc theo loại và trạng thái)
     // =========================================================================
-    /**
-     * Chức năng: Lấy danh sách dịch vụ bổ sung, có hỗ trợ lọc theo loại dịch vụ và trạng thái.
-     */
     public function index(Request $request)
     {
         $query = AdditionalService::query();
@@ -40,9 +37,6 @@ class AdditionalServiceController extends Controller
     // =========================================================================
     // 2. THÊM MỚI DỊCH VỤ
     // =========================================================================
-    /**
-     * Chức năng: Tạo mới dịch vụ bổ sung như nước uống, thuê vợt, dạy cầu hoặc cầu lông.
-     */
     public function store(Request $request)
     {
         $request->validate([
@@ -73,9 +67,6 @@ class AdditionalServiceController extends Controller
     // =========================================================================
     // 3. XEM CHI TIẾT 1 DỊCH VỤ (Để fill dữ liệu lên Form sửa)
     // =========================================================================
-    /**
-     * Chức năng: Lấy chi tiết một dịch vụ bổ sung để xem hoặc đổ dữ liệu lên form sửa.
-     */
     public function show($id)
     {
         $service = AdditionalService::find($id);
@@ -93,9 +84,6 @@ class AdditionalServiceController extends Controller
     // =========================================================================
     // 4. CẬP NHẬT DỊCH VỤ
     // =========================================================================
-    /**
-     * Chức năng: Cập nhật thông tin dịch vụ bổ sung sau khi kiểm tra dữ liệu đầu vào.
-     */
     public function update(Request $request, $id)
     {
         $service = AdditionalService::find($id);
@@ -125,9 +113,6 @@ class AdditionalServiceController extends Controller
     // =========================================================================
     // 5. XÓA DỊCH VỤ (XÓA MỀM / TẠM NGƯNG KINH DOANH)
     // =========================================================================
-    /**
-     * Chức năng: Tạm ngưng kinh doanh dịch vụ bằng cách chuyển trạng thái sang inactive thay vì xóa cứng.
-     */
     public function destroy($id)
     {
         $service = AdditionalService::find($id);
@@ -139,7 +124,6 @@ class AdditionalServiceController extends Controller
             ], 404);
         }
 
-        // Nếu dịch vụ đã là inactive rồi thì báo lỗi luôn để tránh thao tác thừa
         if ($service->status === 'inactive') {
             return response()->json([
                 'status' => 'error',
@@ -147,7 +131,7 @@ class AdditionalServiceController extends Controller
             ], 400);
         }
 
-        // Chuyển trạng thái thành inactive thay vì xóa cứng khỏi Database
+
         $service->status = 'inactive';
         $service->save();
 

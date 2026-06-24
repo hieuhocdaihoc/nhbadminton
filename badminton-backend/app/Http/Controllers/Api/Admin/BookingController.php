@@ -19,9 +19,6 @@ use App\Models\User;
 class BookingController extends Controller
 {
     //xem  danh sách các ca chơi hôm nay (dành cho lễ tân)
-    /**
-     * Chức năng: Lấy danh sách các đơn có ca chơi trong ngày hiện tại cho lễ tân/admin theo dõi.
-     */
     public function getTodayBookings()
     {
         $today = \Carbon\Carbon::now()->format('Y-m-d');
@@ -44,9 +41,6 @@ class BookingController extends Controller
         ]);
     }
     // API ADMIN: Xem danh sách các ca chơi lẻ (không theo lịch đặt định kỳ)
-    /**
-     * Chức năng: Lấy danh sách đơn đặt sân lẻ, có hỗ trợ tìm theo tên, số điện thoại hoặc mã đơn.
-     */
     public function getSingleBookings(Request $request)
     {
         $query = Booking::whereNull('recurring_booking_id')->with(['details.court']);
@@ -67,9 +61,6 @@ class BookingController extends Controller
 
 
     // API ADMIN: Xem danh sách các lịch đặt định kỳ (Recurring Booking Masters)
-    /**
-     * Chức năng: Lấy danh sách hợp đồng/lịch đặt định kỳ gốc để quản lý lịch cố định.
-     */
     public function getRecurringMasters(Request $request)
     {
         $query = RecurringBooking::with(['court', 'user']);
@@ -92,16 +83,13 @@ class BookingController extends Controller
 
 
     // API ADMIN: Xem chi tiết các buổi chơi con của một lịch đặt định kỳ
-    /**
-     * Chức năng: Lấy các buổi chơi con thuộc một lịch đặt định kỳ.
-     */
     public function getRecurringSessions(Request $request, $recurringId)
     {
         // 1. Dùng with(['details.court']) để lấy Tên sân cho từng buổi đá con
         $query = Booking::where('recurring_booking_id', $recurringId)
             ->with(['details.court']);
 
-        // 2. TÌM KIẾM: Lọc theo tên, SĐT hoặc mã ca đá nếu có gõ tìm kiếm
+
         if ($request->has('search') && $request->search != '') {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
@@ -126,13 +114,10 @@ class BookingController extends Controller
      * CẬP NHẬT TRẠNG THÁI ĐƠN ĐẶT SÂN
      * -------------------------------------------------------------
      */
-    /**
-     * Chức năng: Cập nhật trạng thái đơn đặt sân và kích hoạt cộng điểm khi đơn completed + paid.
-     */
     public function updateStatus(Request $request, $bookingId)
     {
         $request->validate([
-            'status' => 'required|in:pending,confirmed,cancelled,completed',
+            'status' => 'required|in:pending,confirmed,playing,cancelled,completed',
         ]);
 
         return DB::transaction(function () use ($request, $bookingId) {
@@ -140,19 +125,39 @@ class BookingController extends Controller
             $booking = Booking::with('details')->lockForUpdate()->findOrFail($bookingId);
             $oldStatus = $booking->status;
 
-            if ($request->status === 'completed' && $booking->payment_status !== 'paid') {
+            // Chỉ cho check-in (playing) khi đơn đang confirmed
+            if ($request->status === 'playing' && $oldStatus !== 'confirmed') {
                 return response()->json([
                     'status' => 'error',
-                    'message' => 'Chỉ có thể hoàn thành đơn sau khi khách đã thanh toán đủ.',
+                    'message' => 'Chỉ có thể check-in khi đơn đã được xác nhận.',
                 ], 422);
             }
 
+            // Chỉ hoàn thành khi đang playing (hoặc confirmed nếu bỏ qua check-in) và đã thanh toán đủ
+            if ($request->status === 'completed') {
+                if (!in_array($oldStatus, ['playing', 'confirmed'])) {
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => 'Chỉ có thể hoàn thành đơn khi đang ở trạng thái đã xác nhận hoặc đang chơi.',
+                    ], 422);
+                }
+                if ($booking->payment_status !== 'paid') {
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => 'Chỉ có thể hoàn thành đơn sau khi khách đã thanh toán đủ.',
+                    ], 422);
+                }
+            }
+
             $booking->status = $request->status;
+            if ($request->status === 'playing' && !$booking->check_in_at) {
+                $booking->check_in_at = now();
+            }
             $booking->save();
 
             $reward = null;
 
-            if ($oldStatus !== 'completed' && $booking->status === 'completed') {
+            if ($booking->status === 'completed') {
                 $reward = $this->rewardCustomerForCompletedBooking($booking);
             }
 
@@ -164,13 +169,6 @@ class BookingController extends Controller
             ]);
         });
     }
-
-    /**
-     * Cong diem thanh vien sau khi don hoan thanh.
-     *
-     * Quy tac hien tai: moi 1 gio choi duoc 10 diem. Diem duoc tinh theo
-     * tong duration_minutes cua cac ca san trong booking.
-     */
     /**
      * Chức năng: Cộng điểm thành viên cho khách sau khi đơn đã hoàn thành và đã thanh toán, đồng thời chống cộng trùng.
      */
@@ -268,9 +266,6 @@ class BookingController extends Controller
      * XÁC NHẬN THANH TOÁN ĐƠN ĐẶT SÂN
      * -------------------------------------------------------------
      */
-    /**
-     * Chức năng: Cập nhật trạng thái thanh toán thủ công tại quầy và ghi nhận payment tiền mặt.
-     */
     public function updatePayment(Request $request, $bookingId)
     {
         $request->validate([
@@ -365,8 +360,8 @@ class BookingController extends Controller
             $booking = $detail->booking;
 
             // Chặn: Không cho phép đổi lịch nếu hóa đơn đã Hủy hoặc Hoàn thành
-            if (in_array($booking->status, ['cancelled', 'completed'])) {
-                return response()->json(['status' => 'error', 'message' => 'Không thể đổi lịch cho đơn hàng đã Hủy hoặc Hoàn thành!'], 400);
+            if (in_array($booking->status, ['playing', 'cancelled', 'completed'])) {
+                return response()->json(['status' => 'error', 'message' => 'Không thể đổi lịch cho đơn hàng đang chơi, đã Hủy hoặc Hoàn thành!'], 400);
             }
 
             // 2. Kiểm tra trùng lịch (BẮT BUỘC PHẢI BỎ QUA CHÍNH CA CHƠI HIỆN TẠI)

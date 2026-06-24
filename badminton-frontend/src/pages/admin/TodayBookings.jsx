@@ -309,11 +309,17 @@ const TodayBookings = () => {
       bg: "bg-blue-50",
       label: "Đã chốt",
     },
+    playing: {
+      dot: "bg-violet-500",
+      text: "text-violet-700",
+      bg: "bg-violet-50",
+      label: "Đang chơi",
+    },
     completed: {
       dot: "bg-emerald-500",
       text: "text-emerald-700",
       bg: "bg-emerald-50",
-      label: "Check-in",
+      label: "Hoàn thành",
     },
     cancelled: {
       dot: "bg-zinc-400",
@@ -692,6 +698,17 @@ const TodayBookings = () => {
                             </button>
                           )}
 
+                          {b.status === "confirmed" && (
+                            <button
+                              onClick={() =>
+                                handleUpdateStatus(b.id, "playing")
+                              }
+                              className="px-2.5 py-1 bg-violet-600 text-white rounded text-[10px] font-medium hover:bg-violet-700 transition-colors"
+                            >
+                              Check-in
+                            </button>
+                          )}
+
                           {b.payment_status !== "paid" && !isCancelled && (
                             <button
                               onClick={() => handleUpdatePayment(b.id, "paid")}
@@ -704,7 +721,8 @@ const TodayBookings = () => {
                                   : "Thu tiền"}
                             </button>
                           )}
-                          {b.status === "confirmed" &&
+
+                          {["playing", "confirmed"].includes(b.status) &&
                             b.payment_status === "paid" && (
                               <button
                                 onClick={() => {

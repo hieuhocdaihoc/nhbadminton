@@ -111,6 +111,16 @@ const SingleBookings = () => {
       msg = `Xác nhận ${booking.customer_name} đã thanh toán đủ tiền sân?`;
       payload = { payment_status: "paid" };
       actionType = "payment";
+    } else if (type === "checkin") {
+      title = "Check-in khách";
+      msg = `Xác nhận khách hàng ${booking.customer_name} đã đến sân và bắt đầu chơi?`;
+      payload = { status: "playing" };
+      actionType = "status";
+    } else if (type === "complete") {
+      title = "Hoàn thành ca chơi";
+      msg = `Xác nhận kết thúc ca chơi của ${booking.customer_name}?`;
+      payload = { status: "completed" };
+      actionType = "status";
     } else if (type === "cancel") {
       title = "Hủy đơn đặt sân";
       msg = `Hủy lịch đá của ${booking.customer_name}. Bạn có chắc chắn?`;
@@ -155,7 +165,7 @@ const SingleBookings = () => {
       fetchData(pagination.current_page, searchTerm);
     } catch (error) {
       console.error(error);
-      alert("❌ Có lỗi xảy ra trong quá trình xử lý!");
+      alert(error.response?.data?.message || "❌ Có lỗi xảy ra trong quá trình xử lý!");
     } finally {
       setIsProcessing(false);
       setTimeout(() => setMessage({ type: "", text: "" }), 3000);
@@ -213,6 +223,12 @@ const SingleBookings = () => {
       bg: "bg-blue-50",
       label: "Đã xác nhận",
     },
+    playing: {
+      dot: "bg-violet-500",
+      text: "text-violet-700",
+      bg: "bg-violet-50",
+      label: "Đang chơi",
+    },
     completed: {
       dot: "bg-emerald-500",
       text: "text-emerald-700",
@@ -238,6 +254,11 @@ const SingleBookings = () => {
       key: "confirmed",
       label: "Đã xác nhận",
       count: bookings.filter((b) => b.status === "confirmed").length,
+    },
+    {
+      key: "playing",
+      label: "Đang chơi",
+      count: bookings.filter((b) => b.status === "playing").length,
     },
     {
       key: "completed",
@@ -465,6 +486,14 @@ const SingleBookings = () => {
                               Duyệt
                             </button>
                           )}
+                          {b.status === "confirmed" && (
+                            <button
+                              onClick={() => requestAction(b, "checkin")}
+                              className="px-2.5 py-1 bg-violet-600 text-white rounded text-[10px] font-medium hover:bg-violet-700 transition-colors"
+                            >
+                              Check-in
+                            </button>
+                          )}
                           {b.payment_status !== "paid" && !isCancelled && (
                             <button
                               onClick={() => requestAction(b, "pay")}
@@ -473,7 +502,15 @@ const SingleBookings = () => {
                               Thu tiền
                             </button>
                           )}
-                          {!isCancelled && b.status !== "completed" && (
+                          {["playing", "confirmed"].includes(b.status) && b.payment_status === "paid" && (
+                            <button
+                              onClick={() => requestAction(b, "complete")}
+                              className="px-2.5 py-1 bg-emerald-600 text-white rounded text-[10px] font-medium hover:bg-emerald-700 transition-colors"
+                            >
+                              Hoàn thành
+                            </button>
+                          )}
+                          {!isCancelled && !["playing", "completed"].includes(b.status) && (
                             <button
                               onClick={() => openRescheduleModal(b)}
                               className="px-2.5 py-1 border border-zinc-200 text-zinc-500 rounded text-[10px] hover:bg-zinc-50 transition-colors"
@@ -481,7 +518,7 @@ const SingleBookings = () => {
                               Đổi lịch
                             </button>
                           )}
-                          {!isCancelled && b.status !== "completed" && (
+                          {!["playing", "cancelled", "completed"].includes(b.status) && (
                             <button
                               onClick={() => requestAction(b, "cancel")}
                               className="px-2 py-1 text-zinc-400 rounded text-[10px] hover:text-red-500 hover:bg-red-50 transition-colors"

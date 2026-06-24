@@ -18,7 +18,6 @@ import GuestBookingLookup from "./pages/user/GuestBookingLookup";
 
 // Admin Pages
 import DashboardReport from "./pages/admin/DashboardReport";
-import BookingManager from "./pages/admin/BookingManager";
 import CourtManager from "./pages/admin/CourtManager";
 import ProductManager from "./pages/admin/ProductManager";
 import CustomerManager from "./pages/admin/CustomerManager";
@@ -149,11 +148,7 @@ function App() {
         />
         <Route
           path="/admin/bookings"
-          element={
-            <ProtectedAdminPage allowedRoles={["admin", "staff"]}>
-              <BookingManager />
-            </ProtectedAdminPage>
-          }
+          element={<Navigate to="/admin/bookings/today" replace />}
         />
         <Route
           path="/admin/courts"

@@ -132,6 +132,16 @@ const RecurringBookings = () => {
       msg = "Xác nhận giữ sân cho ca đá này?";
       payload = { status: "confirmed" };
       actionType = "status";
+    } else if (type === "checkin") {
+      title = "Check-in khách";
+      msg = "Xác nhận khách đã đến sân và bắt đầu chơi?";
+      payload = { status: "playing" };
+      actionType = "status";
+    } else if (type === "complete") {
+      title = "Hoàn thành ca chơi";
+      msg = "Xác nhận kết thúc ca chơi này?";
+      payload = { status: "completed" };
+      actionType = "status";
     } else if (type === "pay") {
       title = "Xác nhận đã thu tiền";
       msg = "Xác nhận đã thu đủ tiền cho ca đá này?";
@@ -239,11 +249,17 @@ const RecurringBookings = () => {
       bg: "bg-blue-50",
       label: "Đã chốt",
     },
+    playing: {
+      dot: "bg-violet-500",
+      text: "text-violet-700",
+      bg: "bg-violet-50",
+      label: "Đang chơi",
+    },
     completed: {
       dot: "bg-emerald-500",
       text: "text-emerald-700",
       bg: "bg-emerald-50",
-      label: "Vào sân",
+      label: "Hoàn thành",
     },
     cancelled: {
       dot: "bg-zinc-400",
@@ -520,6 +536,14 @@ const RecurringBookings = () => {
                                 Duyệt
                               </button>
                             )}
+                            {s.status === "confirmed" && (
+                              <button
+                                onClick={() => requestAction(s, "checkin")}
+                                className="px-2.5 py-1 bg-violet-600 text-white rounded text-[10px] font-medium hover:bg-violet-700 transition-colors"
+                              >
+                                Check-in
+                              </button>
+                            )}
                             {s.payment_status !== "paid" && !isCancelled && (
                               <button
                                 onClick={() => requestAction(s, "pay")}
@@ -528,7 +552,15 @@ const RecurringBookings = () => {
                                 Thu
                               </button>
                             )}
-                            {!isCancelled && s.status !== "completed" && (
+                            {["playing", "confirmed"].includes(s.status) && s.payment_status === "paid" && (
+                              <button
+                                onClick={() => requestAction(s, "complete")}
+                                className="px-2.5 py-1 bg-emerald-600 text-white rounded text-[10px] font-medium hover:bg-emerald-700 transition-colors"
+                              >
+                                Hoàn thành
+                              </button>
+                            )}
+                            {!["playing", "cancelled", "completed"].includes(s.status) && (
                               <button
                                 onClick={() => openRescheduleModal(s)}
                                 className="px-2.5 py-1 border border-zinc-200 text-zinc-500 rounded text-[10px] hover:bg-zinc-50 transition-colors"
@@ -536,7 +568,7 @@ const RecurringBookings = () => {
                                 Đổi lịch
                               </button>
                             )}
-                            {!isCancelled && s.status !== "completed" && (
+                            {!["playing", "cancelled", "completed"].includes(s.status) && (
                               <button
                                 onClick={() => requestAction(s, "cancel")}
                                 className="px-2 py-1 text-zinc-400 rounded text-[10px] hover:text-red-500 hover:bg-red-50 transition-colors"
