@@ -3,292 +3,336 @@
 namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\AdditionalService;
 use App\Models\Booking;
+use App\Models\BookingDetail;
+use App\Models\BookingServiceDetail;
+use App\Models\Court;
+use App\Models\CourtPricing;
+use App\Models\InventoryTransaction;
+use App\Models\Product;
 use App\Models\RecurringBooking;
+use App\Models\User;
+use App\Services\PaymentService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
-use App\Models\Product;
-use App\Models\AdditionalService;
-use App\Models\BookingServiceDetail;
-use App\Models\InventoryTransaction;
 use Illuminate\Support\Facades\DB;
-use App\Services\PaymentService;
 use Illuminate\Support\Str;
-use App\Models\User;
 
 class BookingController extends Controller
 {
-    //xem  danh sách các ca chơi hôm nay (dành cho lễ tân)
+    // Các trạng thái được phép chuyển sang từ trạng thái hiện tại
+    private const ALLOWED_TRANSITIONS = [
+        'pending' => ['confirmed', 'cancelled'],
+        'confirmed' => ['cancelled'],
+        'playing' => ['completed'],
+        'completed' => [],
+        'cancelled' => [],
+    ];
+
+    // Ngưỡng điểm phân hạng thành viên
+    private const MEMBERSHIP_LEVELS = [
+        3000 => 'Vang',
+        1000 => 'Bac',
+        0 => 'Dong',
+    ];
+
+    /**
+     * Chức năng: Lấy danh sách tất cả đơn có buổi chơi vào ngày hôm nay (dành cho lễ tân).
+     */
     public function getTodayBookings()
     {
-        $today = \Carbon\Carbon::now()->format('Y-m-d');
+        $today = now()->format('Y-m-d');
 
-        $bookings = Booking::whereHas('details', function ($query) use ($today) {
-            $query->where('booking_date', $today);
-        })
-            ->with([
-                'details.court',
-                'serviceDetails.product',
-                'serviceDetails.service'
-            ])
-            ->orderBy('created_at', 'desc')
+        $bookings = Booking::whereHas('details', fn($q) => $q->where('booking_date', $today))
+            ->with(['details.court', 'serviceDetails.product', 'serviceDetails.service'])
+            ->orderByDesc('created_at')
             ->get();
 
         return response()->json([
             'status' => 'success',
             'count' => $bookings->count(),
-            'data' => $bookings
+            'data' => $bookings,
         ]);
     }
-    // API ADMIN: Xem danh sách các ca chơi lẻ (không theo lịch đặt định kỳ)
+
+    /**
+     * Chức năng: Lấy danh sách đơn đặt lẻ (không thuộc hợp đồng định kỳ/dài hạn), hỗ trợ tìm kiếm.
+     */
     public function getSingleBookings(Request $request)
     {
         $query = Booking::whereNull('recurring_booking_id')->with(['details.court']);
 
-        // Bắt thêm biến search từ API
-        if ($request->has('search')) {
+        if ($request->filled('search')) {
             $search = $request->search;
-            $query->where(function ($q) use ($search) {
-                $q->where('customer_name', 'like', "%{$search}%")
+            $query->where(
+                fn($q) => $q
+                    ->where('customer_name', 'like', "%{$search}%")
                     ->orWhere('customer_phone', 'like', "%{$search}%")
-                    ->orWhere('booking_code', 'like', "%{$search}%");
-            });
+                    ->orWhere('booking_code', 'like', "%{$search}%")
+            );
         }
 
-        $bookings = $query->orderBy('created_at', 'desc')->paginate(15);
-        return response()->json($bookings);
+        return response()->json($query->orderByDesc('created_at')->paginate(15));
     }
 
-
-    // API ADMIN: Xem danh sách các lịch đặt định kỳ (Recurring Booking Masters)
+    /**
+     * Chức năng: Lấy danh sách hợp đồng đặt sân định kỳ (lặp hàng tuần), hỗ trợ tìm kiếm.
+     */
     public function getRecurringMasters(Request $request)
     {
-        $query = RecurringBooking::with(['court', 'user']);
-
-        if ($request->has('search') && $request->search != '') {
-            $search = $request->search;
-            $query->where(function ($q) use ($search) {
-                $q->where('recurring_code', 'like', "%{$search}%")
-                    ->orWhereHas('user', function ($u) use ($search) {
-                        $u->where('full_name', 'like', "%{$search}%")
-                            ->orWhere('phone', 'like', "%{$search}%");
-                    });
-            });
-        }
-
-        $masters = $query->orderBy('start_date', 'desc')->paginate(15);
-        return response()->json($masters);
+        return response()->json($this->queryContractMasters('recurring', $request)->paginate(15));
     }
 
-
-
-    // API ADMIN: Xem chi tiết các buổi chơi con của một lịch đặt định kỳ
-    public function getRecurringSessions(Request $request, $recurringId)
+    /**
+     * Chức năng: Lấy danh sách hợp đồng đặt sân dài hạn (tự chọn ngày), hỗ trợ tìm kiếm.
+     */
+    public function getLongTermMasters(Request $request)
     {
-        // 1. Dùng with(['details.court']) để lấy Tên sân cho từng buổi đá con
-        $query = Booking::where('recurring_booking_id', $recurringId)
-            ->with(['details.court']);
+        return response()->json($this->queryContractMasters('long_term', $request)->paginate(15));
+    }
 
+    /**
+     * Chức năng: Xây dựng query chung cho danh sách hợp đồng (recurring hoặc long_term).
+     */
+    private function queryContractMasters(string $type, Request $request)
+    {
+        $query = RecurringBooking::with(['court', 'user'])->where('type', $type);
 
-        if ($request->has('search') && $request->search != '') {
+        if ($request->filled('search')) {
             $search = $request->search;
-            $query->where(function ($q) use ($search) {
-                $q->where('customer_name', 'like', "%{$search}%")
-                    ->orWhere('customer_phone', 'like', "%{$search}%")
-                    ->orWhere('booking_code', 'like', "%{$search}%");
-            });
+            $query->where(
+                fn($q) => $q
+                    ->where('recurring_code', 'like', "%{$search}%")
+                    ->orWhereHas(
+                        'user',
+                        fn($u) => $u
+                            ->where('full_name', 'like', "%{$search}%")
+                            ->orWhere('phone', 'like', "%{$search}%")
+                    )
+            );
         }
 
-        // Xếp theo ngày tạo/ngày đá để danh sách hiện ra thứ tự từ trên xuống dưới
-        $sessions = $query->orderBy('created_at', 'asc')->get();
+        return $query->orderByDesc('start_date');
+    }
+
+    /**
+     * Chức năng: Lấy danh sách tất cả buổi chơi con thuộc một hợp đồng định kỳ/dài hạn.
+     */
+    public function getRecurringSessions(Request $request, $recurringId)
+    {
+        $query = Booking::where('recurring_booking_id', $recurringId)->with(['details.court']);
+
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(
+                fn($q) => $q
+                    ->where('customer_name', 'like', "%{$search}%")
+                    ->orWhere('customer_phone', 'like', "%{$search}%")
+                    ->orWhere('booking_code', 'like', "%{$search}%")
+            );
+        }
 
         return response()->json([
             'status' => 'success',
-            'data' => $sessions
+            'data' => $query->orderBy('created_at')->get(),
         ]);
     }
 
+    /**
+     * Chức năng: Tìm kiếm đơn đặt sân theo từ khóa, ngày chơi, trạng thái và tình trạng thanh toán.
+     */
+    public function searchBookings(Request $request)
+    {
+        $query = Booking::with(['details'])->orderByDesc('created_at');
+
+        if ($request->filled('keyword')) {
+            $kw = $request->keyword;
+            $query->where(
+                fn($q) => $q
+                    ->where('customer_phone', 'like', "%{$kw}%")
+                    ->orWhere('customer_name', 'like', "%{$kw}%")
+                    ->orWhere('booking_code', 'like', "%{$kw}%")
+            );
+        }
+
+        if ($request->filled('play_date')) {
+            $query->whereHas('details', fn($q) => $q->where('booking_date', $request->play_date));
+        }
+
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
+        }
+
+        if ($request->filled('payment_status')) {
+            $query->where('payment_status', $request->payment_status);
+        }
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Kết quả tìm kiếm',
+            'data' => $query->paginate(15),
+        ]);
+    }
 
     /**
-     * -------------------------------------------------------------
-     * CẬP NHẬT TRẠNG THÁI ĐƠN ĐẶT SÂN
-     * -------------------------------------------------------------
+     * Chức năng: Chuyển trạng thái đơn (pending→confirmed, confirmed→cancelled...) theo quy tắc nghiệp vụ.
      */
     public function updateStatus(Request $request, $bookingId)
     {
         $request->validate([
-            'status' => 'required|in:pending,confirmed,playing,cancelled,completed',
+            'status' => ['required', 'in:pending,confirmed,cancelled,completed'],
         ]);
 
         return DB::transaction(function () use ($request, $bookingId) {
-            // Khoa don de tranh cong diem hai lan neu nhieu nhan vien cap nhat cung luc.
             $booking = Booking::with('details')->lockForUpdate()->findOrFail($bookingId);
             $oldStatus = $booking->status;
+            $newStatus = $request->status;
 
-            // Chỉ cho check-in (playing) khi đơn đang confirmed
-            if ($request->status === 'playing' && $oldStatus !== 'confirmed') {
+            $allowed = self::ALLOWED_TRANSITIONS[$oldStatus] ?? [];
+            if (!in_array($newStatus, $allowed, true)) {
                 return response()->json([
                     'status' => 'error',
-                    'message' => 'Chỉ có thể check-in khi đơn đã được xác nhận.',
+                    'message' => "Không thể chuyển từ trạng thái '{$oldStatus}' sang '{$newStatus}'.",
                 ], 422);
             }
 
-            // Chỉ hoàn thành khi đang playing (hoặc confirmed nếu bỏ qua check-in) và đã thanh toán đủ
-            if ($request->status === 'completed') {
-                if (!in_array($oldStatus, ['playing', 'confirmed'])) {
-                    return response()->json([
-                        'status' => 'error',
-                        'message' => 'Chỉ có thể hoàn thành đơn khi đang ở trạng thái đã xác nhận hoặc đang chơi.',
-                    ], 422);
-                }
-                if ($booking->payment_status !== 'paid') {
-                    return response()->json([
-                        'status' => 'error',
-                        'message' => 'Chỉ có thể hoàn thành đơn sau khi khách đã thanh toán đủ.',
-                    ], 422);
-                }
+            if ($newStatus === 'completed' && $booking->payment_status !== 'paid') {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Chỉ có thể hoàn thành đơn sau khi khách đã thanh toán đủ.',
+                ], 422);
             }
 
-            $booking->status = $request->status;
-            if ($request->status === 'playing' && !$booking->check_in_at) {
-                $booking->check_in_at = now();
-            }
-            $booking->save();
+            $booking->update(['status' => $newStatus]);
 
-            $reward = null;
-
-            if ($booking->status === 'completed') {
-                $reward = $this->rewardCustomerForCompletedBooking($booking);
-            }
+            $reward = ($oldStatus !== 'completed' && $newStatus === 'completed')
+                ? $this->rewardCustomerForCompletedBooking($booking->fresh())
+                : null;
 
             return response()->json([
                 'status' => 'success',
-                'message' => 'Cap nhat trang thai don thanh cong!',
+                'message' => 'Cập nhật trạng thái đơn thành công!',
                 'data' => $booking->fresh(['details', 'user']),
                 'reward' => $reward,
             ]);
         });
     }
+
     /**
-     * Chức năng: Cộng điểm thành viên cho khách sau khi đơn đã hoàn thành và đã thanh toán, đồng thời chống cộng trùng.
+     * Chức năng: Xác minh SĐT + mã đơn rồi chuyển đơn sang trạng thái đang chơi (playing).
      */
-    private function rewardCustomerForCompletedBooking(Booking $booking): ?array
+    public function checkIn(Request $request, $bookingId)
     {
-        if ($booking->points_awarded_at !== null) {
-            return null;
+        $request->validate([
+            'phone' => ['required', 'string'],
+            'booking_code' => ['required', 'string'],
+        ]);
+
+        $booking = Booking::findOrFail($bookingId);
+
+        if ($booking->status !== 'confirmed') {
+            $label = match ($booking->status) {
+                'pending' => 'chưa được duyệt',
+                'playing' => 'đang trong ca chơi',
+                'completed' => 'đã hoàn thành',
+                'cancelled' => 'đã bị hủy',
+                default => 'không hợp lệ',
+            };
+            return response()->json([
+                'status' => 'error',
+                'message' => "Không thể check-in: đơn {$label}.",
+            ], 422);
         }
 
-        if ($booking->status !== 'completed' || $booking->payment_status !== 'paid') {
-            return null;
+        $phoneMatch = preg_replace('/\D/', '', $booking->customer_phone) === preg_replace('/\D/', '', $request->phone);
+        $codeMatch = strtoupper(trim($booking->booking_code)) === strtoupper(trim($request->booking_code));
+
+        if (!$phoneMatch || !$codeMatch) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Số điện thoại hoặc mã đơn không khớp. Vui lòng kiểm tra lại.',
+            ], 422);
         }
 
-        $totalMinutes = $this->calculateBookingPlayMinutes($booking);
-        $earnedPoints = (int) floor($totalMinutes / 60 * 10);
+        $booking->update(['status' => 'playing']);
 
-        if ($earnedPoints <= 0) {
-            return null;
-        }
-
-        $normalizedPhone = preg_replace('/\D+/', '', (string) $booking->customer_phone);
-        $user = $booking->user_id
-            ? User::lockForUpdate()->find($booking->user_id)
-            : User::where('role', 'customer')
-                ->where(function ($query) use ($booking, $normalizedPhone) {
-                    $query->where('phone', $booking->customer_phone);
-
-                    if ($normalizedPhone !== '') {
-                        $query->orWhere('phone', $normalizedPhone);
-                    }
-                })
-                ->lockForUpdate()
-                ->first();
-
-        if (!$user || $user->role !== 'customer') {
-            return null;
-        }
-
-        if (!$booking->user_id) {
-            $booking->user_id = $user->id;
-            $booking->save();
-        }
-
-        $user->points = (int) $user->points + $earnedPoints;
-        $user->total_spent = (float) $user->total_spent + (float) $booking->total_price;
-        $user->membership_level = $this->resolveMembershipLevel((int) $user->points);
-        $user->save();
-
-        $booking->points_awarded_at = now();
-        $booking->save();
-
-        return [
-            'user_id' => $user->id,
-            'earned_points' => $earnedPoints,
-            'current_points' => (int) $user->points,
-            'membership_level' => $user->membership_level,
-        ];
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Check-in thành công! Khách đã vào sân.',
+            'data' => $booking->fresh(['details', 'user']),
+        ]);
     }
 
     /**
-     * Chức năng: Mô tả nghiệp vụ của hàm calculateBookingPlayMinutes.
+     * Chức năng: Thu tiền còn lại rồi hoàn thành đơn trong một bước (dành cho lễ tân cuối ca).
      */
-    private function calculateBookingPlayMinutes(Booking $booking): int
+    public function checkout(Request $request, $bookingId)
     {
-        return (int) $booking->details->sum(function ($detail) {
-            if ((int) $detail->duration_minutes > 0) {
-                return (int) $detail->duration_minutes;
+        return DB::transaction(function () use ($bookingId) {
+            $booking = Booking::with('details')->lockForUpdate()->findOrFail($bookingId);
+
+            if (!in_array($booking->status, ['playing', 'confirmed'], true)) {
+                $label = match ($booking->status) {
+                    'pending' => 'chưa được duyệt',
+                    'completed' => 'đã hoàn thành',
+                    'cancelled' => 'đã bị hủy',
+                    default => 'không hợp lệ',
+                };
+                return response()->json([
+                    'status' => 'error',
+                    'message' => "Không thể checkout: đơn {$label}.",
+                ], 422);
             }
 
-            if ($detail->start_time && $detail->end_time) {
-                return max(0, Carbon::parse($detail->end_time)->diffInMinutes(Carbon::parse($detail->start_time)));
+            if ($booking->remaining_amount > 0 && $booking->payment_status !== 'paid') {
+                app(PaymentService::class)->recordSuccessfulPayment($booking, [
+                    'payment_code' => 'PAY-' . now()->format('YmdHis') . '-' . strtoupper(Str::random(6)),
+                    'payment_method' => 'cash',
+                    'amount' => $booking->remaining_amount,
+                    'paid_at' => now(),
+                    'reference_code' => $booking->booking_code,
+                    'payment_content' => 'Thu tiền cuối ca tại quầy',
+                ]);
+                $booking->refresh();
             }
 
-            return 0;
+            $booking->update(['status' => 'completed']);
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Checkout thành công! Ca chơi đã hoàn thành.',
+                'data' => $booking->fresh(['details', 'user']),
+                'reward' => $this->rewardCustomerForCompletedBooking($booking->fresh()),
+            ]);
         });
     }
 
     /**
-     * Chức năng: Xác định hạng thành viên dựa trên tổng điểm tích lũy hiện tại.
-     */
-    private function resolveMembershipLevel(int $points): string
-    {
-        if ($points >= 3000) {
-            return 'Vang';
-        }
-
-        if ($points >= 1000) {
-            return 'Bac';
-        }
-
-        return 'Dong';
-    }
-    /**
-     * -------------------------------------------------------------
-     * XÁC NHẬN THANH TOÁN ĐƠN ĐẶT SÂN
-     * -------------------------------------------------------------
+     * Chức năng: Xác nhận thanh toán tại quầy (tiền mặt) hoặc điều chỉnh trạng thái thanh toán của đơn.
      */
     public function updatePayment(Request $request, $bookingId)
     {
         $request->validate([
-            'payment_status' => 'required|in:unpaid,partially_paid,paid',
+            'payment_status' => ['required', 'in:unpaid,partially_paid,paid'],
         ]);
 
         return DB::transaction(function () use ($request, $bookingId) {
-
             $booking = Booking::with('details')->lockForUpdate()->findOrFail($bookingId);
 
-            /**
-             * Trường hợp lễ tân xác nhận khách đã thanh toán đủ
-             */
+            if ($booking->status === 'cancelled') {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Không thể cập nhật thanh toán cho đơn đã bị hủy.',
+                ], 422);
+            }
+
             if ($request->payment_status === 'paid') {
-
-                // Số tiền khách cần trả tại quầy
                 $cashAmount = $booking->remaining_amount;
-
-                // Nếu đơn đã thanh toán đủ rồi thì không tạo thêm payment nữa
                 if ($cashAmount <= 0) {
                     return response()->json([
                         'status' => 'error',
-                        'message' => 'Đơn này đã thanh toán đủ, không cần xác nhận thêm!'
+                        'message' => 'Đơn này đã thanh toán đủ, không cần xác nhận thêm!',
                     ], 400);
                 }
 
@@ -297,342 +341,217 @@ class BookingController extends Controller
                     'payment_method' => 'cash',
                     'amount' => $cashAmount,
                     'paid_at' => now(),
-                    'reference_code' => $booking->booking_code ?? null,
+                    'reference_code' => $booking->booking_code,
                     'payment_content' => 'Lễ tân xác nhận khách thanh toán tiền mặt tại quầy',
                 ]);
             }
 
-            /**
-             * Trường hợp đưa về chưa thanh toán
-             */
             if ($request->payment_status === 'unpaid') {
-                $booking->payment_status = 'unpaid';
-                $booking->deposit_amount = 0;
-                $booking->remaining_amount = $booking->total_price;
+                $booking->update([
+                    'payment_status' => 'unpaid',
+                    'deposit_amount' => 0,
+                    'remaining_amount' => $booking->total_price,
+                ]);
             }
 
-            /**
-             * Trường hợp thanh toán một phần
-             */
             if ($request->payment_status === 'partially_paid') {
-                $booking->payment_status = 'partially_paid';
+                $booking->update(['payment_status' => 'partially_paid']);
             }
-
-            $booking->save();
 
             return response()->json([
                 'status' => 'success',
                 'message' => 'Cập nhật thanh toán thành công!',
                 'data' => $booking->fresh(['details', 'user']),
-                'reward' => null,
             ]);
         });
     }
 
-
-
-
-
-
-
-
-
-    // =========================================================================
-    // API ADMIN: Đổi lịch (Ngày, Giờ, Sân) cho một ca chơi cụ thể
-    // =========================================================================
     /**
-     * Chức năng: Đổi ngày, giờ hoặc sân cho một chi tiết ca chơi sau khi kiểm tra trùng lịch.
+     * Chức năng: Đổi ngày, giờ hoặc sân cho một buổi chơi cụ thể sau khi kiểm tra trùng lịch và tính lại giá.
      */
     public function reschedule(Request $request, $detailId)
     {
-        // 1. Validate dữ liệu đầu vào
-        $request->validate([
-            'court_id' => 'required|exists:courts,id',
-            'booking_date' => 'required|date',
-            'start_time' => 'required|date_format:H:i',
-            'end_time' => 'required|date_format:H:i|after:start_time',
+        $validated = $request->validate([
+            'court_id' => ['required', 'exists:courts,id'],
+            'booking_date' => ['required', 'date'],
+            'start_time' => ['required', 'date_format:H:i'],
+            'end_time' => ['required', 'date_format:H:i', 'after:start_time'],
         ]);
 
-        return \Illuminate\Support\Facades\DB::transaction(function () use ($request, $detailId) {
-
-            // Tìm chi tiết ca chơi và Hóa đơn cha
-            $detail = \App\Models\BookingDetail::with('booking')->findOrFail($detailId);
+        return DB::transaction(function () use ($validated, $detailId) {
+            $detail = BookingDetail::with('booking')->findOrFail($detailId);
             $booking = $detail->booking;
 
-            // Chặn: Không cho phép đổi lịch nếu hóa đơn đã Hủy hoặc Hoàn thành
-            if (in_array($booking->status, ['playing', 'cancelled', 'completed'])) {
-                return response()->json(['status' => 'error', 'message' => 'Không thể đổi lịch cho đơn hàng đang chơi, đã Hủy hoặc Hoàn thành!'], 400);
+            if (in_array($booking->status, ['cancelled', 'completed'], true)) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Không thể đổi lịch cho đơn đã hủy hoặc hoàn thành.',
+                ], 400);
             }
 
-            // 2. Kiểm tra trùng lịch (BẮT BUỘC PHẢI BỎ QUA CHÍNH CA CHƠI HIỆN TẠI)
-            $isBusy = \App\Models\BookingDetail::where('court_id', $request->court_id)
-                ->where('booking_date', $request->booking_date)
-                ->where('id', '!=', $detailId) // <--- Điểm mấu chốt: Bỏ qua ID của chính nó
-                ->where(function ($q) use ($request) {
-                    $q->where('start_time', '<', $request->end_time . ':00')
-                        ->where('end_time', '>', $request->start_time . ':00');
-                })
-                ->whereHas('booking', function ($q) {
-                    $q->where('status', '!=', 'cancelled');
-                })->exists();
+            if ($validated['booking_date'] < now()->format('Y-m-d')) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Ngày dời lịch phải từ hôm nay trở đi.',
+                ], 422);
+            }
+
+            $targetCourt = Court::findOrFail($validated['court_id']);
+            if ($targetCourt->status !== 'active' || $targetCourt->is_maintenance) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Sân này hiện không nhận đặt lịch (đang bảo trì hoặc ngưng hoạt động).',
+                ], 422);
+            }
+
+            // Kiểm tra trùng lịch — bỏ qua chính buổi đang đổi
+            $isBusy = BookingDetail::where('court_id', $validated['court_id'])
+                ->where('booking_date', $validated['booking_date'])
+                ->where('id', '!=', $detailId)
+                ->where(
+                    fn($q) => $q
+                        ->where('start_time', '<', $validated['end_time'] . ':00')
+                        ->where('end_time', '>', $validated['start_time'] . ':00')
+                )
+                ->whereHas('booking', fn($q) => $q->where('status', '!=', 'cancelled'))
+                ->exists();
 
             if ($isBusy) {
-                return response()->json(['status' => 'error', 'message' => 'Lịch mới đã có người đặt, vui lòng chọn giờ/sân khác!'], 400);
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Lịch mới đã có người đặt, vui lòng chọn giờ/sân khác.',
+                ], 400);
             }
 
-            // 3. Tính toán lại giá tiền cho lịch mới
-            $newPrice = $this->internalCalculatePrice($request->court_id, $request->booking_date, $request->start_time, $request->end_time);
-
-            // Tính số tiền chênh lệch (Nếu đổi sang giờ rẻ hơn, chênh lệch sẽ là số ÂM)
+            $newPrice = $this->internalCalculatePrice($validated['court_id'], $validated['booking_date'], $validated['start_time'], $validated['end_time']);
             $priceDiff = $newPrice - $detail->price;
-            $newDuration = (strtotime($request->end_time) - strtotime($request->start_time)) / 60;
+            $newDuration = (strtotime($validated['end_time']) - strtotime($validated['start_time'])) / 60;
 
-            // 4. Cập nhật bảng BookingDetail (Ca chơi con)
             $detail->update([
-                'court_id' => $request->court_id,
-                'booking_date' => $request->booking_date,
-                'start_time' => $request->start_time . ':00',
-                'end_time' => $request->end_time . ':00',
+                'court_id' => $validated['court_id'],
+                'booking_date' => $validated['booking_date'],
+                'start_time' => $validated['start_time'] . ':00',
+                'end_time' => $validated['end_time'] . ':00',
                 'duration_minutes' => $newDuration,
                 'price' => $newPrice,
-                'price_per_hour' => ($newDuration > 0) ? ($newPrice / ($newDuration / 60)) : 0,
+                'price_per_hour' => $newDuration > 0 ? ($newPrice / ($newDuration / 60)) : 0,
             ]);
 
-            // 5. Cập nhật bảng Bookings (Hóa đơn cha)
-            $booking->subtotal_court += $priceDiff;
-            $booking->total_price += $priceDiff;
-            $booking->remaining_amount += $priceDiff;
-            $booking->save();
+            $booking->update([
+                'subtotal_court' => $booking->subtotal_court + $priceDiff,
+                'total_price' => $booking->total_price + $priceDiff,
+                'remaining_amount' => $booking->remaining_amount + $priceDiff,
+            ]);
 
             return response()->json([
                 'status' => 'success',
                 'message' => 'Đổi lịch thành công! Hóa đơn đã được cập nhật giá.',
-                'data' => $booking->load('details')
+                'data' => $booking->load('details'),
             ]);
         });
     }
-    // Hàm tính giá nội bộ dựa trên bảng Court_Pricing (có tính đến ngày hiệu lực và loại ngày)
+
     /**
-     * Chức năng: Tính tiền sân nội bộ theo ngày chơi, khung giờ và bảng giá đang áp dụng.
-     */
-    private function internalCalculatePrice($courtId, $date, $start, $end)
-    {
-        $dayOfWeek = date('N', strtotime($date));
-        $dayType = ($dayOfWeek >= 6) ? 'weekend' : 'weekday';
-
-        $pricings = \App\Models\CourtPricing::where('court_id', $courtId)->where('day_type', $dayType)
-            ->where(function ($q) use ($date) {
-                $q->whereNull('effective_from')->orWhere('effective_from', '<=', $date);
-            })
-            ->where(function ($q) use ($date) {
-                $q->whereNull('effective_to')->orWhere('effective_to', '>=', $date);
-            })
-            ->orderByRaw('effective_from DESC')->get();
-
-        $price = 0;
-        $filled = [];
-        foreach ($pricings as $pricing) {
-            $dbS = substr($pricing->start_time, 0, 5);
-            $dbE = substr($pricing->end_time, 0, 5);
-            $overlapS = max($start, $dbS);
-            $overlapE = min($end, $dbE);
-            if ($overlapS < $overlapE) {
-                $key = $overlapS . '-' . $overlapE;
-                if (!isset($filled[$key])) {
-                    $price += ((strtotime($overlapE) - strtotime($overlapS)) / 3600) * $pricing->price;
-                    $filled[$key] = true;
-                }
-            }
-        }
-        return $price;
-    }
-
-
-    // =========================================================================
-    // API ADMIN: Tìm kiếm và Lọc hóa đơn đa năng
-    // =========================================================================
-    /**
-     * Chức năng: Tìm kiếm nhanh đơn đặt sân theo mã đơn, tên khách hoặc số điện thoại.
-     */
-    public function searchBookings(Request $request)
-    {
-        // Khởi tạo Query Builder nạp sẵn các ca chơi con
-        $query = Booking::with(['details'])->orderBy('created_at', 'desc');
-
-        // 1. Tìm kiếm theo Từ khóa (SĐT, Tên khách, hoặc Mã hóa đơn)
-        if ($request->has('keyword') && $request->keyword != '') {
-            $keyword = $request->keyword;
-            $query->where(function ($q) use ($keyword) {
-                $q->where('customer_phone', 'like', "%{$keyword}%")
-                    ->orWhere('customer_name', 'like', "%{$keyword}%")
-                    ->orWhere('booking_code', 'like', "%{$keyword}%");
-            });
-        }
-
-        // 2. Lọc theo Ngày thi đấu (Tìm sâu vào bảng booking_details)
-        if ($request->has('play_date') && $request->play_date != '') {
-            $playDate = $request->play_date;
-            $query->whereHas('details', function ($q) use ($playDate) {
-                $q->where('booking_date', $playDate);
-            });
-        }
-
-        // 3. Lọc theo Trạng thái đơn hàng (pending, confirmed, cancelled...)
-        if ($request->has('status') && $request->status != '') {
-            $query->where('status', $request->status);
-        }
-
-        // 4. Lọc theo Tình trạng thanh toán (unpaid, paid)
-        if ($request->has('payment_status') && $request->payment_status != '') {
-            $query->where('payment_status', $request->payment_status);
-        }
-
-        // Phân trang kết quả (15 đơn / trang)
-        $bookings = $query->paginate(15);
-
-        return response()->json([
-            'status' => 'success',
-            'message' => 'Kết quả tìm kiếm',
-            'data' => $bookings
-        ]);
-    }
-
-
-    // =========================================================================
-    // LỄ TÂN: THÊM DỊCH VỤ / SẢN PHẨM VÀO HÓA ĐƠN ĐANG CHƠI
-    // =========================================================================
-    /**
-     * Chức năng: Thêm một sản phẩm hoặc dịch vụ phát sinh vào bill của đơn đặt sân.
+     * Chức năng: Thêm một sản phẩm hoặc dịch vụ phát sinh vào bill đang mở.
      */
     public function addItemToBooking(Request $request, $bookingId)
     {
-        $request->validate([
-            'type' => 'required|in:product,service', // Rẽ nhánh tại đây
-            'item_id' => 'required|string', // Chứa ID của bảng Product HOẶC AdditionalService
-            'quantity' => 'required|integer|min:1',
-            'note' => 'nullable|string'
+        $validated = $request->validate([
+            'type' => ['required', 'in:product,service'],
+            'item_id' => ['required', 'string'],
+            'quantity' => ['required', 'integer', 'min:1'],
+            'note' => ['nullable', 'string'],
         ]);
 
-        $user = $request->user('sanctum');
-
-        return DB::transaction(function () use ($request, $bookingId, $user) {
+        return DB::transaction(function () use ($validated, $bookingId, $request) {
             $booking = Booking::findOrFail($bookingId);
-            $quantity = $request->quantity;
-            $unitPrice = 0;
+            $quantity = $validated['quantity'];
             $productId = null;
             $serviceId = null;
 
-            // -----------------------------------------------------------------
-            // RẼ NHÁNH 1: NẾU KHÁCH MUA HÀNG HÓA (CÓ TRỪ KHO)
-            // -----------------------------------------------------------------
-            if ($request->type === 'product') {
-                $product = Product::lockForUpdate()->findOrFail($request->item_id);
+            if ($validated['type'] === 'product') {
+                $product = Product::lockForUpdate()->findOrFail($validated['item_id']);
 
-                // Kiểm tra kho khắt khe
                 if ($product->stock_quantity < $quantity) {
                     throw new \Exception("Hàng hóa này chỉ còn {$product->stock_quantity} sản phẩm trong kho!");
                 }
 
-                $unitPrice = $product->selling_price; // Lấy giá bán lẻ từ bảng Products
+                $unitPrice = $product->selling_price;
                 $productId = $product->id;
                 $beforeQty = $product->stock_quantity;
 
-                // Trừ kho và tăng số lượng đã bán
                 $product->decrement('stock_quantity', $quantity);
                 $product->increment('sold_count', $quantity);
 
-                // Ghi sổ cái Kho (Siêu quan trọng để chủ sân đối soát)
                 InventoryTransaction::create([
                     'product_id' => $productId,
                     'transaction_type' => 'sale',
-                    'quantity' => -$quantity, // Số âm vì xuất kho
+                    'quantity' => -$quantity,
                     'before_quantity' => $beforeQty,
                     'after_quantity' => $beforeQty - $quantity,
                     'reference_type' => 'booking',
                     'reference_id' => $booking->id,
                     'note' => "Bán cho hóa đơn {$booking->booking_code}",
-                    'created_by' => $user ? $user->id : null,
+                    'created_by' => $request->user()?->id,
                 ]);
-            }
-            // -----------------------------------------------------------------
-            // RẼ NHÁNH 2: NẾU KHÁCH GỌI DỊCH VỤ (KHÔNG TRỪ KHO)
-            // -----------------------------------------------------------------
-            else {
-                $service = AdditionalService::findOrFail($request->item_id);
-                $unitPrice = $service->price; // Lấy giá từ bảng Additional_Services
+            } else {
+                $service = AdditionalService::findOrFail($validated['item_id']);
+                $unitPrice = $service->price;
                 $serviceId = $service->id;
             }
 
-            // -----------------------------------------------------------------
-            // ĐIỂM CHUNG: GHI VÀO BILL VÀ CỘNG TIỀN
-            // -----------------------------------------------------------------
             $totalPrice = $unitPrice * $quantity;
 
-            // 1. Ghi chi tiết vào tờ hóa đơn
             $detail = BookingServiceDetail::create([
                 'booking_id' => $booking->id,
-                'product_id' => $productId,  // Sẽ lưu Null nếu là service
-                'service_id' => $serviceId,  // Sẽ lưu Null nếu là product
+                'product_id' => $productId,
+                'service_id' => $serviceId,
                 'quantity' => $quantity,
                 'unit_price' => $unitPrice,
                 'total_price' => $totalPrice,
-                'note' => $request->note
+                'note' => $validated['note'] ?? null,
             ]);
 
-            // 2. Cộng dồn tiền dịch vụ vào bill
-            $newSubtotalService = (float) $booking->subtotal_service + $totalPrice;
-            $newTotalPrice = (float) $booking->total_price + $totalPrice;
-            $newRemainingAmount = (float) $booking->remaining_amount + $totalPrice;
+            $newRemaining = (float) $booking->remaining_amount + $totalPrice;
 
-            // Nếu phát sinh thêm dịch vụ thì số tiền đó là khoản còn phải thu
             $booking->update([
-                'subtotal_service' => $newSubtotalService,
-                'total_price' => $newTotalPrice,
-                'remaining_amount' => $newRemainingAmount,
-                'payment_status' => $newRemainingAmount > 0 ? 'partially_paid' : 'paid',
+                'subtotal_service' => (float) $booking->subtotal_service + $totalPrice,
+                'total_price' => (float) $booking->total_price + $totalPrice,
+                'remaining_amount' => $newRemaining,
+                'payment_status' => $newRemaining > 0 ? 'partially_paid' : 'paid',
             ]);
 
             return response()->json([
                 'status' => 'success',
                 'message' => 'Đã thêm vào hóa đơn thành công!',
-                'data' => $detail
+                'data' => $detail,
             ]);
         });
     }
 
-    // =========================================================================
-// LỄ TÂN: THÊM NHIỀU DỊCH VỤ / SẢN PHẨM VÀO HÓA ĐƠN ĐANG CHƠI
-// =========================================================================
     /**
-     * Chức năng: Thêm nhiều sản phẩm/dịch vụ phát sinh vào bill trong một lần thao tác.
+     * Chức năng: Thêm nhiều sản phẩm/dịch vụ phát sinh vào bill trong một lần thao tác (batch).
      */
     public function addItemsToBooking(Request $request, $bookingId)
     {
-        $request->validate([
-            'items' => 'required|array|min:1',
-            'items.*.type' => 'required|in:product,service',
-            'items.*.item_id' => 'required|string',
-            'items.*.quantity' => 'required|integer|min:1',
-            'items.*.note' => 'nullable|string',
+        $validated = $request->validate([
+            'items' => ['required', 'array', 'min:1'],
+            'items.*.type' => ['required', 'in:product,service'],
+            'items.*.item_id' => ['required', 'string'],
+            'items.*.quantity' => ['required', 'integer', 'min:1'],
+            'items.*.note' => ['nullable', 'string'],
         ]);
 
-        $user = $request->user('sanctum');
-
-        return DB::transaction(function () use ($request, $bookingId, $user) {
+        return DB::transaction(function () use ($validated, $bookingId, $request) {
             $booking = Booking::lockForUpdate()->findOrFail($bookingId);
-
             $createdDetails = [];
             $totalAddedAmount = 0;
 
-            foreach ($request->items as $item) {
+            foreach ($validated['items'] as $item) {
                 $quantity = $item['quantity'];
-                $unitPrice = 0;
                 $productId = null;
                 $serviceId = null;
 
-                // -------------------------------------------------------------
-                // TRƯỜNG HỢP 1: SẢN PHẨM CÓ TRỪ KHO
-                // -------------------------------------------------------------
                 if ($item['type'] === 'product') {
                     $product = Product::lockForUpdate()->findOrFail($item['item_id']);
 
@@ -642,7 +561,6 @@ class BookingController extends Controller
 
                     $unitPrice = $product->selling_price;
                     $productId = $product->id;
-
                     $beforeQty = $product->stock_quantity;
                     $afterQty = $beforeQty - $quantity;
 
@@ -660,14 +578,9 @@ class BookingController extends Controller
                         'reference_type' => 'booking',
                         'reference_id' => $booking->id,
                         'note' => "Bán cho hóa đơn {$booking->booking_code}",
-                        'created_by' => $user ? $user->id : null,
+                        'created_by' => $request->user()?->id,
                     ]);
-                }
-
-                // -------------------------------------------------------------
-                // TRƯỜNG HỢP 2: DỊCH VỤ KHÔNG TRỪ KHO
-                // -------------------------------------------------------------
-                if ($item['type'] === 'service') {
+                } else {
                     $service = AdditionalService::findOrFail($item['item_id']);
 
                     if ($service->status === 'inactive') {
@@ -678,13 +591,10 @@ class BookingController extends Controller
                     $serviceId = $service->id;
                 }
 
-                // -------------------------------------------------------------
-                // GHI CHI TIẾT HÓA ĐƠN
-                // -------------------------------------------------------------
                 $totalPrice = $unitPrice * $quantity;
                 $totalAddedAmount += $totalPrice;
 
-                $detail = BookingServiceDetail::create([
+                $createdDetails[] = BookingServiceDetail::create([
                     'booking_id' => $booking->id,
                     'product_id' => $productId,
                     'service_id' => $serviceId,
@@ -693,24 +603,15 @@ class BookingController extends Controller
                     'total_price' => $totalPrice,
                     'note' => $item['note'] ?? null,
                 ]);
-
-                $createdDetails[] = $detail;
             }
 
-            // -------------------------------------------------------------
-            // CẬP NHẬT TỔNG TIỀN BILL SAU KHI THÊM TẤT CẢ MÓN
-            // -------------------------------------------------------------
-            $newSubtotalService = (float) $booking->subtotal_service + $totalAddedAmount;
-            $newTotalPrice = (float) $booking->total_price + $totalAddedAmount;
-            $newRemainingAmount = (float) $booking->remaining_amount + $totalAddedAmount;
+            $newRemaining = (float) $booking->remaining_amount + $totalAddedAmount;
 
-            // Khi thêm Pro-shop, phần tiền phát sinh này phải được cộng vào tiền còn phải thu.
-            // Nếu trước đó khách đã trả tiền sân rồi, hệ thống sẽ chuyển sang partially_paid.
             $booking->update([
-                'subtotal_service' => $newSubtotalService,
-                'total_price' => $newTotalPrice,
-                'remaining_amount' => $newRemainingAmount,
-                'payment_status' => $newRemainingAmount > 0 ? 'partially_paid' : 'paid',
+                'subtotal_service' => (float) $booking->subtotal_service + $totalAddedAmount,
+                'total_price' => (float) $booking->total_price + $totalAddedAmount,
+                'remaining_amount' => $newRemaining,
+                'payment_status' => $newRemaining > 0 ? 'partially_paid' : 'paid',
             ]);
 
             return response()->json([
@@ -723,5 +624,118 @@ class BookingController extends Controller
                 ],
             ], 201);
         });
+    }
+
+    /**
+     * Chức năng: Cộng điểm thành viên cho khách sau khi đơn hoàn thành và đã thanh toán đủ, chống cộng trùng.
+     */
+    private function rewardCustomerForCompletedBooking(Booking $booking): ?array
+    {
+        if ($booking->points_awarded_at !== null)
+            return null;
+        if ($booking->status !== 'completed' || $booking->payment_status !== 'paid')
+            return null;
+
+        $earnedPoints = (int) floor($this->calculateBookingPlayMinutes($booking) / 60 * 10);
+        if ($earnedPoints <= 0)
+            return null;
+
+        $normalizedPhone = preg_replace('/\D+/', '', (string) $booking->customer_phone);
+
+        $user = $booking->user_id
+            ? User::lockForUpdate()->find($booking->user_id)
+            : User::where('role', 'customer')
+                ->where(
+                    fn($q) => $q
+                        ->where('phone', $booking->customer_phone)
+                        ->when($normalizedPhone !== '', fn($q2) => $q2->orWhere('phone', $normalizedPhone))
+                )
+                ->lockForUpdate()
+                ->first();
+
+        if (!$user || $user->role !== 'customer')
+            return null;
+
+        if (!$booking->user_id) {
+            $booking->update(['user_id' => $user->id]);
+        }
+
+        $user->update([
+            'points' => (int) $user->points + $earnedPoints,
+            'total_spent' => (float) $user->total_spent + (float) $booking->total_price,
+            'membership_level' => $this->resolveMembershipLevel((int) $user->points + $earnedPoints),
+        ]);
+
+        $booking->update(['points_awarded_at' => now()]);
+
+        return [
+            'user_id' => $user->id,
+            'earned_points' => $earnedPoints,
+            'current_points' => (int) $user->points + $earnedPoints,
+            'membership_level' => $user->membership_level,
+        ];
+    }
+
+    /**
+     * Chức năng: Tính tổng số phút thực chơi của đơn dựa trên các buổi chơi con.
+     */
+    private function calculateBookingPlayMinutes(Booking $booking): int
+    {
+        return (int) $booking->details->sum(function ($detail) {
+            if ((int) $detail->duration_minutes > 0) {
+                return (int) $detail->duration_minutes;
+            }
+            if ($detail->start_time && $detail->end_time) {
+                return max(0, Carbon::parse($detail->end_time)->diffInMinutes(Carbon::parse($detail->start_time)));
+            }
+            return 0;
+        });
+    }
+
+    /**
+     * Chức năng: Xác định hạng thành viên dựa trên tổng điểm tích lũy.
+     */
+    private function resolveMembershipLevel(int $points): string
+    {
+        foreach (self::MEMBERSHIP_LEVELS as $threshold => $level) {
+            if ($points >= $threshold)
+                return $level;
+        }
+        return 'Dong';
+    }
+
+    /**
+     * Chức năng: Tính giá tiền sân theo bảng giá hiệu lực tại ngày và khung giờ tương ứng.
+     */
+    private function internalCalculatePrice(string $courtId, string $date, string $start, string $end): float
+    {
+        $dayType = (date('N', strtotime($date)) >= 6) ? 'weekend' : 'weekday';
+
+        $pricings = CourtPricing::where('court_id', $courtId)
+            ->where('day_type', $dayType)
+            ->where(fn($q) => $q->whereNull('effective_from')->orWhere('effective_from', '<=', $date))
+            ->where(fn($q) => $q->whereNull('effective_to')->orWhere('effective_to', '>=', $date))
+            ->orderByDesc('effective_from')
+            ->get();
+
+        $price = 0.0;
+        $filled = [];
+
+        foreach ($pricings as $pricing) {
+            $dbS = substr($pricing->start_time, 0, 5);
+            $dbE = substr($pricing->end_time, 0, 5);
+            $overlapS = max($start, $dbS);
+            $overlapE = min($end, $dbE);
+
+            if ($overlapS < $overlapE) {
+                $key = "{$overlapS}-{$overlapE}";
+                if (!isset($filled[$key])) {
+                    $price += ((strtotime($overlapE) - strtotime($overlapS)) / 3600) * $pricing->price;
+                    $filled[$key] = true;
+                }
+            }
+        }
+
+        return $price;
     }
 }

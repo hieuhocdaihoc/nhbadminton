@@ -25,6 +25,7 @@ class ReviewController extends Controller
 
         $query = Review::with([
             'user:id,full_name,customer_code',
+            'user.avatar',
             'court:id,name,court_code',
             'booking:id,booking_code',
         ])
@@ -148,6 +149,7 @@ class ReviewController extends Controller
         $bookingCode = $review->booking?->booking_code ?? 'don dat san';
         $now = now();
 
+        $groupKey = 'review_' . ($review->id ?? Str::uuid());
         $rows = $receiverIds->map(fn ($receiverId) => [
             'id' => (string) Str::uuid(),
             'receiver_id' => $receiverId,
@@ -156,6 +158,7 @@ class ReviewController extends Controller
             'content' => "{$customerName} danh gia {$review->rating} sao cho {$courtName} tu {$bookingCode}.",
             'is_read' => false,
             'created_at' => $now,
+            'group_key' => $groupKey,
         ])->all();
 
         Notification::insert($rows);

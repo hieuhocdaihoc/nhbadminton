@@ -191,17 +191,17 @@ const InventoryManager = () => {
   };
 
   const inputClass =
-    "w-full bg-[#f8f8fa] border border-zinc-200 rounded-lg px-3.5 py-2.5 text-sm text-zinc-800 outline-none focus:border-zinc-400 focus:ring-1 focus:ring-zinc-200 transition-all";
+    "admin-input";
 
   return (
-    <div className="max-w-[1400px] mx-auto space-y-5">
-      {/* HEADER & TABS */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <div className="admin-page-container">
+      {/* TIÊU ĐỀ & TAB */}
+      <div className="admin-page-header">
         <div>
-          <h2 className="text-base font-semibold text-zinc-800">
+          <h2 className="admin-page-title">
             Kiểm kho & Nhập hàng
           </h2>
-          <p className="text-xs text-zinc-400 mt-0.5">
+          <p className="admin-page-subtitle">
             Theo dõi lịch sử biến động và đơn nhập
           </p>
         </div>
@@ -222,7 +222,7 @@ const InventoryManager = () => {
         </div>
       </div>
 
-      {/* TOAST */}
+      {/* THÔNG BÁO (TOAST) */}
       <AnimatePresence>
         {message.text && (
           <motion.div
@@ -238,8 +238,8 @@ const InventoryManager = () => {
 
       {activeTab === "movement" ? (
         <>
-          {/* TOOLBAR TAB 1 */}
-          <div className="bg-white rounded-xl border border-zinc-200/60 p-4 flex flex-col sm:flex-row gap-3 items-center">
+          {/* THANH CÔNG CỤ TAB 1 */}
+          <div className="admin-card p-4 flex flex-col sm:flex-row gap-3 items-center">
             <div className="flex items-center gap-2 w-full sm:w-auto">
               <span className="text-xs text-zinc-500">Mặt hàng:</span>
               <select
@@ -272,8 +272,8 @@ const InventoryManager = () => {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
-            {/* LIST TABLE */}
-            <div className="lg:col-span-8 bg-white rounded-xl border border-zinc-200/60 overflow-hidden flex flex-col">
+            {/* BẢNG DANH SÁCH */}
+            <div className="lg:col-span-8 admin-card overflow-hidden flex flex-col">
               <div className="overflow-x-auto">
                 <table className="w-full text-left">
                   <thead className="bg-zinc-50/60 border-b border-zinc-100 text-[10px] font-medium text-zinc-400 uppercase tracking-wider">
@@ -396,7 +396,7 @@ const InventoryManager = () => {
                       onClick={() =>
                         fetchTabData(txPagination.current_page - 1)
                       }
-                      className="px-3 py-1.5 bg-white border border-zinc-200 hover:bg-zinc-50 disabled:opacity-50 rounded-lg text-xs font-medium text-zinc-600 transition-colors"
+                      className="admin-btn-outline"
                     >
                       Trước
                     </button>
@@ -407,7 +407,7 @@ const InventoryManager = () => {
                       onClick={() =>
                         fetchTabData(txPagination.current_page + 1)
                       }
-                      className="px-3 py-1.5 bg-white border border-zinc-200 hover:bg-zinc-50 disabled:opacity-50 rounded-lg text-xs font-medium text-zinc-600 transition-colors"
+                      className="admin-btn-outline"
                     >
                       Tiếp
                     </button>
@@ -416,8 +416,8 @@ const InventoryManager = () => {
               )}
             </div>
 
-            {/* FORM ADJUST */}
-            <div className="lg:col-span-4 bg-white rounded-xl border border-zinc-200/60 p-5 sticky top-5">
+            {/* BIỂU MẪU ĐIỀU CHỈNH */}
+            <div className="lg:col-span-4 admin-card p-5 sticky top-5">
               <div className="border-b border-zinc-100 pb-3 mb-4">
                 <h3 className="text-sm font-semibold text-zinc-800">
                   Kiểm kho thủ công
@@ -425,7 +425,7 @@ const InventoryManager = () => {
               </div>
               <form onSubmit={handleAdjustSubmit} className="space-y-4">
                 <div>
-                  <label className="block text-[11px] font-medium text-zinc-500 mb-1.5">
+                  <label className="admin-form-label">
                     Sản phẩm *
                   </label>
                   <select
@@ -450,7 +450,7 @@ const InventoryManager = () => {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-[11px] font-medium text-zinc-500 mb-1.5">
+                  <label className="admin-form-label">
                     Loại điều chỉnh *
                   </label>
                   <select
@@ -469,7 +469,7 @@ const InventoryManager = () => {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-[11px] font-medium text-zinc-500 mb-1.5">
+                  <label className="admin-form-label">
                     Số lượng *
                   </label>
                   <input
@@ -487,7 +487,7 @@ const InventoryManager = () => {
                   </p>
                 </div>
                 <div>
-                  <label className="block text-[11px] font-medium text-zinc-500 mb-1.5">
+                  <label className="admin-form-label">
                     Ghi chú *
                   </label>
                   <textarea
@@ -504,7 +504,7 @@ const InventoryManager = () => {
                 <button
                   type="submit"
                   disabled={isProcessing}
-                  className={`w-full py-2.5 rounded-lg text-xs font-medium text-white bg-zinc-900 hover:bg-zinc-800 transition-colors ${isProcessing ? "opacity-60 cursor-not-allowed" : ""}`}
+                  className={`w-full py-2.5 admin-btn-secondary ${isProcessing ? "opacity-60 cursor-not-allowed shadow-none hover:translate-y-0" : ""}`}
                 >
                   {isProcessing ? "Đang xử lý..." : "Cập nhật kho"}
                 </button>
@@ -514,17 +514,17 @@ const InventoryManager = () => {
         </>
       ) : (
         <>
-          {/* TOOLBAR TAB 2 */}
+          {/* THANH CÔNG CỤ TAB 2 */}
           <div className="flex justify-end mb-4">
             <button
               onClick={() => setIsNewPoOpen(true)}
-              className="px-4 py-2 bg-lime-600 hover:bg-lime-700 text-white rounded-lg text-xs font-medium transition-colors flex items-center gap-2"
+              className="admin-btn-primary flex items-center gap-2"
             >
               <span>+ Nhập hàng mới</span>
             </button>
           </div>
 
-          <div className="bg-white rounded-xl border border-zinc-200/60 overflow-hidden flex flex-col">
+          <div className="admin-card overflow-hidden flex flex-col">
             <div className="overflow-x-auto">
               <table className="w-full text-left">
                 <thead className="bg-zinc-50/60 border-b border-zinc-100 text-[10px] font-medium text-zinc-400 uppercase tracking-wider">
@@ -599,7 +599,7 @@ const InventoryManager = () => {
                         <td className="py-3.5 px-5 text-right">
                           <button
                             onClick={() => handleViewPoDetail(po.id)}
-                            className="px-3 py-1.5 border border-zinc-200 text-zinc-600 rounded-lg text-xs font-medium hover:bg-zinc-50 transition-colors opacity-0 group-hover:opacity-100"
+                            className="admin-btn-outline px-3 py-1.5 opacity-0 group-hover:opacity-100"
                           >
                             Chi tiết
                           </button>
@@ -619,7 +619,7 @@ const InventoryManager = () => {
                   <button
                     disabled={poPagination.current_page === 1}
                     onClick={() => fetchTabData(poPagination.current_page - 1)}
-                    className="px-3 py-1.5 bg-white border border-zinc-200 hover:bg-zinc-50 disabled:opacity-50 rounded-lg text-xs font-medium text-zinc-600 transition-colors"
+                    className="admin-btn-outline"
                   >
                     Trước
                   </button>
@@ -628,7 +628,7 @@ const InventoryManager = () => {
                       poPagination.current_page === poPagination.last_page
                     }
                     onClick={() => fetchTabData(poPagination.current_page + 1)}
-                    className="px-3 py-1.5 bg-white border border-zinc-200 hover:bg-zinc-50 disabled:opacity-50 rounded-lg text-xs font-medium text-zinc-600 transition-colors"
+                    className="admin-btn-outline"
                   >
                     Tiếp
                   </button>
@@ -639,11 +639,11 @@ const InventoryManager = () => {
         </>
       )}
 
-      {/* MODALS */}
+      {/* CÁC CỬA SỔ (MODALS) */}
       <AnimatePresence>
-        {/* NEW PO MODAL */}
+        {/* CỬA SỔ NHẬP HÀNG MỚI */}
         {isNewPoOpen && (
-          <div className="fixed inset-0 z-50 bg-black/30 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="admin-modal-overlay">
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -667,7 +667,7 @@ const InventoryManager = () => {
                 className="flex-1 overflow-y-auto p-6 space-y-5 custom-scrollbar"
               >
                 <div>
-                  <label className="block text-[11px] font-medium text-zinc-500 mb-1.5">
+                  <label className="admin-form-label">
                     Nhà cung cấp *
                   </label>
                   <select
@@ -695,7 +695,7 @@ const InventoryManager = () => {
                     <button
                       type="button"
                       onClick={handleAddPoItemRow}
-                      className="text-[11px] font-medium text-lime-600 hover:text-lime-700"
+                      className="text-[11px] font-medium text-emerald-600 hover:text-emerald-700"
                     >
                       + Thêm dòng
                     </button>
@@ -782,14 +782,14 @@ const InventoryManager = () => {
                 <button
                   type="button"
                   onClick={() => setIsNewPoOpen(false)}
-                  className="flex-1 py-2.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-600 rounded-lg text-xs font-medium transition-colors"
+                  className="flex-1 py-2.5 admin-btn-outline"
                 >
                   Hủy
                 </button>
                 <button
                   onClick={handleCreatePoSubmit}
                   disabled={isProcessing}
-                  className="flex-1 py-2.5 bg-zinc-900 hover:bg-zinc-800 text-white rounded-lg text-xs font-medium transition-colors disabled:opacity-60"
+                  className="flex-1 py-2.5 admin-btn-secondary disabled:opacity-60 disabled:hover:translate-y-0 disabled:shadow-none"
                 >
                   {isProcessing ? "Đang xử lý..." : "Hoàn tất nhập kho"}
                 </button>
@@ -798,14 +798,14 @@ const InventoryManager = () => {
           </div>
         )}
 
-        {/* PO DETAIL MODAL */}
+        {/* CỬA SỔ CHI TIẾT PHIẾU NHẬP */}
         {isPoDetailOpen && selectedPO && (
-          <div className="fixed inset-0 z-50 bg-black/30 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="admin-modal-overlay">
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white w-full max-w-md rounded-2xl shadow-xl overflow-hidden"
+              className="admin-modal-content"
             >
               <div className="px-6 py-4 border-b border-zinc-100 flex justify-between items-center">
                 <div>
@@ -876,11 +876,11 @@ const InventoryManager = () => {
                   </table>
                 </div>
 
-                <div className="flex justify-between items-center bg-lime-50 rounded-lg p-3 border border-lime-100">
-                  <span className="text-[11px] font-semibold text-lime-800">
+                <div className="flex justify-between items-center bg-emerald-50 rounded-lg p-3 border border-emerald-100">
+                  <span className="text-[11px] font-semibold text-emerald-800">
                     Tổng chi phí
                   </span>
-                  <span className="text-base font-bold text-lime-700">
+                  <span className="text-base font-bold text-emerald-700">
                     {Number(selectedPO.total_amount).toLocaleString()} ₫
                   </span>
                 </div>

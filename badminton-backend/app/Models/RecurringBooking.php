@@ -10,41 +10,46 @@ class RecurringBooking extends Model
     use HasUuid;
 
     protected $table = 'recurring_bookings';
-    public $timestamps = false;
-
     protected $keyType = 'string';
     public $incrementing = false;
+    public $timestamps = false;
 
     protected $fillable = [
         'user_id',
         'court_id',
         'recurring_code',
-        'day_of_week',
+        'days_of_week',
         'start_time',
         'end_time',
         'start_date',
         'end_date',
-        'status'
+        'status',
+        'type',
     ];
 
     protected $casts = [
-        'day_of_week' => 'integer',
-        'start_date' => 'date:Y-m-d',
-        'end_date' => 'date:Y-m-d',
+        'days_of_week' => 'array',
+        'start_date'   => 'date:Y-m-d',
+        'end_date'     => 'date:Y-m-d',
     ];
-    /**
-     * Chức năng: Khai báo quan hệ bản ghi thuộc về một sân.
-     */
+
+    // Relationships
+
+    /** Quan hệ: RecurringBooking thuộc về một khách hàng */
+    public function user()
+    {
+        return $this->belongsTo(User::class, 'user_id', 'id');
+    }
+
+    /** Quan hệ: RecurringBooking thuộc về một sân */
     public function court()
     {
         return $this->belongsTo(Court::class, 'court_id', 'id');
     }
-    // Thêm hàm này để lấy thông tin người đặt (User)
-    /**
-     * Chức năng: Khai báo quan hệ bản ghi thuộc về một người dùng.
-     */
-    public function user()
+
+    /** Quan hệ: RecurringBooking có nhiều booking phát sinh */
+    public function bookings()
     {
-        return $this->belongsTo(User::class, 'user_id', 'id');
+        return $this->hasMany(Booking::class, 'recurring_booking_id', 'id');
     }
 }

@@ -5,7 +5,7 @@ import { authService } from '../../services/auth/authService';
 
 const Header = () => {
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-    const [activeLink, setActiveLink] = useState('Trang chủ');
+    const [activeLink, setActiveLink] = useState('Sân Cầu');
     const [currentUser, setCurrentUser] = useState(() => {
         const storedUser = localStorage.getItem('current_user');
         if (!storedUser) return null;
@@ -57,13 +57,43 @@ const Header = () => {
     };
 
     const navLinks = [
-        { name: 'Trang chủ', href: '/' },
-        { name: 'Tra cứu đơn', href: '/guest-booking-lookup' },
-        { name: 'Tiện ích', href: '/#utilities' },
-        { name: 'Sơ đồ sân', href: '/#courts' },
-        { name: 'Quy trình', href: '/#steps' },
-        { name: 'Liên hệ', href: '/#contact' },
+        { name: 'Sân Cầu', href: '/#courts', sectionId: 'courts' },
+        { name: 'Bảng Giá', href: '/#pricing', sectionId: 'pricing' },
+        { name: 'Tiện Ích', href: '/#utilities', sectionId: 'utilities' },
+        { name: 'Hướng Dẫn', href: '/#steps', sectionId: 'steps' },
+        { name: 'Tra Cứu Đơn', href: '/guest-booking-lookup' },
+        { name: 'Mặt Bằng', href: '/#floorplan', sectionId: 'floorplan' },
     ];
+
+    // SCROLL-SPY: tự động chuyển pill active theo section đang hiển thị trên trang chủ
+    useEffect(() => {
+        if (window.location.pathname !== '/') return;
+
+        const sectionLinks = navLinks.filter((l) => l.sectionId);
+        const sections = sectionLinks
+            .map((l) => ({ ...l, el: document.getElementById(l.sectionId) }))
+            .filter((l) => l.el);
+
+        if (sections.length === 0) return;
+
+        const observer = new IntersectionObserver(
+            (entries) => {
+                const visible = entries
+                    .filter((entry) => entry.isIntersecting)
+                    .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+
+                if (visible) {
+                    const match = sections.find((s) => s.el === visible.target);
+                    if (match) setActiveLink(match.name);
+                }
+            },
+            { rootMargin: '-35% 0px -55% 0px', threshold: [0, 0.25, 0.5, 0.75, 1] }
+        );
+
+        sections.forEach((s) => observer.observe(s.el));
+        return () => observer.disconnect();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     const mobileMenuVariant = {
         hidden: { opacity: 0, height: 0 },
@@ -87,18 +117,17 @@ const Header = () => {
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
 
                 {/* ═══ LOGO ═══ */}
-                <a href="/" className="flex items-center gap-2.5 group focus:outline-none">
-                    <motion.div whileHover={{ rotate: 5, scale: 1.08 }} whileTap={{ scale: 0.95 }}
-                        className="w-10 h-10 bg-lime-500 rounded-xl flex items-center justify-center text-zinc-950 font-black text-xl tracking-tighter shadow-lg shadow-lime-500/25">
-                        NH
-                    </motion.div>
-                    <span className="font-extrabold text-xl tracking-tight text-white">
-                        Badminton<span className="text-lime-400">.</span>
+                <a href="/" className="flex items-center gap-2 group focus:outline-none">
+                    <span className="material-symbols-outlined text-lime-400 text-[28px]" style={{ fontVariationSettings: "'FILL' 1" }}>
+                        sports_tennis
+                    </span>
+                    <span className="font-extrabold text-lg tracking-tight text-white uppercase">
+                        NH<span className="text-lime-400"> Badminton</span>
                     </span>
                 </a>
 
                 {/* ═══ DESKTOP NAV ═══ */}
-                <nav className="hidden md:flex items-center gap-1 font-semibold text-sm">
+                <nav className="hidden md:flex items-center gap-1 font-semibold text-sm bg-zinc-900/60 border border-zinc-800/80 rounded-full px-1.5 py-1.5">
                     {navLinks.map((link) => {
                         const isActive = activeLink === link.name;
                         return (
@@ -106,13 +135,13 @@ const Header = () => {
                                 onClick={() => setActiveLink(link.name)}
                                 onMouseEnter={() => setHoveredLink(link.name)}
                                 onMouseLeave={() => setHoveredLink(null)}
-                                className={`relative px-4 py-2 rounded-lg transition-colors duration-200 ${isActive ? 'text-lime-400' : 'text-zinc-400 hover:text-white'}`}>
-                                {link.name}
-                                {(isActive || hoveredLink === link.name) && (
-                                    <motion.div layoutId="navNeonLine"
-                                        className="absolute bottom-0 left-2 right-2 h-[2px] bg-lime-400 rounded-full shadow-[0_0_8px_rgba(163,230,53,0.6)]"
+                                className={`relative px-4 py-2 rounded-full transition-colors duration-200 ${isActive ? 'text-zinc-950' : 'text-zinc-400 hover:text-white'}`}>
+                                {(isActive) && (
+                                    <motion.div layoutId="navPill"
+                                        className="absolute inset-0 bg-lime-400 rounded-full shadow-[0_0_12px_rgba(163,230,53,0.5)]"
                                         transition={{ type: 'spring', stiffness: 350, damping: 30 }} />
                                 )}
+                                <span className="relative z-10">{link.name}</span>
                             </a>
                         );
                     })}
@@ -147,9 +176,13 @@ const Header = () => {
                                     onClick={() => setUserDropdownOpen(!userDropdownOpen)}
                                     className="flex items-center gap-2 p-1 pl-3 bg-zinc-900/80 border border-zinc-700/80 rounded-full focus:outline-none hover:border-lime-500/40 transition-colors">
                                     <span className="text-sm font-bold text-zinc-300 max-w-[120px] truncate">{currentUser.full_name || 'Vợt thủ'}</span>
-                                    <div className="w-8 h-8 bg-gradient-to-tr from-lime-500 to-emerald-500 rounded-full flex items-center justify-center text-zinc-950 font-bold text-xs">
-                                        {getInitials(currentUser.full_name)}
-                                    </div>
+                                    {currentUser.avatar_url ? (
+                                        <img src={currentUser.avatar_url} alt={currentUser.full_name} className="w-8 h-8 rounded-full object-cover" />
+                                    ) : (
+                                        <div className="w-8 h-8 bg-gradient-to-tr from-lime-500 to-emerald-500 rounded-full flex items-center justify-center text-zinc-950 font-bold text-xs">
+                                            {getInitials(currentUser.full_name)}
+                                        </div>
+                                    )}
                                 </motion.button>
 
                                 <AnimatePresence>
@@ -233,7 +266,11 @@ const Header = () => {
                             ) : (
                                 <div className="bg-zinc-900/80 p-4 rounded-2xl border border-zinc-800">
                                     <div className="flex items-center gap-3 mb-4">
-                                        <div className="w-10 h-10 bg-gradient-to-tr from-lime-500 to-emerald-500 rounded-full flex items-center justify-center text-zinc-950 font-bold text-sm">{getInitials(currentUser.full_name)}</div>
+                                        {currentUser.avatar_url ? (
+                                            <img src={currentUser.avatar_url} alt={currentUser.full_name} className="w-10 h-10 rounded-full object-cover" />
+                                        ) : (
+                                            <div className="w-10 h-10 bg-gradient-to-tr from-lime-500 to-emerald-500 rounded-full flex items-center justify-center text-zinc-950 font-bold text-sm">{getInitials(currentUser.full_name)}</div>
+                                        )}
                                         <div className="overflow-hidden">
                                             <p className="text-sm font-bold text-white truncate">{currentUser.full_name}</p>
                                             <p className="text-xs text-zinc-500 truncate">{currentUser.phone}</p>

@@ -40,37 +40,37 @@ const getPaymentMethodLabel = (method) => {
 
 const getPaymentMethodStyle = (method) => {
   if (method === "cash") {
-    return "bg-amber-50 text-amber-700 border-amber-100";
+    return "badge-warning";
   }
 
   if (["bank_transfer", "sepay", "online"].includes(method)) {
-    return "bg-blue-50 text-blue-700 border-blue-100";
+    return "badge-success";
   }
 
-  return "bg-zinc-50 text-zinc-600 border-zinc-100";
+  return "badge-neutral";
 };
 
 const getStatusStyle = (status) => {
   if (status === "success") {
-    return "bg-emerald-50 text-emerald-700 border-emerald-100";
+    return "badge-success";
   }
 
   if (status === "failed") {
-    return "bg-red-50 text-red-600 border-red-100";
+    return "badge-error";
   }
 
-  return "bg-zinc-50 text-zinc-600 border-zinc-100";
+  return "badge-neutral";
 };
 
 const StatCard = ({ label, value, sub, icon, color = "text-zinc-900" }) => (
-  <div className="bg-white p-5 rounded-2xl border border-zinc-100 shadow-sm">
+  <div className="admin-card p-5">
     <div className="flex items-start justify-between gap-3">
       <div>
-        <p className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">
+        <p className="admin-stat-label">
           {label}
         </p>
 
-        <h3 className={`text-2xl font-extrabold mt-1 ${color}`}>{value}</h3>
+        <h3 className={`admin-stat-value mt-1 ${color}`}>{value}</h3>
 
         {sub && (
           <p className="text-[10px] font-medium text-zinc-400 mt-1">{sub}</p>
@@ -224,26 +224,26 @@ const RevenueManager = () => {
 
   return (
     <div className="max-w-[1500px] mx-auto space-y-6">
-      {/* HEADER */}
+      {/* TIÊU ĐỀ */}
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
         <div>
-          <h2 className="text-lg font-extrabold text-zinc-900">
+          <h2 className="admin-page-title text-2xl">
             Quản lý doanh thu
           </h2>
-          <p className="text-xs text-zinc-400 mt-1">
+          <p className="admin-page-subtitle text-sm mt-1">
             Theo dõi giao dịch thanh toán, doanh thu tiền mặt và chuyển khoản.
           </p>
         </div>
 
         <button
           onClick={fetchRevenueData}
-          className="px-4 py-2.5 bg-zinc-900 text-white rounded-xl text-xs font-bold hover:bg-zinc-800 transition-colors"
+          className="admin-btn-secondary px-4 py-2.5 rounded-xl text-xs"
         >
           Làm mới dữ liệu
         </button>
       </div>
 
-      {/* TOAST */}
+      {/* THÔNG BÁO (TOAST) */}
       <AnimatePresence>
         {message.text && (
           <motion.div
@@ -262,7 +262,7 @@ const RevenueManager = () => {
       </AnimatePresence>
 
       {/* FILTER */}
-      <div className="bg-white p-5 rounded-2xl border border-zinc-100 shadow-sm">
+      <div className="admin-card p-5">
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-6 gap-3">
           <div className="xl:col-span-2">
             <label className="block text-[11px] font-bold text-zinc-400 uppercase mb-1.5">
@@ -273,7 +273,7 @@ const RevenueManager = () => {
               value={filters.keyword}
               onChange={(e) => handleFilterChange("keyword", e.target.value)}
               placeholder="Mã thanh toán, mã đơn, tên, SĐT..."
-              className="w-full px-3.5 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl text-xs outline-none focus:border-lime-400"
+              className="admin-input w-full px-3.5 py-2.5 text-xs rounded-xl"
             />
           </div>
 
@@ -285,7 +285,7 @@ const RevenueManager = () => {
               type="date"
               value={filters.from_date}
               onChange={(e) => handleFilterChange("from_date", e.target.value)}
-              className="w-full px-3.5 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl text-xs outline-none focus:border-lime-400"
+              className="admin-input w-full px-3.5 py-2.5 text-xs rounded-xl"
             />
           </div>
 
@@ -297,7 +297,7 @@ const RevenueManager = () => {
               type="date"
               value={filters.to_date}
               onChange={(e) => handleFilterChange("to_date", e.target.value)}
-              className="w-full px-3.5 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl text-xs outline-none focus:border-lime-400"
+              className="admin-input w-full px-3.5 py-2.5 text-xs rounded-xl"
             />
           </div>
 
@@ -310,7 +310,7 @@ const RevenueManager = () => {
               onChange={(e) =>
                 handleFilterChange("payment_method", e.target.value)
               }
-              className="w-full px-3.5 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl text-xs outline-none focus:border-lime-400"
+              className="admin-input w-full px-3.5 py-2.5 text-xs rounded-xl"
             >
               <option value="">Tất cả</option>
               <option value="cash">Tiền mặt</option>
@@ -327,7 +327,7 @@ const RevenueManager = () => {
             <select
               value={filters.status}
               onChange={(e) => handleFilterChange("status", e.target.value)}
-              className="w-full px-3.5 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl text-xs outline-none focus:border-lime-400"
+              className="admin-input w-full px-3.5 py-2.5 text-xs rounded-xl"
             >
               <option value="">Tất cả</option>
               <option value="success">Thành công</option>
@@ -340,14 +340,14 @@ const RevenueManager = () => {
         <div className="flex flex-col sm:flex-row justify-end gap-2 mt-4">
           <button
             onClick={handleResetFilter}
-            className="px-4 py-2.5 bg-zinc-100 text-zinc-600 rounded-xl text-xs font-bold hover:bg-zinc-200 transition-colors"
+            className="admin-btn-outline px-4 py-2.5 rounded-xl text-xs font-bold"
           >
             Đặt lại
           </button>
 
           <button
             onClick={handleApplyFilter}
-            className="px-4 py-2.5 bg-lime-500 text-zinc-950 rounded-xl text-xs font-extrabold hover:bg-lime-400 transition-colors"
+            className="admin-btn-primary px-4 py-2.5 rounded-xl text-xs font-extrabold"
           >
             Lọc doanh thu
           </button>
@@ -399,7 +399,7 @@ const RevenueManager = () => {
       {/* METHOD SUMMARY + TABLE */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
         {/* BIỂU ĐỒ ĐƠN GIẢN */}
-        <div className="bg-white p-5 rounded-2xl border border-zinc-100 shadow-sm">
+        <div className="admin-card p-5">
           <div className="flex items-center justify-between mb-5">
             <div>
               <h3 className="text-sm font-extrabold text-zinc-900">
@@ -438,7 +438,7 @@ const RevenueManager = () => {
 
                     <div className="w-full h-2 bg-zinc-100 rounded-full overflow-hidden">
                       <div
-                        className="h-full bg-gradient-to-r from-lime-500 to-emerald-500 rounded-full"
+                        className="h-full bg-gradient-to-r from-emerald-500 to-emerald-500 rounded-full"
                         style={{ width: `${percent}%` }}
                       />
                     </div>
@@ -454,7 +454,7 @@ const RevenueManager = () => {
         </div>
 
         {/* TABLE */}
-        <div className="xl:col-span-2 bg-white rounded-2xl border border-zinc-100 shadow-sm overflow-hidden">
+        <div className="xl:col-span-2 admin-card overflow-hidden">
           <div className="p-5 border-b border-zinc-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
             <div>
               <h3 className="text-sm font-extrabold text-zinc-900">
@@ -543,7 +543,7 @@ const RevenueManager = () => {
 
                         <td className="py-3.5 px-3 text-center">
                           <span
-                            className={`inline-flex px-2.5 py-1 rounded-lg border text-[10px] font-bold ${getPaymentMethodStyle(payment.payment_method)}`}
+                            className={`admin-badge px-3 py-1 text-[10px] ${getPaymentMethodStyle(payment.payment_method)}`}
                           >
                             {getPaymentMethodLabel(payment.payment_method)}
                           </span>
@@ -551,7 +551,7 @@ const RevenueManager = () => {
 
                         <td className="py-3.5 px-3 text-center">
                           <span
-                            className={`inline-flex px-2.5 py-1 rounded-lg border text-[10px] font-bold ${getStatusStyle(payment.status)}`}
+                            className={`admin-badge px-3 py-1 text-[10px] ${getStatusStyle(payment.status)}`}
                           >
                             {payment.status === "success"
                               ? "Thành công"
@@ -602,11 +602,11 @@ const RevenueManager = () => {
         </div>
       </div>
 
-      {/* DETAIL MODAL */}
+      {/* CỬA SỔ CHI TIẾT */}
       <AnimatePresence>
         {isDetailOpen && (
           <div
-            className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4"
+            className="admin-modal-overlay"
             onClick={() => setIsDetailOpen(false)}
           >
             <motion.div
@@ -614,14 +614,14 @@ const RevenueManager = () => {
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
               onClick={(e) => e.stopPropagation()}
-              className="bg-white w-full max-w-2xl rounded-2xl shadow-xl overflow-hidden"
+              className="admin-modal-content max-w-2xl"
             >
-              <div className="p-5 border-b border-zinc-100 flex justify-between items-start gap-4">
+              <div className="admin-modal-header p-5">
                 <div>
                   <h3 className="text-base font-extrabold text-zinc-900">
                     Chi tiết giao dịch
                   </h3>
-                  <p className="text-xs text-zinc-400 mt-0.5">
+                  <p className="admin-page-subtitle">
                     Thông tin thanh toán và đơn đặt sân liên quan.
                   </p>
                 </div>

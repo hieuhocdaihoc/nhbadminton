@@ -10,10 +10,12 @@ class Notification extends Model
     use HasUuid;
 
     protected $table = 'notifications';
-    public $timestamps = false;
 
     protected $keyType = 'string';
+
     public $incrementing = false;
+
+    public $timestamps = false;
 
     protected $fillable = [
         'receiver_id',
@@ -22,16 +24,17 @@ class Notification extends Model
         'content',
         'is_read',
         'created_at',
+        'group_key',
     ];
 
     protected $casts = [
-        'is_read' => 'boolean',
+        'is_read'    => 'boolean',
         'created_at' => 'datetime',
     ];
 
-    /**
-     * Chức năng: Khai báo quan hệ thông báo thuộc về người nhận.
-     */
+    // Relationships
+
+    /** Quan hệ: Thông báo thuộc về một người nhận */
     public function receiver()
     {
         return $this->belongsTo(User::class, 'receiver_id', 'id');

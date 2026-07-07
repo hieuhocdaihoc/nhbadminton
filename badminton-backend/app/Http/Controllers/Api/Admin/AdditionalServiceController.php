@@ -8,136 +8,113 @@ use Illuminate\Http\Request;
 
 class AdditionalServiceController extends Controller
 {
-    // =========================================================================
-    // 1. LẤY DANH SÁCH DỊCH VỤ (Có hỗ trợ lọc theo loại và trạng thái)
-    // =========================================================================
+    // Danh sach loai dich vu hop le
+    private const SERVICE_TYPES = ['drink', 'rental', 'coaching', 'shuttlecock', 'other'];
+
+    /**
+     * Chức năng: Lấy danh sách dịch vụ bổ sung, hỗ trợ lọc theo loại và trạng thái.
+     */
     public function index(Request $request)
     {
         $query = AdditionalService::query();
 
-        // Admin có thể lọc theo loại (ví dụ: ?type=drink)
-        if ($request->has('type') && $request->type != '') {
+        if ($request->filled('type')) {
             $query->where('service_type', $request->type);
         }
 
-        // Lọc theo trạng thái (ví dụ: ?status=active)
-        if ($request->has('status') && $request->status != '') {
+        if ($request->filled('status')) {
             $query->where('status', $request->status);
         }
 
-        // Sắp xếp mới nhất lên đầu
-        $services = $query->orderBy('name', 'asc')->get();
-
         return response()->json([
             'status' => 'success',
-            'data' => $services
+            'data'   => $query->orderBy('name')->get(),
         ]);
     }
 
-    // =========================================================================
-    // 2. THÊM MỚI DỊCH VỤ
-    // =========================================================================
+    /**
+     * Chức năng: Thêm mới một dịch vụ bổ sung (nước, vợt, huấn luyện, cầu...).
+     */
     public function store(Request $request)
     {
-        $request->validate([
-            'name' => 'required|string|max:100',
-            'service_type' => 'required|in:drink,rental,coaching,shuttlecock,other',
-            'description' => 'nullable|string',
-            'price' => 'required|numeric|min:0',
-            'unit' => 'nullable|string|max:50',
-            'status' => 'nullable|in:active,inactive'
+        $validated = $request->validate([
+            'name'         => ['required', 'string', 'max:100'],
+            'service_type' => ['required', 'in:' . implode(',', self::SERVICE_TYPES)],
+            'description'  => ['nullable', 'string'],
+            'price'        => ['required', 'numeric', 'min:0'],
+            'unit'         => ['nullable', 'string', 'max:50'],
+            'status'       => ['nullable', 'in:active,inactive'],
         ]);
 
         $service = AdditionalService::create([
-            'name' => $request->name,
-            'service_type' => $request->service_type,
-            'description' => $request->description,
-            'price' => $request->price,
-            'unit' => $request->unit,
-            'status' => $request->status ?? 'active', // Mặc định active nếu không truyền
+            ...$validated,
+            'status' => $validated['status'] ?? 'active',
         ]);
 
         return response()->json([
-            'status' => 'success',
+            'status'  => 'success',
             'message' => 'Thêm dịch vụ thành công!',
-            'data' => $service
+            'data'    => $service,
         ], 201);
     }
 
-    // =========================================================================
-    // 3. XEM CHI TIẾT 1 DỊCH VỤ (Để fill dữ liệu lên Form sửa)
-    // =========================================================================
+    /**
+     * Chức năng: Lấy chi tiết một dịch vụ để hiển thị lên form chỉnh sửa.
+     */
     public function show($id)
     {
-        $service = AdditionalService::find($id);
-
-        if (!$service) {
-            return response()->json(['status' => 'error', 'message' => 'Không tìm thấy dịch vụ!'], 404);
-        }
+        $service = AdditionalService::findOrFail($id);
 
         return response()->json([
             'status' => 'success',
-            'data' => $service
+            'data'   => $service,
         ]);
     }
 
-    // =========================================================================
-    // 4. CẬP NHẬT DỊCH VỤ
-    // =========================================================================
+    /**
+     * Chức năng: Cập nhật thông tin dịch vụ (có thể gửi một phần trường, không cần gửi hết).
+     */
     public function update(Request $request, $id)
     {
-        $service = AdditionalService::find($id);
+        $service = AdditionalService::findOrFail($id);
 
-        if (!$service) {
-            return response()->json(['status' => 'error', 'message' => 'Không tìm thấy dịch vụ!'], 404);
-        }
-
-        $request->validate([
-            'name' => 'sometimes|required|string|max:100',
-            'service_type' => 'sometimes|required|in:drink,rental,coaching,shuttlecock,other',
-            'description' => 'nullable|string',
-            'price' => 'sometimes|required|numeric|min:0',
-            'unit' => 'nullable|string|max:50',
-            'status' => 'sometimes|required|in:active,inactive'
+        $validated = $request->validate([
+            'name'         => ['sometimes', 'required', 'string', 'max:100'],
+            'service_type' => ['sometimes', 'required', 'in:' . implode(',', self::SERVICE_TYPES)],
+            'description'  => ['nullable', 'string'],
+            'price'        => ['sometimes', 'required', 'numeric', 'min:0'],
+            'unit'         => ['nullable', 'string', 'max:50'],
+            'status'       => ['sometimes', 'required', 'in:active,inactive'],
         ]);
 
-        $service->update($request->all());
+        $service->update($validated);
 
         return response()->json([
-            'status' => 'success',
+            'status'  => 'success',
             'message' => 'Cập nhật dịch vụ thành công!',
-            'data' => $service
+            'data'    => $service,
         ]);
     }
 
-    // =========================================================================
-    // 5. XÓA DỊCH VỤ (XÓA MỀM / TẠM NGƯNG KINH DOANH)
-    // =========================================================================
+    /**
+     * Chức năng: Tạm ngưng dịch vụ (xóa mềm) thay vì xóa hẳn để bảo toàn lịch sử hóa đơn cũ.
+     */
     public function destroy($id)
     {
-        $service = AdditionalService::find($id);
-
-        if (!$service) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Không tìm thấy dịch vụ!'
-            ], 404);
-        }
+        $service = AdditionalService::findOrFail($id);
 
         if ($service->status === 'inactive') {
             return response()->json([
-                'status' => 'error',
-                'message' => 'Dịch vụ này đã được tạm ngưng từ trước!'
+                'status'  => 'error',
+                'message' => 'Dịch vụ này đã được tạm ngưng từ trước!',
             ], 400);
         }
 
-
-        $service->status = 'inactive';
-        $service->save();
+        $service->update(['status' => 'inactive']);
 
         return response()->json([
-            'status' => 'success',
-            'message' => 'Đã tạm ngưng dịch vụ! (Dữ liệu hóa đơn cũ vẫn được bảo toàn)'
+            'status'  => 'success',
+            'message' => 'Đã tạm ngưng dịch vụ! (Dữ liệu hóa đơn cũ vẫn được bảo toàn)',
         ]);
     }
 }

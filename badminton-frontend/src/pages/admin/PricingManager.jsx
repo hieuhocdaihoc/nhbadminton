@@ -164,9 +164,9 @@ const PricingManager = () => {
     : [];
 
   const inputClass =
-    "w-full bg-[#f8f8fa] border border-zinc-200 rounded-lg px-3.5 py-2.5 text-sm text-zinc-800 outline-none focus:border-zinc-400 focus:ring-1 focus:ring-zinc-200 transition-all";
+    "admin-input";
   const calcInputClass =
-    "w-full bg-zinc-50 border border-zinc-200 rounded-lg px-3 py-2 text-xs text-zinc-700 outline-none focus:border-zinc-400 transition-all";
+    "admin-input bg-zinc-50";
 
   const dayTypeConfig = {
     weekday: { label: "Ngày thường", bg: "bg-blue-50", text: "text-blue-700" },
@@ -179,20 +179,20 @@ const PricingManager = () => {
   };
 
   return (
-    <div className="max-w-[1400px] mx-auto space-y-5">
-      {/* HEADER */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <div className="admin-page-container">
+      {/* TIÊU ĐỀ */}
+      <div className="admin-page-header">
         <div>
-          <h2 className="text-base font-semibold text-zinc-800">
+          <h2 className="admin-page-title">
             Cấu hình bảng giá
           </h2>
-          <p className="text-xs text-zinc-400 mt-0.5">
+          <p className="admin-page-subtitle">
             Quản lý đơn giá theo khung giờ, loại ngày và thời vụ
           </p>
         </div>
       </div>
 
-      {/* TOAST */}
+      {/* THÔNG BÁO (TOAST) */}
       <AnimatePresence>
         {message.text && (
           <motion.div
@@ -207,7 +207,7 @@ const PricingManager = () => {
       </AnimatePresence>
 
       {/* CALCULATOR */}
-      <div className="bg-white rounded-xl border border-zinc-200/60 overflow-hidden">
+      <div className="admin-card overflow-hidden">
         <div className="px-5 py-3.5 border-b border-zinc-100 flex items-center gap-2">
           <span className="w-5 h-5 bg-zinc-100 rounded flex items-center justify-center text-[10px]">
             ⚡
@@ -221,7 +221,7 @@ const PricingManager = () => {
           className="p-5 grid grid-cols-1 sm:grid-cols-5 gap-3 items-end"
         >
           <div>
-            <label className="block text-[11px] font-medium text-zinc-500 mb-1.5">
+            <label className="admin-form-label">
               Sân
             </label>
             <select
@@ -239,7 +239,7 @@ const PricingManager = () => {
             </select>
           </div>
           <div>
-            <label className="block text-[11px] font-medium text-zinc-500 mb-1.5">
+            <label className="admin-form-label">
               Ngày
             </label>
             <input
@@ -252,7 +252,7 @@ const PricingManager = () => {
             />
           </div>
           <div>
-            <label className="block text-[11px] font-medium text-zinc-500 mb-1.5">
+            <label className="admin-form-label">
               Bắt đầu
             </label>
             <input
@@ -265,7 +265,7 @@ const PricingManager = () => {
             />
           </div>
           <div>
-            <label className="block text-[11px] font-medium text-zinc-500 mb-1.5">
+            <label className="admin-form-label">
               Kết thúc
             </label>
             <input
@@ -280,7 +280,7 @@ const PricingManager = () => {
           <button
             type="submit"
             disabled={calculator.loading}
-            className="py-2.5 bg-zinc-900 hover:bg-zinc-800 text-white rounded-lg text-xs font-medium transition-colors"
+            className="admin-btn-secondary h-[38px] w-full"
           >
             {calculator.loading ? "Đang tính..." : "Kiểm tra"}
           </button>
@@ -314,10 +314,10 @@ const PricingManager = () => {
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="text-[10px] text-zinc-400 uppercase">
+                  <p className="admin-stat-label lbl-default">
                     Tổng dự kiến
                   </p>
-                  <p className="text-lg font-bold text-zinc-800">
+                  <p className="admin-stat-value val-default">
                     {calculator.result.total_price.toLocaleString()}₫
                   </p>
                 </div>
@@ -330,7 +330,7 @@ const PricingManager = () => {
       {/* MASTER-DETAIL */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 items-start">
         {/* LEFT — COURT LIST */}
-        <div className="bg-white rounded-xl border border-zinc-200/60 overflow-hidden">
+        <div className="admin-card overflow-hidden">
           <div className="px-4 py-3 border-b border-zinc-100">
             <h4 className="text-xs font-medium text-zinc-700">Chọn sân</h4>
             <p className="text-[10px] text-zinc-400 mt-0.5">
@@ -358,22 +358,22 @@ const PricingManager = () => {
                         court_id: court.id,
                       }));
                     }}
-                    className={`w-full p-3 rounded-lg border text-left transition-all duration-150 flex items-center justify-between ${isSelected ? "bg-zinc-900 border-zinc-900 text-white" : "bg-white border-zinc-100 hover:border-zinc-200"}`}
+                    className={`w-full p-3 rounded-xl border text-left transition-all duration-200 flex items-center justify-between group ${isSelected ? "bg-emerald-50/50 border-emerald-500 ring-1 ring-emerald-500 shadow-sm" : "bg-white border-zinc-200 hover:border-emerald-300 hover:shadow-sm"}`}
                   >
                     <div className="min-w-0">
                       <span
-                        className={`text-[10px] font-mono ${isSelected ? "text-zinc-400" : "text-zinc-400"}`}
+                        className={`text-[10px] font-mono transition-colors ${isSelected ? "text-emerald-600" : "text-zinc-400 group-hover:text-emerald-500"}`}
                       >
                         {court.court_code}
                       </span>
                       <p
-                        className={`text-xs font-medium truncate ${isSelected ? "text-white" : "text-zinc-800"}`}
+                        className={`text-xs transition-colors truncate ${isSelected ? "text-emerald-950 font-bold" : "text-zinc-800 font-medium group-hover:text-emerald-900"}`}
                       >
                         {court.name}
                       </p>
                     </div>
                     <span
-                      className={`text-[10px] px-2 py-0.5 rounded shrink-0 ${isSelected ? "bg-white/15 text-zinc-300" : cnt > 0 ? "bg-emerald-50 text-emerald-700" : "bg-zinc-100 text-zinc-400"}`}
+                      className={`text-[10px] px-2.5 py-1 rounded-md shrink-0 font-medium transition-colors ${isSelected ? "bg-emerald-500 text-white shadow-sm shadow-emerald-500/20" : cnt > 0 ? "bg-emerald-50 text-emerald-700" : "bg-zinc-100 text-zinc-400"}`}
                     >
                       {cnt} mốc
                     </span>
@@ -385,7 +385,7 @@ const PricingManager = () => {
         </div>
 
         {/* RIGHT — PRICING TABLE */}
-        <div className="lg:col-span-3 bg-white rounded-xl border border-zinc-200/60 overflow-hidden">
+        <div className="lg:col-span-3 admin-card overflow-hidden">
           <div className="px-5 py-3.5 border-b border-zinc-100 flex justify-between items-center">
             <div>
               <h3 className="text-sm font-medium text-zinc-800">
@@ -398,7 +398,7 @@ const PricingManager = () => {
             <button
               onClick={handleOpenCreate}
               disabled={!selectedCourt}
-              className={`px-4 py-2 bg-zinc-900 hover:bg-zinc-800 text-white rounded-lg text-xs font-medium transition-colors ${!selectedCourt ? "opacity-40 cursor-not-allowed" : ""}`}
+              className={`admin-btn-primary px-4 py-2 ${!selectedCourt ? "opacity-40 cursor-not-allowed hover:from-emerald-500 hover:to-emerald-600 shadow-none" : ""}`}
             >
               + Thêm mốc giá
             </button>
@@ -508,13 +508,13 @@ const PricingManager = () => {
                           <div className="flex items-center justify-end gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                             <button
                               onClick={() => handleOpenEdit(item)}
-                              className="px-2.5 py-1 border border-zinc-200 text-zinc-500 rounded text-[10px] hover:bg-zinc-50 transition-colors"
+                              className="admin-btn-outline px-2.5 py-1 text-[10px]"
                             >
                               Sửa
                             </button>
                             <button
                               onClick={() => handleDeletePricing(item.id)}
-                              className="px-2 py-1 text-zinc-400 rounded text-[10px] hover:text-red-500 hover:bg-red-50 transition-colors"
+                              className="admin-btn-outline px-2 py-1 text-[10px] hover:text-red-500 hover:border-red-200"
                             >
                               Xóa
                             </button>
@@ -530,21 +530,21 @@ const PricingManager = () => {
         </div>
       </div>
 
-      {/* MODAL */}
+      {/* CỬA SỔ (MODAL) */}
       <AnimatePresence>
         {isModalOpen && (
           <div
             onClick={() => setIsModalOpen(false)}
-            className="fixed inset-0 z-50 bg-black/30 backdrop-blur-sm flex items-center justify-center p-4"
+            className="admin-modal-overlay"
           >
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
               onClick={(e) => e.stopPropagation()}
-              className="bg-white w-full max-w-md rounded-2xl shadow-xl overflow-hidden"
+              className="admin-modal-content"
             >
-              <div className="px-6 py-5 border-b border-zinc-100 flex items-center justify-between">
+              <div className="admin-modal-header">
                 <div>
                   <h4 className="text-sm font-semibold text-zinc-800">
                     {modalMode === "create" ? "Tạo mốc giá" : "Cập nhật giá"}
@@ -563,7 +563,7 @@ const PricingManager = () => {
               <form onSubmit={handleSubmitForm} className="p-6 space-y-4">
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-[11px] font-medium text-zinc-500 mb-1.5">
+                    <label className="admin-form-label">
                       Loại ngày *
                     </label>
                     <select
@@ -579,7 +579,7 @@ const PricingManager = () => {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-[11px] font-medium text-zinc-500 mb-1.5">
+                    <label className="admin-form-label">
                       Đơn giá (VNĐ/h) *
                     </label>
                     <input
@@ -597,7 +597,7 @@ const PricingManager = () => {
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-[11px] font-medium text-zinc-500 mb-1.5">
+                    <label className="admin-form-label">
                       Giờ bắt đầu *
                     </label>
                     <input
@@ -611,7 +611,7 @@ const PricingManager = () => {
                     />
                   </div>
                   <div>
-                    <label className="block text-[11px] font-medium text-zinc-500 mb-1.5">
+                    <label className="admin-form-label">
                       Giờ kết thúc *
                     </label>
                     <input
@@ -668,14 +668,14 @@ const PricingManager = () => {
                   <button
                     type="button"
                     onClick={() => setIsModalOpen(false)}
-                    className="flex-1 py-2.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-600 rounded-lg text-xs font-medium transition-colors"
+                    className="admin-btn-outline flex-1 py-2.5 text-xs font-medium"
                   >
                     Hủy
                   </button>
                   <button
                     type="submit"
                     disabled={isSaving}
-                    className={`flex-1 py-2.5 bg-zinc-900 hover:bg-zinc-800 text-white rounded-lg text-xs font-medium transition-colors ${isSaving ? "opacity-60" : ""}`}
+                    className="admin-btn-secondary flex-1 py-2.5 text-xs font-medium disabled:opacity-60"
                   >
                     {isSaving ? "Đang lưu..." : "Xác nhận"}
                   </button>

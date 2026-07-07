@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { adminProductService } from "../../services/admin/productService";
 import { adminCategoryService } from "../../services/admin/categoryService";
+import { imageService } from "../../services/admin/imageService";
 
 const ProductManager = () => {
   const [products, setProducts] = useState([]);
@@ -28,6 +29,11 @@ const ProductManager = () => {
   });
   const [isEditing, setIsEditing] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [productImages, setProductImages] = useState([]);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [pendingImageFile, setPendingImageFile] = useState(null);
+  const [pendingImagePreview, setPendingImagePreview] = useState(null);
+  const imageInputRef = useRef(null);
 
   const loadInitData = async () => {
     try {
@@ -100,11 +106,44 @@ const ProductManager = () => {
       if (isEditing) {
         await adminProductService.updateProduct(form.id, payload);
         setMessage({ type: "success", text: "Cập nhật thành công!" });
+        resetForm();
       } else {
-        await adminProductService.createProduct(payload);
-        setMessage({ type: "success", text: "Thêm mới thành công!" });
+        const res = await adminProductService.createProduct(payload);
+        const newProduct = res.data?.data;
+        let uploadedImage = null;
+
+        // Nếu admin đã chọn ảnh trước khi lưu, upload luôn ảnh đó cho sản phẩm vừa tạo
+        if (newProduct?.id && pendingImageFile) {
+          try {
+            const imgRes = await imageService.upload(
+              pendingImageFile,
+              "product",
+              newProduct.id,
+              true,
+            );
+            uploadedImage = imgRes.data?.data;
+          } catch (imgErr) {
+            setMessage({
+              type: "error",
+              text: "Tạo sản phẩm thành công nhưng tải ảnh thất bại, bạn có thể thử lại bên dưới.",
+            });
+          }
+        }
+
+        if (!pendingImageFile || uploadedImage) {
+          setMessage({ type: "success", text: "Thêm sản phẩm thành công!" });
+        }
+
+        // Chuyển sang chế độ sửa để xem/quản lý ảnh vừa tải lên
+        if (newProduct?.id) {
+          handleEditClick({
+            ...newProduct,
+            images: uploadedImage ? [uploadedImage] : [],
+          });
+        } else {
+          resetForm();
+        }
       }
-      resetForm();
       fetchProducts(pagination.current_page);
     } catch (error) {
       setMessage({
@@ -129,6 +168,76 @@ const ProductManager = () => {
       low_stock_threshold: product.low_stock_threshold,
       description: product.description || "",
     });
+    setProductImages(product.images || []);
+    setPendingImageFile(null);
+    setPendingImagePreview(null);
+  };
+
+  const handleImageButtonClick = () => {
+    imageInputRef.current?.click();
+  };
+
+  const validateImageFile = (file) => {
+    if (!file.type.startsWith("image/")) {
+      setMessage({ type: "error", text: "Vui lòng chọn một tệp hình ảnh." });
+      return false;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      setMessage({ type: "error", text: "Ảnh không được vượt quá 2MB." });
+      return false;
+    }
+    return true;
+  };
+
+  const handleImageUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!validateImageFile(file)) return;
+
+    // Chưa tạo sản phẩm (chưa có id) -> chỉ lưu tạm ảnh để xem trước, upload sau khi lưu thành công
+    if (!form.id) {
+      setPendingImageFile(file);
+      setPendingImagePreview(URL.createObjectURL(file));
+      e.target.value = "";
+      return;
+    }
+
+    setIsUploadingImage(true);
+    try {
+      const res = await imageService.upload(file, "product", form.id, true);
+      const newImage = res.data?.data;
+      // Ảnh mới là primary nên gỡ primary của các ảnh cũ trên giao diện
+      setProductImages((prev) => [
+        ...prev.map((img) => ({ ...img, is_primary: false })),
+        newImage,
+      ]);
+      setMessage({ type: "success", text: "Tải ảnh lên thành công!" });
+    } catch (error) {
+      setMessage({
+        type: "error",
+        text: error.response?.data?.message || "Tải ảnh thất bại.",
+      });
+    } finally {
+      setIsUploadingImage(false);
+      e.target.value = "";
+      setTimeout(() => setMessage({ type: "", text: "" }), 2500);
+    }
+  };
+
+  const handleRemovePendingImage = () => {
+    setPendingImageFile(null);
+    setPendingImagePreview(null);
+  };
+
+  const handleImageDelete = async (image) => {
+    if (!window.confirm("Xóa ảnh này?")) return;
+    try {
+      await imageService.remove(image.id);
+      setProductImages((prev) => prev.filter((img) => img.id !== image.id));
+    } catch (error) {
+      setMessage({ type: "error", text: "Xóa ảnh thất bại." });
+      setTimeout(() => setMessage({ type: "", text: "" }), 2500);
+    }
   };
 
   const handleDeleteClick = async (product) => {
@@ -173,26 +282,29 @@ const ProductManager = () => {
       description: "",
     });
     setIsEditing(false);
+    setProductImages([]);
+    setPendingImageFile(null);
+    setPendingImagePreview(null);
   };
 
   const inputClass =
-    "w-full bg-[#f8f8fa] border border-zinc-200 rounded-lg px-3.5 py-2.5 text-sm text-zinc-800 outline-none focus:border-zinc-400 focus:ring-1 focus:ring-zinc-200 transition-all";
+    "admin-input";
 
   return (
-    <div className="max-w-[1400px] mx-auto space-y-5">
-      {/* HEADER */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <div className="admin-page-container">
+      {/* TIÊU ĐỀ */}
+      <div className="admin-page-header">
         <div>
-          <h2 className="text-base font-semibold text-zinc-800">
+          <h2 className="admin-page-title">
             Quản lý sản phẩm
           </h2>
-          <p className="text-xs text-zinc-400 mt-0.5">
+          <p className="admin-page-subtitle">
             Thiết lập giá bán lẻ và theo dõi tồn kho
           </p>
         </div>
       </div>
 
-      {/* TOAST */}
+      {/* THÔNG BÁO (TOAST) */}
       <AnimatePresence>
         {message.text && (
           <motion.div
@@ -206,8 +318,8 @@ const ProductManager = () => {
         )}
       </AnimatePresence>
 
-      {/* TOOLBAR */}
-      <div className="bg-white rounded-xl border border-zinc-200/60 p-4">
+      {/* THANH CÔNG CỤ */}
+      <div className="admin-card p-4">
         <div className="flex flex-col sm:flex-row gap-3 justify-between items-center">
           <form
             onSubmit={handleSearchSubmit}
@@ -228,7 +340,7 @@ const ProductManager = () => {
               placeholder="Tìm tên hoặc SKU..."
               value={searchKeyword}
               onChange={(e) => setSearchKeyword(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-lg text-xs text-zinc-700 outline-none focus:border-zinc-300 focus:bg-white transition-all"
+              className="admin-input pl-10 py-2.5"
             />
             <button type="submit" className="hidden"></button>
           </form>
@@ -251,8 +363,8 @@ const ProductManager = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
-        {/* LIST TABLE (LEFT) */}
-        <div className="lg:col-span-8 bg-white rounded-xl border border-zinc-200/60 overflow-hidden flex flex-col">
+        {/* BẢNG DANH SÁCH (TRÁI) */}
+        <div className="lg:col-span-8 admin-card overflow-hidden flex flex-col">
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead className="bg-zinc-50/60 border-b border-zinc-100 text-[10px] font-medium text-zinc-400 uppercase tracking-wider">
@@ -315,12 +427,32 @@ const ProductManager = () => {
                         className="border-b border-zinc-100 last:border-b-0 hover:bg-zinc-50/40 transition-colors group"
                       >
                         <td className="py-3.5 px-5">
-                          <p className="text-sm font-semibold text-zinc-800">
-                            {p.name}
-                          </p>
-                          <p className="text-[10px] font-mono text-zinc-500 mt-0.5">
-                            {p.sku} {p.brand && `· ${p.brand}`}
-                          </p>
+                          <div className="flex items-center gap-2.5">
+                            {(() => {
+                              const primaryImg =
+                                p.images?.find((img) => img.is_primary) ||
+                                p.images?.[0];
+                              return primaryImg ? (
+                                <img
+                                  src={primaryImg.url}
+                                  alt={p.name}
+                                  className="w-9 h-9 rounded-lg object-cover border border-zinc-200 shrink-0"
+                                />
+                              ) : (
+                                <div className="w-9 h-9 rounded-lg bg-zinc-100 flex items-center justify-center text-zinc-300 text-xs shrink-0">
+                                  📦
+                                </div>
+                              );
+                            })()}
+                            <div>
+                              <p className="text-sm font-semibold text-zinc-800">
+                                {p.name}
+                              </p>
+                              <p className="text-[10px] font-mono text-zinc-500 mt-0.5">
+                                {p.sku} {p.brand && `· ${p.brand}`}
+                              </p>
+                            </div>
+                          </div>
                         </td>
                         <td className="py-3.5 px-3">
                           <span className="text-xs text-zinc-600">
@@ -357,21 +489,21 @@ const ProductManager = () => {
                           <div className="flex items-center justify-end gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                             <button
                               onClick={() => handleEditClick(p)}
-                              className="px-2.5 py-1 border border-zinc-200 text-zinc-500 rounded text-[10px] hover:bg-zinc-50 transition-colors"
+                              className="admin-btn-outline px-2.5 py-1 text-[10px]"
                             >
                               Sửa
                             </button>
                             {p.status === "active" ? (
                               <button
                                 onClick={() => handleDeleteClick(p)}
-                                className="px-2.5 py-1 text-zinc-400 rounded text-[10px] hover:text-red-500 hover:bg-red-50 transition-colors"
+                                className="admin-btn-outline px-2.5 py-1 text-[10px] hover:text-red-500 hover:border-red-200"
                               >
                                 Dừng
                               </button>
                             ) : (
                               <button
                                 onClick={() => handleRestoreClick(p)}
-                                className="px-2.5 py-1 text-emerald-600 bg-emerald-50 rounded text-[10px] font-medium hover:bg-emerald-100 transition-colors"
+                                className="admin-btn-outline px-2.5 py-1 text-[10px] text-emerald-600 border-emerald-200 hover:bg-emerald-50"
                               >
                                 Bật
                               </button>
@@ -396,14 +528,14 @@ const ProductManager = () => {
                 <button
                   disabled={pagination.current_page === 1}
                   onClick={() => fetchProducts(pagination.current_page - 1)}
-                  className="px-3 py-1.5 bg-white border border-zinc-200 hover:bg-zinc-50 disabled:opacity-50 rounded-lg text-xs font-medium text-zinc-600 transition-colors"
+                  className="admin-btn-outline"
                 >
                   Trước
                 </button>
                 <button
                   disabled={pagination.current_page === pagination.last_page}
                   onClick={() => fetchProducts(pagination.current_page + 1)}
-                  className="px-3 py-1.5 bg-white border border-zinc-200 hover:bg-zinc-50 disabled:opacity-50 rounded-lg text-xs font-medium text-zinc-600 transition-colors"
+                  className="admin-btn-outline"
                 >
                   Tiếp
                 </button>
@@ -412,8 +544,8 @@ const ProductManager = () => {
           )}
         </div>
 
-        {/* FORM (RIGHT) */}
-        <div className="lg:col-span-4 bg-white rounded-xl border border-zinc-200/60 p-5 sticky top-5">
+        {/* BIỂU MẪU (PHẢI) */}
+        <div className="lg:col-span-4 admin-card p-5 sticky top-5">
           <div className="flex items-center justify-between mb-4 pb-3 border-b border-zinc-100">
             <h3 className="text-sm font-semibold text-zinc-800">
               {isEditing ? "Sửa thông tin hàng hóa" : "Thêm sản phẩm mới"}
@@ -429,9 +561,81 @@ const ProductManager = () => {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="admin-form-label">
+                Hình ảnh sản phẩm
+              </label>
+              <div className="flex flex-wrap gap-2 mb-2">
+                {productImages.map((img) => (
+                  <div key={img.id} className="relative w-16 h-16 group">
+                    <img
+                      src={img.url}
+                      alt={img.alt_text}
+                      className={`w-16 h-16 object-cover rounded-lg border ${img.is_primary ? "border-emerald-500 ring-1 ring-emerald-400" : "border-zinc-200"}`}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleImageDelete(img)}
+                      className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white rounded-full text-[10px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+
+                {/* Ảnh đang chờ (chưa có product_id, sẽ upload sau khi lưu) */}
+                {pendingImagePreview && (
+                  <div className="relative w-16 h-16 group">
+                    <img
+                      src={pendingImagePreview}
+                      alt="Ảnh đang chờ"
+                      className="w-16 h-16 object-cover rounded-lg border border-amber-400 ring-1 ring-amber-300"
+                    />
+                    <span className="absolute -bottom-1 left-0 right-0 text-center text-[8px] font-bold text-amber-600 bg-amber-50 rounded-b-lg">
+                      Chờ lưu
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleRemovePendingImage}
+                      className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white rounded-full text-[10px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                )}
+
+                {!pendingImagePreview && (
+                  <button
+                    type="button"
+                    onClick={handleImageButtonClick}
+                    disabled={isUploadingImage}
+                    className="w-16 h-16 border-2 border-dashed border-zinc-300 rounded-lg flex items-center justify-center text-zinc-400 hover:border-emerald-500 hover:text-emerald-600 transition-colors text-xl"
+                  >
+                    {isUploadingImage ? (
+                      <span className="w-4 h-4 border-2 border-zinc-300 border-t-emerald-600 rounded-full animate-spin" />
+                    ) : (
+                      "+"
+                    )}
+                  </button>
+                )}
+              </div>
+              <input
+                ref={imageInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                onChange={handleImageUpload}
+                className="hidden"
+              />
+              <p className="text-[10px] text-zinc-400">
+                {isEditing
+                  ? "Ảnh có viền xanh là ảnh đại diện sản phẩm. JPG/PNG/WEBP, tối đa 2MB."
+                  : "Chọn ảnh trước, ảnh sẽ tự động lưu khi bạn tạo sản phẩm. JPG/PNG/WEBP, tối đa 2MB."}
+              </p>
+            </div>
+
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-[11px] font-medium text-zinc-500 mb-1.5">
+                <label className="admin-form-label">
                   Danh mục *
                 </label>
                 <select
@@ -453,7 +657,7 @@ const ProductManager = () => {
                 </select>
               </div>
               <div>
-                <label className="block text-[11px] font-medium text-zinc-500 mb-1.5">
+                <label className="admin-form-label">
                   Mã SKU *
                 </label>
                 <input
@@ -468,7 +672,7 @@ const ProductManager = () => {
             </div>
 
             <div>
-              <label className="block text-[11px] font-medium text-zinc-500 mb-1.5">
+              <label className="admin-form-label">
                 Tên sản phẩm *
               </label>
               <input
@@ -483,7 +687,7 @@ const ProductManager = () => {
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-[11px] font-medium text-zinc-500 mb-1.5">
+                <label className="admin-form-label">
                   Giá bán lẻ (₫) *
                 </label>
                 <input
@@ -499,7 +703,7 @@ const ProductManager = () => {
                 />
               </div>
               <div>
-                <label className="block text-[11px] font-medium text-zinc-500 mb-1.5">
+                <label className="admin-form-label">
                   Mức báo yếu tồn kho
                 </label>
                 <input
@@ -516,7 +720,7 @@ const ProductManager = () => {
             </div>
 
             <div>
-              <label className="block text-[11px] font-medium text-zinc-500 mb-1.5">
+              <label className="admin-form-label">
                 Thương hiệu
               </label>
               <input
@@ -529,7 +733,7 @@ const ProductManager = () => {
             </div>
 
             <div>
-              <label className="block text-[11px] font-medium text-zinc-500 mb-1.5">
+              <label className="admin-form-label">
                 Ghi chú / Mô tả
               </label>
               <textarea
@@ -553,7 +757,7 @@ const ProductManager = () => {
                   form.selling_price === "" ||
                   !form.category_id
                 }
-                className={`w-full py-2.5 rounded-lg text-xs font-medium text-white transition-colors ${isEditing ? "bg-zinc-900 hover:bg-zinc-800" : "bg-lime-600 hover:bg-lime-700"} ${isProcessing || !form.name.trim() || !form.sku.trim() || form.selling_price === "" || !form.category_id ? "opacity-60 cursor-not-allowed" : ""}`}
+                className={`w-full py-2.5 ${isEditing ? "admin-btn-secondary" : "admin-btn-primary"} ${isProcessing || !form.name.trim() || !form.sku.trim() || form.selling_price === "" || !form.category_id ? "opacity-60 cursor-not-allowed shadow-none hover:translate-y-0" : ""}`}
               >
                 {isProcessing
                   ? "Đang lưu..."

@@ -1,5 +1,18 @@
 @import "tailwindcss";
 
+.material-symbols-outlined {
+  font-variation-settings:
+    "FILL" 0,
+    "wght" 400,
+    "GRAD" 0,
+    "opsz" 24;
+  vertical-align: middle;
+}
+
+.font-outfit {
+  font-family: "Outfit", ui-sans-serif, system-ui, sans-serif;
+}
+
 @layer base {
   * {
     box-sizing: border-box;
@@ -7,11 +20,13 @@
 
   body {
     margin: 0;
-    background: #f4f6f8;
+    background: #f8fafc;
     color: #0f172a;
     font-family:
       Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
       "Segoe UI", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 
   button,
@@ -31,94 +46,203 @@
 }
 
 @layer components {
+  /* Shell Admin - Nền Premium */
   .admin-shell {
-    background:
-      radial-gradient(circle at top left, rgba(132, 204, 22, 0.12), transparent 28rem),
-      linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%);
+    @apply bg-slate-50;
+    /* Giữ nguyên gradient dạng CSS thuần phức tạp vì Tailwind không hỗ trợ radial-gradient tiện lợi */
+    background: radial-gradient(circle at 0% 0%, rgba(16, 185, 129, 0.08) 0%, transparent 50%), radial-gradient(circle at 100% 100%, rgba(59, 130, 246, 0.06) 0%, transparent 50%), #f4f7f9;
   }
 
+  /* Thanh bên Admin - Nổi bật & Tông tối cao cấp */
   .admin-sidebar {
-    background:
-      linear-gradient(180deg, rgba(15, 23, 42, 0.98), rgba(2, 6, 23, 1)),
-      #020617;
+    @apply bg-gradient-to-br from-slate-900 to-slate-950 shadow-[4px_0_24px_rgba(2,6,23,0.15)];
   }
 
   .admin-sidebar button,
   .admin-content button {
-    -webkit-tap-highlight-color: transparent;
+    @apply [-webkit-tap-highlight-color:transparent];
   }
 
   .admin-content > div {
-    min-width: 0;
+    @apply min-w-0;
   }
 
-  .admin-content .max-w-\[1400px\],
-  .admin-content .max-w-\[1500px\],
-  .admin-content .max-w-\[1600px\] {
-    max-width: 1680px;
+  /* Các Component tiện ích giúp JSX gọn hơn */
+  .admin-card {
+    @apply bg-white/85 backdrop-blur-md border border-slate-200/80 rounded-2xl shadow-[0_2px_8px_-2px_rgba(15,23,42,0.04),0_4px_12px_-2px_rgba(15,23,42,0.02)] hover:shadow-[0_12px_32px_-4px_rgba(15,23,42,0.08),0_4px_12px_-2px_rgba(15,23,42,0.04)] hover:-translate-y-0.5 transition-all duration-300 ease-out;
   }
 
-  .admin-content .bg-white {
-    background-color: rgba(255, 255, 255, 0.94);
+
+
+  /* Bảng */
+  :where(.admin-content) table {
+    @apply w-full border-separate border-spacing-0;
   }
 
-  .admin-content .rounded-xl,
-  .admin-content .rounded-2xl {
-    border-radius: 14px;
+  :where(.admin-content) thead th {
+    @apply text-slate-500 font-semibold uppercase tracking-[0.05em] text-xs border-b border-slate-200/80 p-4;
   }
 
-  .admin-content .border-zinc-100,
-  .admin-content .border-zinc-200\/60,
-  .admin-content .border-zinc-200 {
-    border-color: rgba(203, 213, 225, 0.72);
+  :where(.admin-content) tbody tr {
+    @apply transition-all duration-200 ease-in-out hover:bg-slate-50/80;
   }
 
-  .admin-content .shadow-sm,
-  .admin-content .hover\:shadow-md:hover {
-    box-shadow:
-      0 1px 2px rgba(15, 23, 42, 0.04),
-      0 12px 32px rgba(15, 23, 42, 0.06);
+  :where(.admin-content) tbody td {
+    @apply border-b border-slate-100/60 p-4;
   }
 
-  .admin-content table {
-    border-collapse: separate;
-    border-spacing: 0;
+  /* Input & Biểu mẫu (Dự phòng cho phiên bản cũ) */
+  :where(.admin-content) input,
+  :where(.admin-content) select,
+  :where(.admin-content) textarea {
+    @apply text-slate-900 transition-all duration-200 ease-in-out bg-white/90 border border-slate-300 rounded-xl focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/15 focus:outline-none focus:bg-white;
   }
 
-  .admin-content thead tr {
-    color: #64748b;
-  }
-
-  .admin-content tbody tr {
-    transition:
-      background-color 150ms ease,
-      box-shadow 150ms ease;
-  }
-
-  .admin-content tbody tr:hover {
-    background-color: rgba(248, 250, 252, 0.92);
-  }
-
-  .admin-content input,
-  .admin-content select,
-  .admin-content textarea {
-    color: #0f172a;
-  }
-
-  .admin-content input:focus,
-  .admin-content select:focus,
-  .admin-content textarea:focus {
-    border-color: #84cc16;
-    box-shadow: 0 0 0 3px rgba(132, 204, 22, 0.14);
-  }
-
-  .admin-content input::placeholder,
-  .admin-content textarea::placeholder {
-    color: #94a3b8;
+  :where(.admin-content) input::placeholder,
+  :where(.admin-content) textarea::placeholder {
+    @apply text-slate-400;
   }
 
   .admin-content .sticky {
     z-index: 20;
+  }
+
+  /* --- COMPONENT BEM CHO ADMIN --- */
+  
+  /* Bố cục & Typography */
+  .admin-page-container {
+    @apply max-w-[1400px] mx-auto space-y-5;
+  }
+  .admin-page-header {
+    @apply flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4;
+  }
+  .admin-page-title {
+    @apply text-base font-semibold text-zinc-800;
+  }
+  .admin-page-subtitle {
+    @apply text-xs text-zinc-400 mt-0.5;
+  }
+
+  /* Huy hiệu Thống kê */
+  .admin-stat-group {
+    @apply flex gap-2.5;
+  }
+  .admin-stat-badge {
+    @apply rounded-lg text-center border;
+  }
+  .admin-stat-value {
+    @apply text-lg font-bold;
+  }
+  .admin-stat-value.val-default { @apply text-zinc-800; }
+  .admin-stat-value.val-success { @apply text-emerald-600; }
+  .admin-stat-value.val-danger { @apply text-red-500; }
+  
+  .admin-stat-label {
+    @apply text-[10px] uppercase;
+  }
+  .admin-stat-label.lbl-default { @apply text-zinc-400; }
+  .admin-stat-label.lbl-success { @apply text-emerald-500; }
+  .admin-stat-label.lbl-danger { @apply text-red-400; }
+
+  /* Màu Huy hiệu Dùng chung (Được dùng bởi .admin-stat-badge & .admin-badge) */
+  .admin-badge {
+    @apply rounded-full font-bold uppercase tracking-wide border;
+  }
+  .badge-default {
+    @apply bg-white text-zinc-800 border-zinc-200/60;
+  }
+  .badge-success {
+    @apply bg-emerald-50 text-emerald-600 border-emerald-200/50;
+  }
+  .badge-danger {
+    @apply bg-red-50 text-red-600 border-red-200/50;
+  }
+  .badge-warning {
+    @apply bg-amber-50 text-amber-600 border-amber-200/50;
+  }
+  .badge-error {
+    @apply bg-red-50 text-red-600 border-red-200/50;
+  }
+  .badge-neutral {
+    @apply bg-zinc-100 text-zinc-500 border-zinc-200/50;
+  }
+
+  /* Input & Biểu mẫu */
+  .admin-form-label {
+    @apply block text-xs font-medium text-zinc-600 mb-1.5;
+  }
+  .admin-input {
+    @apply bg-[#f8f8fa] border border-zinc-200 rounded-lg text-sm text-zinc-800 outline-none focus:border-zinc-400 focus:ring-1 focus:ring-zinc-200 transition-all w-full;
+  }
+
+  /* Nút bấm */
+  .admin-btn-primary {
+    @apply px-4 py-2 text-xs font-medium rounded-lg bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-[0_4px_12px_rgba(16,185,129,0.25)] hover:shadow-[0_6px_16px_rgba(16,185,129,0.35)] hover:-translate-y-px active:translate-y-px transition-all duration-300 ease-out border-none;
+  }
+  .admin-btn-secondary {
+    @apply px-4 py-2 text-xs bg-zinc-900 hover:bg-zinc-800 text-white rounded-lg font-medium transition-colors shadow-sm;
+  }
+  .admin-btn-outline {
+    @apply px-4 py-2 text-xs border border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-50 font-medium rounded-lg transition-colors shadow-sm;
+  }
+  .admin-btn-danger {
+    @apply px-4 py-2 text-xs bg-red-50/50 text-red-600 hover:bg-red-50 border border-red-100 font-medium rounded-lg transition-colors shadow-sm;
+  }
+
+  /* Cửa sổ bật lên (Modals) */
+  .admin-modal-overlay {
+    @apply fixed inset-0 z-50 bg-black/30 backdrop-blur-sm flex items-center justify-center p-4;
+  }
+  .admin-modal-content {
+    @apply bg-white w-full max-w-md rounded-2xl shadow-xl overflow-hidden;
+  }
+  .admin-modal-header {
+    @apply px-6 py-5 border-b border-zinc-100 flex items-center justify-between;
+  }
+
+  /* Component Cấu trúc & Vi mô */
+  .admin-info-row {
+    @apply text-xs;
+  }
+  .admin-info-label {
+    @apply text-zinc-400;
+  }
+  .admin-info-value {
+    @apply font-medium text-zinc-700;
+  }
+  .admin-card-actions {
+    @apply border-t border-zinc-100;
+  }
+
+  /* Giao diện Hướng dẫn Đặt sân */
+  .admin-step-circle {
+    @apply flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-black transition-all duration-300;
+  }
+  .admin-step-completed {
+    @apply bg-gradient-to-r from-emerald-400 to-emerald-500 text-white shadow-md shadow-emerald-500/30;
+  }
+  .admin-step-active {
+    @apply bg-zinc-900 text-white shadow-md shadow-zinc-900/20 ring-4 ring-zinc-100;
+  }
+  .admin-step-pending {
+    @apply bg-zinc-100 text-zinc-400;
+  }
+
+  .admin-slot-btn {
+    @apply rounded-xl border p-2.5 text-center transition-all duration-200;
+  }
+  .slot-unavailable {
+    @apply cursor-not-allowed border-zinc-100 bg-zinc-50 opacity-50;
+  }
+  .slot-selected {
+    @apply border-emerald-500 bg-emerald-50 shadow-sm ring-2 ring-emerald-500/20;
+  }
+  .slot-available {
+    @apply border-zinc-200 bg-white hover:border-emerald-400 hover:bg-emerald-50/30 hover:shadow-sm;
+  }
+  
+  .admin-debt-alert {
+    @apply mt-2 px-2.5 py-1.5 bg-red-50 border border-red-200 rounded-lg text-red-600 font-bold text-[10px] uppercase flex items-center justify-center shadow-sm shadow-red-500/10 animate-pulse;
   }
 
   @media (max-width: 768px) {
@@ -130,5 +254,58 @@
     .admin-content .sticky {
       position: static;
     }
+  }
+
+  /* --- COMPONENT BEM CHO USER --- */
+  
+  .user-page-container {
+    @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+  }
+  
+  .user-card-glass {
+    @apply bg-zinc-900/60 border border-zinc-800 rounded-3xl p-6 sm:p-8 backdrop-blur-md shadow-lg;
+  }
+  
+  .user-card-glass-hover {
+    @apply hover:border-lime-500/30 transition-all duration-300;
+  }
+  
+  .user-input {
+    @apply w-full px-4 py-3 bg-zinc-800/60 border border-zinc-700/60 rounded-2xl text-sm font-medium text-white placeholder-zinc-500 focus:outline-none focus:border-lime-400 focus:shadow-[0_0_15px_rgba(163,230,53,0.15)] focus:bg-zinc-800/90 transition-all;
+  }
+  
+  .user-form-label {
+    @apply block text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2;
+  }
+  
+  .user-btn-primary {
+    @apply px-6 py-3.5 bg-lime-500 hover:bg-lime-400 text-zinc-950 font-extrabold rounded-2xl text-sm uppercase tracking-wider transition-all shadow-[0_0_15px_rgba(163,230,53,0.2)] disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-[0_0_25px_rgba(163,230,53,0.3)] hover:-translate-y-0.5 active:translate-y-0 inline-flex justify-center items-center gap-2;
+  }
+  
+  .user-btn-outline {
+    @apply px-6 py-3.5 bg-transparent border border-lime-500/40 hover:border-lime-400 hover:bg-lime-500/10 text-lime-400 font-extrabold rounded-2xl text-sm uppercase tracking-wider transition-all disabled:opacity-50 disabled:cursor-not-allowed inline-flex justify-center items-center gap-2;
+  }
+  
+  .user-btn-secondary {
+    @apply px-6 py-3.5 bg-zinc-800 hover:bg-zinc-700 text-white font-extrabold rounded-2xl text-sm uppercase tracking-wider transition-all border border-zinc-700 hover:border-lime-500/30 hover:shadow-[0_0_15px_rgba(163,230,53,0.1)] disabled:opacity-50 disabled:cursor-not-allowed inline-flex justify-center items-center gap-2;
+  }
+
+  .user-badge {
+    @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border;
+  }
+  .user-badge-success {
+    @apply bg-lime-500/10 text-lime-400 border-lime-500/20;
+  }
+  .user-badge-warning {
+    @apply bg-amber-500/10 text-amber-400 border-amber-500/20;
+  }
+  .user-badge-danger {
+    @apply bg-red-500/10 text-red-400 border-red-500/20;
+  }
+  .user-badge-info {
+    @apply bg-sky-500/10 text-sky-400 border-sky-500/20;
+  }
+  .user-badge-neutral {
+    @apply bg-zinc-800 text-zinc-400 border-zinc-700;
   }
 }

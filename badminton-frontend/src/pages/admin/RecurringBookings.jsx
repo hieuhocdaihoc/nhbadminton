@@ -23,6 +23,7 @@ const RecurringBookings = () => {
     message: "",
     actionData: null,
   });
+
   const [rescheduleModal, setRescheduleModal] = useState({
     isOpen: false,
     detailId: null,
@@ -46,6 +47,16 @@ const RecurringBookings = () => {
     "Thứ 7",
     "Chủ nhật",
   ];
+
+  const formatDaysOfWeek = (daysOfWeek) => {
+    if (!daysOfWeek) return "—";
+    const arr = Array.isArray(daysOfWeek) ? daysOfWeek : [daysOfWeek];
+    return arr
+      .slice()
+      .sort((a, b) => a - b)
+      .map((d) => DAYS[d] || `Ngày ${d}`)
+      .join(", ");
+  };
 
   // --- FETCH ---
   const fetchInitData = useCallback(async (search = "") => {
@@ -132,11 +143,6 @@ const RecurringBookings = () => {
       msg = "Xác nhận giữ sân cho ca đá này?";
       payload = { status: "confirmed" };
       actionType = "status";
-    } else if (type === "checkin") {
-      title = "Check-in khách";
-      msg = "Xác nhận khách đã đến sân và bắt đầu chơi?";
-      payload = { status: "playing" };
-      actionType = "status";
     } else if (type === "complete") {
       title = "Hoàn thành ca chơi";
       msg = "Xác nhận kết thúc ca chơi này?";
@@ -195,7 +201,7 @@ const RecurringBookings = () => {
       alert(e.response?.data?.message || "Lỗi hệ thống!");
     } finally {
       setIsProcessing(false);
-      setTimeout(() => setMessage({ type: "", text: "" }), 2000);
+      setTimeout(() => setMessage({ type: "", text: "" }), 2500);
     }
   };
 
@@ -231,7 +237,7 @@ const RecurringBookings = () => {
       alert(error.response?.data?.message || "Có lỗi xảy ra!");
     } finally {
       setIsProcessing(false);
-      setTimeout(() => setMessage({ type: "", text: "" }), 4000);
+      setTimeout(() => setMessage({ type: "", text: "" }), 2500);
     }
   };
 
@@ -273,11 +279,11 @@ const RecurringBookings = () => {
     dateStr ? dateStr.split("-").reverse().join("/") : "...";
 
   const inputClass =
-    "w-full bg-[#f8f8fa] border border-zinc-200 rounded-lg px-3.5 py-2.5 text-sm text-zinc-800 outline-none focus:border-zinc-400 focus:ring-1 focus:ring-zinc-200 transition-all";
+    "admin-input";
 
   return (
     <div className="max-w-[1600px] mx-auto gap-4 h-[calc(100dvh-80px)] flex flex-col overflow-hidden">
-      {/* TOAST */}
+      {/* THÔNG BÁO (TOAST) */}
       <AnimatePresence>
         {message.text && (
           <motion.div
@@ -291,10 +297,10 @@ const RecurringBookings = () => {
         )}
       </AnimatePresence>
 
-      {/* MAIN SPLIT LAYOUT */}
+      {/* BỐ CỤC CHIA ĐÔI CHÍNH */}
       <div className="flex-1 grid grid-cols-12 gap-4 min-h-0">
-        {/* LEFT — CONTRACT LIST */}
-        <div className="col-span-4 bg-white rounded-xl border border-zinc-200/60 flex flex-col min-h-0 overflow-hidden">
+        {/* TRÁI — DANH SÁCH HỢP ĐỒNG */}
+        <div className="col-span-4 admin-card border-none flex flex-col min-h-0 overflow-hidden">
           <div className="shrink-0 px-4 py-3 border-b border-zinc-100">
             <h2 className="text-sm font-semibold text-zinc-800 mb-2.5">
               Hợp đồng định kỳ
@@ -315,7 +321,7 @@ const RecurringBookings = () => {
                 placeholder="Tìm tên, SĐT, mã HĐ..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 bg-zinc-50 border border-zinc-200 rounded-lg text-xs text-zinc-700 outline-none focus:border-zinc-300 focus:bg-white transition-all"
+                className="admin-input pl-9 py-2"
               />
             </div>
           </div>
@@ -340,7 +346,7 @@ const RecurringBookings = () => {
                         : "bg-white border-zinc-100 hover:border-zinc-200"
                     } ${
                       isNotificationTarget && !isSelected
-                        ? "ring-2 ring-lime-300 bg-lime-50"
+                        ? "ring-2 ring-emerald-300 bg-emerald-50"
                         : ""
                     }`}
                   >
@@ -369,7 +375,9 @@ const RecurringBookings = () => {
                     <div
                       className={`mt-2 pt-2 border-t border-dashed flex justify-between items-center text-[10px] ${isSelected ? "border-zinc-700 text-zinc-400" : "border-zinc-100 text-zinc-400"}`}
                     >
-                      <span>{DAYS[m.day_of_week]}</span>
+                      <span>
+                        {formatDaysOfWeek(m.days_of_week ?? m.day_of_week)}
+                      </span>
                       <span className="font-mono">
                         {formatVN(m.start_date)} → {formatVN(m.end_date)}
                       </span>
@@ -381,8 +389,8 @@ const RecurringBookings = () => {
           </div>
         </div>
 
-        {/* RIGHT — SESSION DETAIL TABLE */}
-        <div className="col-span-8 bg-white rounded-xl border border-zinc-200/60 flex flex-col min-h-0 overflow-hidden">
+        {/* PHẢI — BẢNG CHI TIẾT BUỔI CHƠI */}
+        <div className="col-span-8 admin-card border-none flex flex-col min-h-0 overflow-hidden">
           {/* Session Header */}
           <div className="shrink-0 px-5 py-3.5 border-b border-zinc-100 flex justify-between items-center">
             <div className="flex items-center gap-3">
@@ -398,7 +406,9 @@ const RecurringBookings = () => {
                   <div className="flex items-center gap-2 mt-0.5 text-[11px] text-zinc-400">
                     <span>{selectedMaster.user?.phone}</span>
                     <span>·</span>
-                    <span>{DAYS[selectedMaster.day_of_week]}</span>
+                    <span>
+                      {formatDaysOfWeek(selectedMaster.days_of_week ?? selectedMaster.day_of_week)}
+                    </span>
                     <span>·</span>
                     <span className="font-mono">
                       {formatVN(selectedMaster.start_date)} →{" "}
@@ -425,13 +435,13 @@ const RecurringBookings = () => {
                   placeholder="Tìm ca..."
                   value={sessionSearchTerm}
                   onChange={(e) => setSessionSearchTerm(e.target.value)}
-                  className="w-full pl-8 pr-3 py-1.5 bg-zinc-50 border border-zinc-200 rounded-lg text-[11px] text-zinc-700 outline-none focus:border-zinc-300 transition-all"
+                  className="admin-input w-full pl-8 pr-3 py-1.5 text-[11px]"
                 />
               </div>
             )}
           </div>
 
-          {/* Session Table */}
+          {/* Bảng buổi chơi */}
           <div className="flex-1 overflow-auto">
             <table className="w-full text-left text-xs whitespace-nowrap">
               <thead className="bg-zinc-50/60 sticky top-0 z-10 border-b border-zinc-100">
@@ -531,23 +541,15 @@ const RecurringBookings = () => {
                             {s.status === "pending" && (
                               <button
                                 onClick={() => requestAction(s, "confirm")}
-                                className="px-2.5 py-1 bg-zinc-900 text-white rounded text-[10px] font-medium hover:bg-zinc-800 transition-colors"
+                                className="admin-btn-secondary px-2.5 py-1 text-[10px] font-medium"
                               >
                                 Duyệt
-                              </button>
-                            )}
-                            {s.status === "confirmed" && (
-                              <button
-                                onClick={() => requestAction(s, "checkin")}
-                                className="px-2.5 py-1 bg-violet-600 text-white rounded text-[10px] font-medium hover:bg-violet-700 transition-colors"
-                              >
-                                Check-in
                               </button>
                             )}
                             {s.payment_status !== "paid" && !isCancelled && (
                               <button
                                 onClick={() => requestAction(s, "pay")}
-                                className="px-2.5 py-1 bg-lime-600 text-white rounded text-[10px] font-medium hover:bg-lime-700 transition-colors"
+                                className="admin-btn-primary px-2.5 py-1 text-[10px] font-medium"
                               >
                                 Thu
                               </button>
@@ -555,7 +557,7 @@ const RecurringBookings = () => {
                             {["playing", "confirmed"].includes(s.status) && s.payment_status === "paid" && (
                               <button
                                 onClick={() => requestAction(s, "complete")}
-                                className="px-2.5 py-1 bg-emerald-600 text-white rounded text-[10px] font-medium hover:bg-emerald-700 transition-colors"
+                                className="admin-btn-primary px-2.5 py-1 text-[10px] font-medium"
                               >
                                 Hoàn thành
                               </button>
@@ -563,7 +565,7 @@ const RecurringBookings = () => {
                             {!["playing", "cancelled", "completed"].includes(s.status) && (
                               <button
                                 onClick={() => openRescheduleModal(s)}
-                                className="px-2.5 py-1 border border-zinc-200 text-zinc-500 rounded text-[10px] hover:bg-zinc-50 transition-colors"
+                                className="admin-btn-outline px-2.5 py-1 text-[10px]"
                               >
                                 Đổi lịch
                               </button>
@@ -571,7 +573,7 @@ const RecurringBookings = () => {
                             {!["playing", "cancelled", "completed"].includes(s.status) && (
                               <button
                                 onClick={() => requestAction(s, "cancel")}
-                                className="px-2 py-1 text-zinc-400 rounded text-[10px] hover:text-red-500 hover:bg-red-50 transition-colors"
+                                className="admin-btn-outline px-2 py-1 text-[10px] hover:text-red-500 hover:border-red-200"
                               >
                                 Hủy
                               </button>
@@ -588,15 +590,15 @@ const RecurringBookings = () => {
         </div>
       </div>
 
-      {/* MODAL XÁC NHẬN */}
+      {/* CỬA SỔ XÁC NHẬN */}
       <AnimatePresence>
         {confirmModal.isOpen && (
-          <div className="fixed inset-0 z-50 bg-black/30 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="admin-modal-overlay">
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white w-full max-w-xs rounded-2xl shadow-xl p-6 text-center"
+              className="admin-modal-content max-w-xs p-6 text-center"
             >
               <div className="w-12 h-12 bg-amber-50 rounded-xl flex items-center justify-center text-xl mx-auto mb-4">
                 ⚠️
@@ -610,14 +612,14 @@ const RecurringBookings = () => {
               <div className="flex gap-2">
                 <button
                   onClick={() => setConfirmModal({ isOpen: false })}
-                  className="flex-1 py-2.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-600 rounded-lg text-xs font-medium transition-colors"
+                  className="admin-btn-outline flex-1 py-2.5 text-xs font-medium"
                 >
                   Hủy
                 </button>
                 <button
                   onClick={executeAction}
                   disabled={isProcessing}
-                  className="flex-1 py-2.5 bg-zinc-900 hover:bg-zinc-800 text-white rounded-lg text-xs font-medium transition-colors"
+                  className="admin-btn-secondary flex-1 py-2.5 text-xs font-medium"
                 >
                   {isProcessing ? "..." : "Xác nhận"}
                 </button>
@@ -627,22 +629,22 @@ const RecurringBookings = () => {
         )}
       </AnimatePresence>
 
-      {/* MODAL ĐỔI LỊCH */}
+      {/* CỬA SỔ ĐỔI LỊCH */}
       <AnimatePresence>
         {rescheduleModal.isOpen && (
-          <div className="fixed inset-0 z-50 bg-black/30 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="admin-modal-overlay">
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
               onClick={(e) => e.stopPropagation()}
-              className="bg-white w-full max-w-md rounded-2xl shadow-xl overflow-hidden"
+              className="admin-modal-content"
             >
-              <div className="px-6 py-5 border-b border-zinc-100">
+              <div className="admin-modal-header p-6 border-b border-zinc-100">
                 <h3 className="text-sm font-semibold text-zinc-800">
                   Đổi lịch ca chơi
                 </h3>
-                <p className="text-xs text-zinc-400 mt-0.5">
+                <p className="admin-page-subtitle">
                   Ca:{" "}
                   <span className="text-zinc-600 font-mono">
                     {rescheduleModal.booking?.booking_code}
@@ -651,7 +653,7 @@ const RecurringBookings = () => {
               </div>
               <form onSubmit={handleRescheduleSubmit} className="p-6 space-y-4">
                 <div>
-                  <label className="block text-[11px] font-medium text-zinc-500 mb-1.5">
+                  <label className="admin-form-label">
                     Sân
                   </label>
                   <select
@@ -676,7 +678,7 @@ const RecurringBookings = () => {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-[11px] font-medium text-zinc-500 mb-1.5">
+                  <label className="admin-form-label">
                     Ngày
                   </label>
                   <input
@@ -694,7 +696,7 @@ const RecurringBookings = () => {
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-[11px] font-medium text-zinc-500 mb-1.5">
+                    <label className="admin-form-label">
                       Bắt đầu
                     </label>
                     <input
@@ -711,7 +713,7 @@ const RecurringBookings = () => {
                     />
                   </div>
                   <div>
-                    <label className="block text-[11px] font-medium text-zinc-500 mb-1.5">
+                    <label className="admin-form-label">
                       Kết thúc
                     </label>
                     <input
@@ -738,14 +740,14 @@ const RecurringBookings = () => {
                         booking: null,
                       })
                     }
-                    className="flex-1 py-2.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-600 rounded-lg text-xs font-medium transition-colors"
+                    className="admin-btn-outline flex-1 py-2.5 text-xs font-medium"
                   >
                     Hủy
                   </button>
                   <button
                     type="submit"
                     disabled={isProcessing}
-                    className="flex-1 py-2.5 bg-zinc-900 hover:bg-zinc-800 text-white rounded-lg text-xs font-medium transition-colors"
+                    className="admin-btn-secondary flex-1 py-2.5 text-xs font-medium"
                   >
                     {isProcessing ? "Đang xử lý..." : "Lưu lịch mới"}
                   </button>
@@ -755,6 +757,7 @@ const RecurringBookings = () => {
           </div>
         )}
       </AnimatePresence>
+
     </div>
   );
 };

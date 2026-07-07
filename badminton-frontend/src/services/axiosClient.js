@@ -23,11 +23,22 @@ axiosClient.interceptors.request.use(
 axiosClient.interceptors.response.use(
     (response) => response,
     (error) => {
-        // Chỉ xử lý lỗi 401 nếu API đó không phải là API Public
-        // Hoặc đơn giản là xóa token cũ nếu Server bảo nó không hợp lệ
-        if (error.response && error.response.status === 401) {
-            console.warn('Lưu ý: Token hết hạn hoặc không hợp lệ.');
-            // localStorage.removeItem('access_token'); // Tùy chọn xóa để lần sau gửi request sạch
+        if (error.response) {
+            const { status, data } = error.response;
+
+            if (status === 401 && localStorage.getItem('access_token')) {
+                localStorage.removeItem('access_token');
+                localStorage.removeItem('current_user');
+                localStorage.removeItem('current_role');
+                window.location.href = '/';
+            }
+
+            if (status === 403 && data?.error_code === 'ACCOUNT_BLOCKED') {
+                localStorage.removeItem('access_token');
+                localStorage.removeItem('current_user');
+                localStorage.removeItem('current_role');
+                window.location.href = '/?blocked=1';
+            }
         }
         return Promise.reject(error);
     }

@@ -1,128 +1,137 @@
 <?php
 
-namespace App\Http\Controllers\Api\Admin; // Namespace đã có thêm \Admin
+namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Court;
+use App\Models\Booking;
+use App\Models\RecurringBooking;
 use Illuminate\Http\Request;
 
 class CourtController extends Controller
 {
-    // Lấy danh sách sân (Admin quản lý)
-    /**
-     * Chức năng: Lấy danh sách sân cho khu vực quản trị.
-     */
+    private const ACTIVE_BOOKING_STATUSES = ['pending', 'confirmed', 'playing'];
+    private const COURT_STATUSES = ['active', 'inactive'];
+
+    /** Chức năng: Lấy danh sách sân cho khu vực quản trị. */
     public function index()
     {
-        $courts = Court::all();
         return response()->json([
             'message' => 'Danh sách sân hiện có',
-            'data' => $courts
+            'data' => Court::all(),
         ]);
     }
 
-    // Thêm sân mới
-    /**
-     * Chức năng: Tạo mới sân với mã sân, thông tin mặt sân, sức chứa và trạng thái vận hành.
-     */
+    /** Chức năng: Tạo mới sân với mã sân, thông tin mặt sân, sức chứa và trạng thái vận hành. */
     public function store(Request $request)
     {
-        $request->validate([
-            'name' => 'required|string|max:100',
-            'court_code' => 'required|string|unique:courts,court_code|max:50',
-            'floor_type' => 'nullable|string|max:100',
-            'has_lighting' => 'boolean',
-            'capacity' => 'nullable|integer',
-            'location_note' => 'nullable|string|max:255',
-            'status' => 'string|in:active,inactive'
+        $validated = $request->validate([
+            'name'          => ['required', 'string', 'max:100'],
+            'court_code'    => ['required', 'string', 'max:50', 'unique:courts,court_code'],
+            'floor_type'    => ['nullable', 'string', 'max:100'],
+            'has_lighting'  => ['boolean'],
+            'capacity'      => ['nullable', 'integer'],
+            'location_note' => ['nullable', 'string', 'max:255'],
+            'status'        => ['string', 'in:active,inactive'],
         ]);
 
-        $court = Court::create($request->all());
+        $court = Court::create($validated);
 
         return response()->json([
             'message' => 'Tạo sân thành công',
-            'data' => $court
+            'data'    => $court,
         ], 201);
     }
 
-    // Xem chi tiết
-    /**
-     * Chức năng: Lấy chi tiết một sân.
-     */
+    /** Chức năng: Lấy chi tiết một sân. */
     public function show($id)
     {
-        $court = Court::find($id);
-        if (!$court)
-            return response()->json(['message' => 'Không tìm thấy sân'], 404);
-        return response()->json(['data' => $court]);
+        return response()->json(['data' => Court::findOrFail($id)]);
     }
 
-    // Cập nhật sân
-    /**
-     * Chức năng: Cập nhật thông tin cấu hình và trạng thái của sân.
-     */
+    /** Chức năng: Cập nhật thông tin cấu hình và trạng thái của sân. */
     public function update(Request $request, $id)
     {
-        $court = Court::find($id);
-        if (!$court)
-            return response()->json(['message' => 'Không tìm thấy sân'], 404);
+        $court = Court::findOrFail($id);
 
-        $request->validate([
-            'name' => 'required|string|max:100',
-            'court_code' => 'required|string|max:50|unique:courts,court_code,' . $court->id,
-            'floor_type' => 'nullable|string|max:100',
-            'has_lighting' => 'boolean',
-            'capacity' => 'nullable|integer',
-            'is_maintenance' => 'boolean',
-            'status' => 'string|in:active,inactive'
+        $validated = $request->validate([
+            'name'           => ['required', 'string', 'max:100'],
+            'court_code'     => ['required', 'string', 'max:50', 'unique:courts,court_code,' . $court->id],
+            'floor_type'     => ['nullable', 'string', 'max:100'],
+            'has_lighting'   => ['boolean'],
+            'capacity'       => ['nullable', 'integer'],
+            'is_maintenance' => ['boolean'],
+            'status'         => ['string', 'in:active,inactive'],
         ]);
 
-        $court->update($request->all());
+        $newStatus      = $request->input('status', $court->status);
+        $newMaintenance = $request->boolean('is_maintenance', $court->is_maintenance);
+
+        if (($newStatus === 'inactive' || $newMaintenance) && $court->status === 'active' && !$court->is_maintenance) {
+            $upcomingCount = $this->countUpcomingBookings($court->id);
+            if ($upcomingCount > 0) {
+                return response()->json([
+                    'message' => "Sân này đang có {$upcomingCount} buổi đặt sắp tới chưa hoàn thành. Vui lòng xử lý hoặc dời lịch các buổi đó trước khi ẩn/bảo trì sân.",
+                ], 422);
+            }
+        }
+
+        $court->update($validated);
 
         return response()->json([
             'message' => 'Cập nhật thành công',
-            'data' => $court
+            'data'    => $court,
         ]);
     }
 
-    // Xóa sân
-    /**
-     * Chức năng: Ngưng hoạt động sân bằng cách chuyển trạng thái thay vì xóa dữ liệu.
-     */
+    /** Chức năng: Ngưng hoạt động sân bằng cách chuyển trạng thái thay vì xóa dữ liệu. */
     public function destroy($id)
     {
-        $court = Court::find($id);
-        if (!$court)
-            return response()->json(['message' => 'Không tìm thấy sân'], 404);
+        $court = Court::findOrFail($id);
 
-        $court->delete();
-        return response()->json(['message' => 'Đã xóa sân khỏi hệ thống']);
+        $upcomingCount = $this->countUpcomingBookings($court->id);
+        if ($upcomingCount > 0) {
+            return response()->json([
+                'message' => "Không thể xóa sân đang có {$upcomingCount} buổi đặt sắp tới. Vui lòng dời hoặc hủy các buổi đó trước.",
+            ], 422);
+        }
+
+        $court->status = 'inactive';
+        $court->save();
+
+        return response()->json(['message' => 'Đã ngưng hoạt động sân. Lịch sử đặt sân vẫn được lưu giữ.']);
     }
 
-
-
-    // API PUBLIC: Lấy danh sách sân cho Khách hàng (Chỉ lấy sân Active kèm ảnh)
-    // API PUBLIC: Lấy danh sách sân đang hoạt động cho Khách hàng
-    /**
-     * Chức năng: Lấy danh sách sân đang public cho khách xem và đặt lịch.
-     */
+    /** Chức năng: Lấy danh sách sân đang public cho khách xem và đặt lịch. */
     public function getPublicCourts()
     {
-        // Truy vấn lấy các sân có status = 'active'
         $courts = Court::where('status', 'active')
-            ->with([
-                'images' => function ($query) {
-                    // Lọc lấy ảnh được đánh dấu làm ảnh bìa
-                    $query->where('is_primary', true);
-                }
-            ])
+            ->with(['images' => fn($q) => $q->where('is_primary', true)])
             ->orderBy('name')
             ->get();
 
-        // Chuẩn hóa JSON trả về với key 'data' rõ ràng
         return response()->json([
             'status' => 'success',
-            'data' => $courts
+            'data'   => $courts,
         ]);
+    }
+
+    /** Chức năng: Đếm tổng số booking sắp tới (đơn lẻ và định kỳ) cho một sân. */
+    private function countUpcomingBookings(string $courtId): int
+    {
+        $singleCount = Booking::whereHas(
+            'details',
+            fn($q) => $q->where('court_id', $courtId)->where('booking_date', '>=', today())
+        )->whereIn('status', self::ACTIVE_BOOKING_STATUSES)->count();
+
+        $recurringCount = RecurringBooking::whereHas(
+            'bookings',
+            fn($q) => $q->whereHas(
+                'details',
+                fn($d) => $d->where('court_id', $courtId)->where('booking_date', '>=', today())
+            )->whereIn('status', ['pending', 'confirmed'])
+        )->count();
+
+        return $singleCount + $recurringCount;
     }
 }

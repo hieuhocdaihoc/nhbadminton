@@ -60,8 +60,16 @@ class NotificationController extends Controller
         $notification = Notification::where('receiver_id', $request->user()->id)
             ->findOrFail($id);
 
-        $notification->is_read = true;
-        $notification->save();
+        if ($notification->group_key) {
+            // Đánh dấu đã đọc cho toàn bộ người nhận cùng nhóm (1 người đọc = cả nhóm đọc)
+            Notification::where('group_key', $notification->group_key)
+                ->where('is_read', false)
+                ->update(['is_read' => true]);
+            $notification->is_read = true;
+        } else {
+            $notification->is_read = true;
+            $notification->save();
+        }
 
         return response()->json([
             'status' => 'success',

@@ -2,9 +2,9 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Concerns\HasUuids;
 
 class Product extends Model
 {
@@ -12,7 +12,6 @@ class Product extends Model
 
     protected $table = 'products';
 
-    // Khai báo các cột được phép thêm/sửa
     protected $fillable = [
         'category_id',
         'brand',
@@ -26,15 +25,40 @@ class Product extends Model
         'stock_quantity',
         'low_stock_threshold',
         'status',
-        'selling_price' // ĐÃ BỔ SUNG GIÁ BÁN LẺ VÀO ĐÂY
+        'selling_price',
     ];
 
-    // Tạo mối quan hệ: 1 Sản phẩm thuộc về 1 Danh mục
-    /**
-     * Chức năng: Khai báo quan hệ sản phẩm thuộc về một danh mục.
-     */
+    // Relationships
+
+    /** Quan hệ: sản phẩm thuộc về một danh mục */
     public function category()
     {
         return $this->belongsTo(Category::class, 'category_id', 'id');
+    }
+
+    /** Quan hệ: sản phẩm có nhiều chi tiết dịch vụ đặt sân */
+    public function bookingServiceDetails()
+    {
+        return $this->hasMany(BookingServiceDetail::class, 'product_id', 'id');
+    }
+
+    /** Quan hệ: sản phẩm có nhiều chi tiết phiếu nhập hàng */
+    public function purchaseOrderDetails()
+    {
+        return $this->hasMany(PurchaseOrderDetail::class, 'product_id', 'id');
+    }
+
+    /** Quan hệ: sản phẩm có nhiều bản ghi biến động kho */
+    public function inventoryTransactions()
+    {
+        return $this->hasMany(InventoryTransaction::class, 'product_id', 'id');
+    }
+
+    /** Quan hệ: sản phẩm có nhiều hình ảnh */
+    public function images()
+    {
+        return $this->hasMany(Image::class, 'target_id', 'id')
+            ->where('target_type', 'product')
+            ->orderBy('sort_order', 'asc');
     }
 }

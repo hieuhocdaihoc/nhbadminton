@@ -8,127 +8,67 @@ use Illuminate\Http\Request;
 
 class PaymentManagementController extends Controller
 {
-    /**
-     * -------------------------------------------------------------
-     * DANH SÁCH THANH TOÁN CHO ADMIN
-     * -------------------------------------------------------------
-     */
-    /**
-     * Chức năng: Lấy danh sách giao dịch thanh toán để quản trị đối soát doanh thu.
-     */
+    private const BANK_METHODS = ['bank_transfer', 'sepay', 'online'];
+
+    /** Chức năng: Lấy danh sách giao dịch thanh toán để quản trị đối soát doanh thu. */
     public function index(Request $request)
     {
         $query = Payment::with([
             'booking:id,booking_code,total_price,deposit_amount,remaining_amount,payment_status,status,user_id',
-            'user:id,full_name,email,phone'
+            'user:id,full_name,email,phone',
         ]);
 
-        // Lọc theo phương thức thanh toán
-        if ($request->filled('payment_method')) {
-            $query->where('payment_method', $request->payment_method);
-        }
+        $query->when($request->filled('payment_method'), fn($q) => $q->where('payment_method', $request->payment_method))
+              ->when($request->filled('status'),         fn($q) => $q->where('status', $request->status))
+              ->when($request->filled('from_date'),      fn($q) => $q->whereDate('paid_at', '>=', $request->from_date))
+              ->when($request->filled('to_date'),        fn($q) => $q->whereDate('paid_at', '<=', $request->to_date))
+              ->when($request->filled('keyword'), function ($q) use ($request) {
+                  $keyword = $request->keyword;
+                  $q->where(function ($sub) use ($keyword) {
+                      $sub->where('payment_code', 'like', "%{$keyword}%")
+                          ->orWhere('reference_code', 'like', "%{$keyword}%")
+                          ->orWhere('payment_content', 'like', "%{$keyword}%")
+                          ->orWhereHas('booking', fn($bq) => $bq->where('booking_code', 'like', "%{$keyword}%"))
+                          ->orWhereHas('user', fn($uq) => $uq
+                              ->where('full_name', 'like', "%{$keyword}%")
+                              ->orWhere('email', 'like', "%{$keyword}%")
+                              ->orWhere('phone', 'like', "%{$keyword}%"));
+                  });
+              });
 
-        // Lọc theo trạng thái payment
-        if ($request->filled('status')) {
-            $query->where('status', $request->status);
-        }
-
-        // Lọc từ ngày
-        if ($request->filled('from_date')) {
-            $query->whereDate('paid_at', '>=', $request->from_date);
-        }
-
-        // Lọc đến ngày
-        if ($request->filled('to_date')) {
-            $query->whereDate('paid_at', '<=', $request->to_date);
-        }
-
-        // Tìm kiếm theo mã thanh toán, mã đơn, nội dung thanh toán hoặc thông tin người dùng
-        if ($request->filled('keyword')) {
-            $keyword = $request->keyword;
-
-            $query->where(function ($q) use ($keyword) {
-                $q->where('payment_code', 'like', "%{$keyword}%")
-                    ->orWhere('reference_code', 'like', "%{$keyword}%")
-                    ->orWhere('payment_content', 'like', "%{$keyword}%")
-                    ->orWhereHas('booking', function ($bookingQuery) use ($keyword) {
-                        $bookingQuery->where('booking_code', 'like', "%{$keyword}%");
-                    })
-                    ->orWhereHas('user', function ($userQuery) use ($keyword) {
-                        $userQuery->where('full_name', 'like', "%{$keyword}%")
-                            ->orWhere('email', 'like', "%{$keyword}%")
-                            ->orWhere('phone', 'like', "%{$keyword}%");
-                    });
-            });
-        }
-
-        $payments = $query
-            ->orderByDesc('paid_at')
-            ->paginate($request->get('per_page', 10));
+        $payments = $query->orderByDesc('paid_at')->paginate($request->get('per_page', 10));
 
         return response()->json([
-            'status' => 'success',
+            'status'  => 'success',
             'message' => 'Lấy danh sách thanh toán thành công!',
-            'data' => $payments
+            'data'    => $payments,
         ]);
     }
 
-    /**
-     * -------------------------------------------------------------
-     * CHI TIẾT MỘT THANH TOÁN
-     * -------------------------------------------------------------
-     */
-    /**
-     * Chức năng: Lấy chi tiết một giao dịch thanh toán.
-     */
+    /** Chức năng: Lấy chi tiết một giao dịch thanh toán. */
     public function show($id)
     {
-        $payment = Payment::with([
-            'booking',
-            'user:id,full_name,email,phone'
-        ])->findOrFail($id);
+        $payment = Payment::with(['booking', 'user:id,full_name,email,phone'])->findOrFail($id);
 
         return response()->json([
-            'status' => 'success',
+            'status'  => 'success',
             'message' => 'Lấy chi tiết thanh toán thành công!',
-            'data' => $payment
+            'data'    => $payment,
         ]);
     }
 
-    /**
-     * -------------------------------------------------------------
-     * THỐNG KÊ DOANH THU
-     * -------------------------------------------------------------
-     */
-    /**
-     * Chức năng: Tổng hợp doanh thu thanh toán theo thời gian, phương thức và trạng thái.
-     */
+    /** Chức năng: Tổng hợp doanh thu thanh toán theo thời gian, phương thức và trạng thái. */
     public function summary(Request $request)
     {
-        $query = Payment::query()
-            ->where('status', 'success');
+        $query = Payment::where('status', 'success');
 
-        // Lọc từ ngày
-        if ($request->filled('from_date')) {
-            $query->whereDate('paid_at', '>=', $request->from_date);
-        }
+        $query->when($request->filled('from_date'), fn($q) => $q->whereDate('paid_at', '>=', $request->from_date))
+              ->when($request->filled('to_date'),   fn($q) => $q->whereDate('paid_at', '<=', $request->to_date));
 
-        // Lọc đến ngày
-        if ($request->filled('to_date')) {
-            $query->whereDate('paid_at', '<=', $request->to_date);
-        }
-
-        $totalRevenue = (clone $query)->sum('amount');
-
+        $totalRevenue      = (clone $query)->sum('amount');
         $totalTransactions = (clone $query)->count();
-
-        $cashRevenue = (clone $query)
-            ->where('payment_method', 'cash')
-            ->sum('amount');
-
-        $bankRevenue = (clone $query)
-            ->whereIn('payment_method', ['bank_transfer', 'sepay', 'online'])
-            ->sum('amount');
+        $cashRevenue       = (clone $query)->where('payment_method', 'cash')->sum('amount');
+        $bankRevenue       = (clone $query)->whereIn('payment_method', self::BANK_METHODS)->sum('amount');
 
         $revenueByMethod = (clone $query)
             ->selectRaw('payment_method, SUM(amount) as total_amount, COUNT(*) as total_transactions')
@@ -136,39 +76,30 @@ class PaymentManagementController extends Controller
             ->get();
 
         return response()->json([
-            'status' => 'success',
+            'status'  => 'success',
             'message' => 'Lấy thống kê doanh thu thành công!',
-            'data' => [
-                'total_revenue' => $totalRevenue,
+            'data'    => [
+                'total_revenue'      => $totalRevenue,
                 'total_transactions' => $totalTransactions,
-                'cash_revenue' => $cashRevenue,
-                'bank_revenue' => $bankRevenue,
-                'revenue_by_method' => $revenueByMethod,
-            ]
+                'cash_revenue'       => $cashRevenue,
+                'bank_revenue'       => $bankRevenue,
+                'revenue_by_method'  => $revenueByMethod,
+            ],
         ]);
     }
 
-    /**
-     * -------------------------------------------------------------
-     * LỊCH SỬ THANH TOÁN THEO ĐƠN
-     * -------------------------------------------------------------
-     */
-    /**
-     * Chức năng: Lấy toàn bộ giao dịch thanh toán thuộc một đơn đặt sân.
-     */
+    /** Chức năng: Lấy toàn bộ giao dịch thanh toán thuộc một đơn đặt sân. */
     public function paymentsByBooking($bookingId)
     {
-        $payments = Payment::with([
-            'user:id,full_name,email,phone'
-        ])
+        $payments = Payment::with(['user:id,full_name,email,phone'])
             ->where('booking_id', $bookingId)
             ->orderByDesc('paid_at')
             ->get();
 
         return response()->json([
-            'status' => 'success',
+            'status'  => 'success',
             'message' => 'Lấy lịch sử thanh toán của đơn thành công!',
-            'data' => $payments
+            'data'    => $payments,
         ]);
     }
 }

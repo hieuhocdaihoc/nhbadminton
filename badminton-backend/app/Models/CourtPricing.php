@@ -10,12 +10,13 @@ class CourtPricing extends Model
     use HasUuid;
 
     protected $table = 'court_pricing';
-    public $timestamps = false; // Bảng không dùng created_at, updated_at
 
     protected $keyType = 'string';
+
     public $incrementing = false;
 
-    // Chỉ chứa tên các cột cho phép insert/update
+    public $timestamps = false;
+
     protected $fillable = [
         'court_id',
         'day_type',
@@ -27,28 +28,18 @@ class CourtPricing extends Model
         'min_booking_minutes',
     ];
 
-    // Tự động ép kiểu dữ liệu chuẩn (Casts) khi lấy từ DB ra
     protected $casts = [
-        'price' => 'float',
-        'min_booking_minutes' => 'integer',
-        'effective_from' => 'date:Y-m-d',
-        'effective_to' => 'date:Y-m-d',
+        'price'                => 'float',
+        'min_booking_minutes'  => 'integer',
+        'effective_from'       => 'date:Y-m-d',
+        'effective_to'         => 'date:Y-m-d',
     ];
 
-    // Quan hệ: Một mức giá này thuộc về một Sân cụ thể
-    /**
-     * Chức năng: Khai báo quan hệ bản ghi thuộc về một sân.
-     */
+    // Relationships
+
+    /** Quan hệ: Mức giá thuộc về một sân */
     public function court()
     {
         return $this->belongsTo(Court::class, 'court_id', 'id');
-    }
-    // Bổ sung Quan hệ: Một Hợp đồng định kỳ sẽ sinh ra nhiều Hóa đơn (Buổi chơi)
-    /**
-     * Chức năng: Khai báo quan hệ model có nhiều đơn đặt sân liên quan.
-     */
-    public function bookings()
-    {
-        return $this->hasMany(Booking::class, 'recurring_booking_id', 'id');
     }
 }

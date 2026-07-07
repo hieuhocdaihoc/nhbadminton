@@ -10,10 +10,9 @@ class BookingDetail extends Model
     use HasUuid;
 
     protected $table = 'booking_details';
-    public $timestamps = false;
-
     protected $keyType = 'string';
     public $incrementing = false;
+    public $timestamps = false;
 
     protected $fillable = [
         'booking_id',
@@ -25,27 +24,26 @@ class BookingDetail extends Model
         'price_per_hour',
         'price',
         'overtime_minutes',
-        'overtime_fee'
+        'overtime_fee',
     ];
 
     protected $casts = [
-        'price_per_hour' => 'float',
-        'price' => 'float',
-        'overtime_fee' => 'float',
+        'price_per_hour'   => 'float',
+        'price'            => 'float',
+        'overtime_fee'     => 'float',
         'duration_minutes' => 'integer',
         'overtime_minutes' => 'integer',
     ];
 
-    /**
-     * Chức năng: Khai báo quan hệ bản ghi thuộc về một đơn đặt sân.
-     */
+    // Relationships
+
+    /** Quan hệ: BookingDetail thuộc về một booking */
     public function booking()
     {
         return $this->belongsTo(Booking::class, 'booking_id', 'id');
     }
-    /**
-     * Chức năng: Khai báo quan hệ chi tiết đặt sân thuộc về một sân.
-     */
+
+    /** Quan hệ: BookingDetail thuộc về một sân */
     public function court()
     {
         return $this->belongsTo(Court::class, 'court_id', 'id');

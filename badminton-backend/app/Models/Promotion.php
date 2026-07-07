@@ -24,14 +24,14 @@ class Promotion extends Model
     ];
 
     protected $casts = [
-        'discount_value' => 'float',
-        'per_user_limit' => 'integer',
+        'discount_value'      => 'float',
+        'per_user_limit'      => 'integer',
         'min_points_required' => 'integer',
     ];
 
-    /**
-     * Chức năng: Khai báo quan hệ model có nhiều đơn đặt sân liên quan.
-     */
+    // Relationships
+
+    /** Quan hệ: một khuyến mãi có nhiều đơn đặt sân */
     public function bookings()
     {
         return $this->hasMany(Booking::class, 'promotion_id', 'id');

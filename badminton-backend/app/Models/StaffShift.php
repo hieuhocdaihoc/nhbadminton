@@ -10,6 +10,7 @@ class StaffShift extends Model
     use HasUuids;
 
     protected $table = 'Staff_Shifts';
+
     public $timestamps = false;
 
     protected $fillable = [
@@ -25,14 +26,14 @@ class StaffShift extends Model
     ];
 
     protected $casts = [
-        'shift_date' => 'date:Y-m-d',
-        'check_in_time' => 'datetime:Y-m-d H:i:s',
+        'shift_date'     => 'date:Y-m-d',
+        'check_in_time'  => 'datetime:Y-m-d H:i:s',
         'check_out_time' => 'datetime:Y-m-d H:i:s',
     ];
 
-    /**
-     * Chức năng: Khai báo quan hệ ca làm thuộc về một nhân viên.
-     */
+    // Relationships
+
+    /** Quan hệ: Ca làm thuộc về một nhân viên */
     public function staff()
     {
         return $this->belongsTo(User::class, 'staff_id', 'id');

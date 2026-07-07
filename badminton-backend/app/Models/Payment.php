@@ -2,13 +2,12 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\Model;
 
 class Payment extends Model
 {
-    use HasFactory, HasUuids;
+    use HasUuids;
 
     protected $table = 'payments';
 
@@ -29,33 +28,27 @@ class Payment extends Model
     ];
 
     protected $casts = [
-        'amount' => 'float',
+        'amount'  => 'float',
         'paid_at' => 'datetime',
     ];
 
-    /**
-     * -------------------------------------------------------------
-     * QUAN HỆ VỚI ĐƠN ĐẶT SÂN
-     * -------------------------------------------------------------
-     */
-    /**
-     * Chức năng: Khai báo quan hệ bản ghi thuộc về một đơn đặt sân.
-     */
+    // Relationships
+
+    /** Quan hệ: Thanh toán thuộc về một đơn đặt sân */
     public function booking()
     {
         return $this->belongsTo(Booking::class, 'booking_id', 'id');
     }
 
-    /**
-     * -------------------------------------------------------------
-     * QUAN HỆ VỚI NGƯỜI THANH TOÁN
-     * -------------------------------------------------------------
-     */
-    /**
-     * Chức năng: Khai báo quan hệ bản ghi thuộc về một người dùng.
-     */
+    /** Quan hệ: Thanh toán thuộc về một người dùng */
     public function user()
     {
         return $this->belongsTo(User::class, 'user_id', 'id');
+    }
+
+    /** Quan hệ: Thanh toán có nhiều yêu cầu hoàn tiền */
+    public function refunds()
+    {
+        return $this->hasMany(Refund::class, 'payment_id', 'id');
     }
 }

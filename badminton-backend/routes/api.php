@@ -20,7 +20,8 @@ use App\Http\Controllers\Api\Admin\{
     StaffShiftController,
     SupplierController,
     DashboardReportController,
-    PaymentManagementController
+    PaymentManagementController,
+    SystemSettingController
 };
 use App\Http\Controllers\Api\Admin\ReviewController as AdminReviewController;
 use App\Http\Controllers\Api\Payment\SePayController;
@@ -35,6 +36,9 @@ use App\Http\Controllers\Api\Payment\SePayController;
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login'])->name('login');
 
+// Cấu hình hệ thống (địa chỉ, hotline, giờ hoạt động...) cho Footer/Trang chủ hiển thị
+Route::get('/settings', [SystemSettingController::class, 'index']);
+
 // Tra cứu sân & bảng giá công khai
 Route::get('/courts', [CourtController::class, 'getPublicCourts']);
 Route::get('/courts/{id}', [CourtController::class, 'show']);
@@ -44,10 +48,13 @@ Route::post('/courts/calculate-price', [CourtPricingController::class, 'calculat
 Route::post('/sepay/webhook', [SePayController::class, 'webhook']);
 // Lấy thông tin thanh toán và QR chuyển khoản của đơn đặt sân
 Route::get('/bookings/{id}/payment-info', [SePayController::class, 'paymentInfo']);
+Route::get('/booking-intents/{code}/status', [SePayController::class, 'intentStatus']);
 
 // Lịch trống & Đặt sân lẻ
 Route::get('/courts/{id}/availability', [UserBooking::class, 'getCourtAvailability']);
 Route::post('/bookings', [UserBooking::class, 'store']);
+Route::post('/bookings/prepare', [UserBooking::class, 'preparePayment']);
+Route::delete('/bookings/cancel-unpaid', [UserBooking::class, 'cancelUnpaid']);
 Route::post('/bookings/guest-lookup', [UserBooking::class, 'lookupGuestBooking']);
 Route::post('/bookings/validate-promotion', [UserBooking::class, 'validatePromotion']);
 Route::get('/reviews', [UserReviewController::class, 'index']);
@@ -62,6 +69,8 @@ Route::middleware('auth:sanctum')->group(function () {
     // --- PHÂN HỆ KHÁCH HÀNG THÀNH VIÊN ---
     Route::get('/user/bookings', [UserBooking::class, 'getUserBookings'])
         ->middleware('role:customer');
+    Route::post('/user/booking-request', [UserBooking::class, 'sendRequest'])
+        ->middleware('role:customer');
     Route::post('/reviews', [UserReviewController::class, 'store'])
         ->middleware('role:customer');
 
@@ -73,7 +82,12 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/logout-all', 'logoutAllDevices');
         Route::post('/address', 'addAddress');
         Route::put('/address/{id}', 'updateAddress');
+        Route::post('/avatar', 'uploadAvatar');
     });
+
+    // Ca làm của nhân viên đang đăng nhập (dùng để kiểm tra có đang trong ca không)
+    Route::get('/staff/my-shifts', [StaffShiftController::class, 'myShifts'])
+        ->middleware('role:staff');
 
     // --- PHÂN HỆ QUẢN TRỊ (ADMIN / LỄ TÂN) ---
     Route::prefix('admin')->middleware('role:admin,staff')->group(function () {
@@ -83,9 +97,13 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::get('/bookings/single', 'getSingleBookings');
             Route::get('/bookings/recurring', 'getRecurringMasters');
             Route::get('/bookings/recurring/{id}/sessions', 'getRecurringSessions');
+            Route::get('/bookings/long-term', 'getLongTermMasters');
+            Route::get('/bookings/long-term/{id}/sessions', 'getRecurringSessions');
             Route::get('/bookings/search', 'searchBookings');
             Route::patch('/bookings/{id}/status', 'updateStatus');
+            Route::post('/bookings/{id}/check-in', 'checkIn');
             Route::patch('/bookings/{id}/payment', 'updatePayment');
+            Route::patch('/bookings/{id}/checkout', 'checkout');
             Route::patch('/bookings/details/{detailId}/reschedule', 'reschedule');
             Route::post('/bookings/{id}/add-item', 'addItemToBooking');
             Route::post('/bookings/{id}/add-items', 'addItemsToBooking');
@@ -160,6 +178,9 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::patch('staff-shifts/{id}/check-in', [StaffShiftController::class, 'checkIn']);
             Route::patch('staff-shifts/{id}/check-out', [StaffShiftController::class, 'checkOut']);
             Route::apiResource('staff-shifts', StaffShiftController::class);
+
+            Route::get('settings', [SystemSettingController::class, 'index']);
+            Route::put('settings', [SystemSettingController::class, 'update']);
         });
     });
 });

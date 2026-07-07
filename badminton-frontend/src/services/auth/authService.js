@@ -48,6 +48,15 @@ export const authService = {
         });
     },
 
+    uploadAvatar: (file) => {
+        const formData = new FormData();
+        formData.append('image', file);
+        return axiosClient.post('/avatar', formData, {
+            // Bỏ Content-Type mặc định (application/json) để trình duyệt tự thêm boundary cho multipart
+            headers: { 'Content-Type': undefined }
+        });
+    },
+
     // ==========================================
     // 3. NHÓM QUẢN LÝ ĐỊA CHỈ
     // ==========================================

@@ -8,13 +8,18 @@ use Illuminate\Http\Request;
 
 class ReviewController extends Controller
 {
-    /**
-     * Chức năng: Lấy danh sách đánh giá để admin/staff lọc, duyệt, ẩn hoặc phản hồi.
-     */
+    private const LOAD_RELATIONS = [
+        'user:id,full_name,phone,customer_code',
+        'court:id,name,court_code',
+        'booking:id,booking_code,status,payment_status',
+    ];
+
+    /** Chức năng: Lấy danh sách đánh giá để admin/staff lọc, duyệt, ẩn hoặc phản hồi. */
     public function index(Request $request)
     {
         $query = Review::with([
             'user:id,full_name,phone,customer_code',
+            'user.avatar',
             'court:id,name,court_code',
             'booking:id,booking_code,status,payment_status',
         ]);
@@ -35,11 +40,8 @@ class ReviewController extends Controller
             if ($request->reply_status === 'replied') {
                 $query->whereNotNull('staff_reply')->where('staff_reply', '!=', '');
             }
-
             if ($request->reply_status === 'unreplied') {
-                $query->where(function ($q) {
-                    $q->whereNull('staff_reply')->orWhere('staff_reply', '');
-                });
+                $query->where(fn($q) => $q->whereNull('staff_reply')->orWhere('staff_reply', ''));
             }
         }
 
@@ -48,27 +50,19 @@ class ReviewController extends Controller
             $query->where(function ($q) use ($keyword) {
                 $q->where('comment', 'like', "%{$keyword}%")
                     ->orWhere('staff_reply', 'like', "%{$keyword}%")
-                    ->orWhereHas('user', function ($userQuery) use ($keyword) {
-                        $userQuery->where('full_name', 'like', "%{$keyword}%")
-                            ->orWhere('phone', 'like', "%{$keyword}%");
-                    })
-                    ->orWhereHas('booking', function ($bookingQuery) use ($keyword) {
-                        $bookingQuery->where('booking_code', 'like', "%{$keyword}%");
-                    });
+                    ->orWhereHas('user', fn($u) => $u->where('full_name', 'like', "%{$keyword}%")
+                        ->orWhere('phone', 'like', "%{$keyword}%"))
+                    ->orWhereHas('booking', fn($b) => $b->where('booking_code', 'like', "%{$keyword}%"));
             });
         }
 
-        $reviews = $query->orderByDesc('id')->paginate(12);
-
         return response()->json([
             'status' => 'success',
-            'data' => $reviews,
+            'data'   => $query->orderByDesc('id')->paginate(12),
         ]);
     }
 
-    /**
-     * Chức năng: Lưu phản hồi của trung tâm cho một đánh giá khách hàng.
-     */
+    /** Chức năng: Lưu phản hồi của trung tâm cho một đánh giá khách hàng. */
     public function reply(Request $request, $id)
     {
         $validated = $request->validate([
@@ -80,19 +74,13 @@ class ReviewController extends Controller
         $review->save();
 
         return response()->json([
-            'status' => 'success',
+            'status'  => 'success',
             'message' => 'Da cap nhat phan hoi danh gia.',
-            'data' => $review->load([
-                'user:id,full_name,phone,customer_code',
-                'court:id,name,court_code',
-                'booking:id,booking_code,status,payment_status',
-            ]),
+            'data'    => $review->load(self::LOAD_RELATIONS),
         ]);
     }
 
-    /**
-     * Chức năng: Cập nhật trạng thái kiểm duyệt review: pending, approved hoặc hidden.
-     */
+    /** Chức năng: Cập nhật trạng thái kiểm duyệt review: pending, approved hoặc hidden. */
     public function updateStatus(Request $request, $id)
     {
         $validated = $request->validate([
@@ -104,25 +92,19 @@ class ReviewController extends Controller
         $review->save();
 
         return response()->json([
-            'status' => 'success',
+            'status'  => 'success',
             'message' => 'Đã cập nhật trạng thái đánh giá.',
-            'data' => $review->load([
-                'user:id,full_name,phone,customer_code',
-                'court:id,name,court_code',
-                'booking:id,booking_code,status,payment_status',
-            ]),
+            'data'    => $review->load(self::LOAD_RELATIONS),
         ]);
     }
 
-    /**
-     * Chức năng: Xóa đánh giá không phù hợp khỏi hệ thống.
-     */
+    /** Chức năng: Xóa đánh giá không phù hợp khỏi hệ thống. */
     public function destroy($id)
     {
         Review::findOrFail($id)->delete();
 
         return response()->json([
-            'status' => 'success',
+            'status'  => 'success',
             'message' => 'Da xoa danh gia khong phu hop.',
         ]);
     }

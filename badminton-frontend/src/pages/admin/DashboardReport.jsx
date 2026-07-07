@@ -11,6 +11,7 @@ import {
   BarChart,
   Bar,
 } from "recharts";
+import ExcelJS from "exceljs";
 import { adminDashboardService } from "../../services/admin/dashboardService";
 
 const getToday = () => new Date().toLocaleDateString("sv-SE");
@@ -59,45 +60,45 @@ const getBookingStatusLabel = (status) => {
 
 const getStatusClass = (status) => {
   if (status === "paid" || status === "confirmed" || status === "completed") {
-    return "bg-emerald-50 text-emerald-600";
+    return "badge-success";
   }
 
   if (status === "pending" || status === "partially_paid") {
-    return "bg-amber-50 text-amber-600";
+    return "badge-warning";
   }
 
   if (status === "cancelled") {
-    return "bg-red-50 text-red-600";
+    return "badge-error";
   }
 
-  return "bg-zinc-50 text-zinc-600";
+  return "badge-neutral";
 };
 
-const StatCard = ({ item }) => {
-  return (
-    <div className="bg-white p-5 rounded-2xl border border-zinc-100 shadow-sm hover:shadow-md transition-all">
-      <div className="flex items-center justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider">
-            {item.label}
-          </p>
-
-          <h4
-            className="text-2xl font-extrabold mt-2 truncate"
-            style={{ color: item.color }}
-          >
-            {item.value}
-            {item.unit && (
-              <span className="ml-1 text-xs font-medium text-zinc-400">
-                {item.unit}
-              </span>
-            )}
-          </h4>
-
-          <p className="text-[11px] font-medium mt-2 text-zinc-500">
-            {item.sub}
-          </p>
-        </div>
+  const StatCard = ({ item }) => {
+    return (
+      <div className="admin-card p-5">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="admin-stat-label">
+              {item.label}
+            </p>
+  
+            <h4
+              className="admin-stat-value mt-2 truncate"
+              style={{ color: item.color }}
+            >
+              {item.value}
+              {item.unit && (
+                <span className="ml-1 text-xs font-medium text-zinc-400">
+                  {item.unit}
+                </span>
+              )}
+            </h4>
+  
+            <p className="text-[11px] font-medium mt-2 text-zinc-500">
+              {item.sub}
+            </p>
+          </div>
 
         <div
           className="w-12 h-12 rounded-2xl flex items-center justify-center text-xl shrink-0"
@@ -158,6 +159,161 @@ const DashboardReport = () => {
 
     return courtPerformance[0]?.court_name || "Chưa có dữ liệu";
   }, [courtPerformance]);
+
+  // --- XUẤT FILE EXCEL ĐỊNH DẠNG ĐẸP THEO KHOẢNG NGÀY ĐANG CHỌN ---
+  const handleExportExcel = async () => {
+    if (!report) return;
+
+    const BRAND_GREEN = "FF65A30D";
+    const HEADER_FONT = { color: { argb: "FFFFFFFF" }, bold: true, size: 11 };
+    const THIN_BORDER = {
+      top: { style: "thin", color: { argb: "FFE4E4E7" } },
+      bottom: { style: "thin", color: { argb: "FFE4E4E7" } },
+      left: { style: "thin", color: { argb: "FFE4E4E7" } },
+      right: { style: "thin", color: { argb: "FFE4E4E7" } },
+    };
+    const CURRENCY_FMT = '#,##0 "đ"';
+
+    const styleHeaderRow = (row) => {
+      row.eachCell((cell) => {
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: BRAND_GREEN } };
+        cell.font = HEADER_FONT;
+        cell.alignment = { vertical: "middle", horizontal: "center" };
+        cell.border = THIN_BORDER;
+      });
+      row.height = 22;
+    };
+
+    const styleDataRow = (row, evenIndex) => {
+      row.eachCell((cell) => {
+        cell.border = THIN_BORDER;
+        cell.alignment = { vertical: "middle" };
+        if (evenIndex) {
+          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF7FAF0" } };
+        }
+      });
+    };
+
+    const wb = new ExcelJS.Workbook();
+    wb.creator = "NH Badminton";
+    wb.created = new Date();
+
+    // ── Trang 1: Tổng quan ──
+    const wsOverview = wb.addWorksheet("Tổng quan", { views: [{ state: "frozen", ySplit: 3 }] });
+    wsOverview.mergeCells("A1:B1");
+    wsOverview.getCell("A1").value = `BÁO CÁO THỐNG KÊ (${filters.from_date} → ${filters.to_date})`;
+    wsOverview.getCell("A1").font = { bold: true, size: 14, color: { argb: BRAND_GREEN } };
+    wsOverview.getCell("A1").alignment = { vertical: "middle" };
+    wsOverview.getRow(1).height = 28;
+
+    wsOverview.columns = [{ width: 30 }, { width: 22 }];
+    const overviewHeaderRow = wsOverview.addRow(["Chỉ tiêu", "Giá trị"]);
+    styleHeaderRow(overviewHeaderRow);
+
+    const overviewData = [
+      ["Tổng doanh thu đã thu", Number(summary.total_revenue || 0), CURRENCY_FMT],
+      ["   - Tiền mặt", Number(summary.cash_revenue || 0), CURRENCY_FMT],
+      ["   - Chuyển khoản", Number(summary.bank_revenue || 0), CURRENCY_FMT],
+      ["Lượt đặt sân", Number(summary.total_bookings || 0), "#,##0"],
+      ["Khách hàng mới", Number(summary.new_customers || 0), "#,##0"],
+      ["Tỷ lệ lấp đầy", Number(summary.occupancy_rate || 0) / 100, "0.0%"],
+      ["Doanh thu tiền sân", Number(summary.court_revenue || 0), CURRENCY_FMT],
+      ["Doanh thu dịch vụ", Number(summary.service_revenue || 0), CURRENCY_FMT],
+      ["Tổng tiền nhập hàng", Number(summary.purchase_amount || 0), CURRENCY_FMT],
+      [
+        "Lợi nhuận tạm tính",
+        Number(summary.total_revenue || 0) - Number(summary.purchase_amount || 0),
+        CURRENCY_FMT,
+      ],
+      ["Sân hiệu suất tốt nhất", bestCourt, null],
+    ];
+    overviewData.forEach(([label, value, fmt], i) => {
+      const row = wsOverview.addRow([label, value]);
+      if (fmt) row.getCell(2).numFmt = fmt;
+      row.getCell(1).font = { bold: true };
+      styleDataRow(row, i % 2 === 1);
+    });
+
+    // ── Trang 2: Doanh thu theo ngày ──
+    const wsRevenue = wb.addWorksheet("Doanh thu theo ngày", { views: [{ state: "frozen", ySplit: 1 }] });
+    wsRevenue.columns = [
+      { header: "Ngày", key: "date", width: 14 },
+      { header: "Doanh thu", key: "revenue", width: 20 },
+    ];
+    styleHeaderRow(wsRevenue.getRow(1));
+    revenueChart.forEach((r, i) => {
+      const row = wsRevenue.addRow({ date: r.date, revenue: Number(r.revenue || 0) });
+      row.getCell(2).numFmt = CURRENCY_FMT;
+      styleDataRow(row, i % 2 === 1);
+    });
+    if (revenueChart.length) {
+      wsRevenue.autoFilter = { from: "A1", to: "B1" };
+    }
+
+    // ── Trang 3: Hiệu suất khai thác sân ──
+    const wsCourts = wb.addWorksheet("Hiệu suất sân", { views: [{ state: "frozen", ySplit: 1 }] });
+    wsCourts.columns = [
+      { header: "Sân", key: "court", width: 20 },
+      { header: "Số giờ đã đặt", key: "hours", width: 16 },
+      { header: "Tỷ lệ lấp đầy", key: "rate", width: 16 },
+    ];
+    styleHeaderRow(wsCourts.getRow(1));
+    courtPerformance.forEach((c, i) => {
+      const row = wsCourts.addRow({
+        court: c.court_name,
+        hours: Number(c.booked_hours || 0),
+        rate: Number(c.occupancy_rate || 0) / 100,
+      });
+      row.getCell(3).numFmt = "0.0%";
+      styleDataRow(row, i % 2 === 1);
+    });
+
+    // ── Trang 4: Danh sách đơn gần đây ──
+    const wsBookings = wb.addWorksheet("Đơn đặt sân", { views: [{ state: "frozen", ySplit: 1 }] });
+    wsBookings.columns = [
+      { header: "Mã đơn", key: "code", width: 16 },
+      { header: "Khách hàng", key: "customer", width: 20 },
+      { header: "SĐT", key: "phone", width: 14 },
+      { header: "Sân", key: "court", width: 12 },
+      { header: "Ngày chơi", key: "date", width: 12 },
+      { header: "Khung giờ", key: "slot", width: 14 },
+      { header: "Giá", key: "price", width: 16 },
+      { header: "Thanh toán", key: "payment", width: 18 },
+      { header: "Trạng thái", key: "status", width: 14 },
+    ];
+    styleHeaderRow(wsBookings.getRow(1));
+    recentBookings.forEach((b, i) => {
+      const row = wsBookings.addRow({
+        code: b.booking_code,
+        customer: b.customer_name || "Khách vãng lai",
+        phone: b.customer_phone || "",
+        court: b.court_name || "",
+        date: formatDate(b.play_date),
+        slot: b.time_slot || "",
+        price: Number(b.total_price || 0),
+        payment: getPaymentStatusLabel(b.payment_status),
+        status: getBookingStatusLabel(b.status),
+      });
+      row.getCell(7).numFmt = CURRENCY_FMT;
+      styleDataRow(row, i % 2 === 1);
+    });
+    if (recentBookings.length) {
+      wsBookings.autoFilter = { from: "A1", to: "I1" };
+    }
+
+    const buffer = await wb.xlsx.writeBuffer();
+    const blob = new Blob([buffer], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `bao-cao-thong-ke_${filters.from_date}_${filters.to_date}.xlsx`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
 
   const stats = [
     {
@@ -240,7 +396,7 @@ const DashboardReport = () => {
 
   if (isLoading) {
     return (
-      <div className="bg-white rounded-2xl border border-zinc-100 p-16 text-center">
+      <div className="admin-card p-16 text-center">
         <div className="inline-block w-7 h-7 border-2 border-zinc-300 border-t-zinc-900 rounded-full animate-spin mb-3" />
         <p className="text-sm font-semibold text-zinc-500">
           Đang tải báo cáo thống kê...
@@ -251,12 +407,12 @@ const DashboardReport = () => {
 
   return (
     <div className="space-y-6 max-w-[1600px] mx-auto">
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-6">
         <div>
-          <h1 className="text-2xl font-extrabold text-zinc-900">
+          <h1 className="admin-page-title text-2xl">
             Báo cáo tổng quan
           </h1>
-          <p className="text-sm text-zinc-500 mt-1">
+          <p className="admin-page-subtitle text-sm mt-1">
             Theo dõi doanh thu, lịch đặt sân, chi phí nhập hàng và hiệu suất
             khai thác sân.
           </p>
@@ -272,7 +428,7 @@ const DashboardReport = () => {
                 from_date: e.target.value,
               }))
             }
-            className="px-4 py-2 rounded-xl border border-zinc-200 bg-white text-sm font-semibold text-zinc-700 outline-none focus:border-lime-400"
+            className="admin-input px-3.5 py-2 w-full sm:w-auto"
           />
 
           <input
@@ -284,14 +440,25 @@ const DashboardReport = () => {
                 to_date: e.target.value,
               }))
             }
-            className="px-4 py-2 rounded-xl border border-zinc-200 bg-white text-sm font-semibold text-zinc-700 outline-none focus:border-lime-400"
+            className="admin-input px-3.5 py-2 w-full sm:w-auto"
           />
 
           <button
             onClick={handleApplyFilter}
-            className="px-4 py-2 rounded-xl bg-lime-500 text-sm font-bold text-zinc-950 hover:bg-lime-400"
+            className="admin-btn-primary px-4 py-2 text-sm rounded-xl font-bold"
           >
             Lọc báo cáo
+          </button>
+
+          <button
+            onClick={handleExportExcel}
+            disabled={!report || isLoading}
+            className="admin-btn-secondary px-4 py-2 text-sm rounded-xl flex items-center gap-2 shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2-9.5V8a1 1 0 001 1h3.5M7 21h10a2 2 0 002-2V8.414a1 1 0 00-.293-.707l-4.414-4.414A1 1 0 0013.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+            </svg>
+            Xuất Excel
           </button>
         </div>
       </div>
@@ -309,7 +476,7 @@ const DashboardReport = () => {
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
-        <div className="xl:col-span-2 bg-white p-6 rounded-2xl border border-zinc-100 shadow-sm">
+        <div className="xl:col-span-2 admin-card p-6">
           <div className="flex items-center justify-between mb-5">
             <div>
               <h3 className="font-bold text-zinc-800 text-base">
@@ -320,7 +487,7 @@ const DashboardReport = () => {
               </p>
             </div>
 
-            <span className="text-[11px] font-semibold text-lime-700 bg-lime-50 px-3 py-1 rounded-lg border border-lime-100">
+            <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-3 py-1 rounded-lg border border-emerald-100">
               {filters.from_date} → {filters.to_date}
             </span>
           </div>
@@ -343,10 +510,10 @@ const DashboardReport = () => {
                     >
                       <stop
                         offset="5%"
-                        stopColor="#84cc16"
+                        stopColor="#10b981"
                         stopOpacity={0.35}
                       />
-                      <stop offset="95%" stopColor="#84cc16" stopOpacity={0} />
+                      <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
                     </linearGradient>
                   </defs>
 
@@ -359,13 +526,14 @@ const DashboardReport = () => {
                   />
                   <Tooltip
                     formatter={(value) =>
-                      new Intl.NumberFormat("vi-VN").format(value) + " VNĐ"
+                      [new Intl.NumberFormat("vi-VN").format(value) + " VNĐ", "Doanh thu"]
                     }
                   />
                   <Area
                     type="monotone"
                     dataKey="revenue"
-                    stroke="#65a30d"
+                    name="Doanh thu"
+                    stroke="#059669"
                     strokeWidth={3}
                     fill="url(#revenueColor)"
                   />
@@ -375,7 +543,7 @@ const DashboardReport = () => {
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-2xl border border-zinc-100 shadow-sm">
+        <div className="admin-card p-6">
           <h3 className="font-bold text-zinc-800 text-base mb-5">
             Hiệu suất khai thác sân
           </h3>
@@ -397,7 +565,7 @@ const DashboardReport = () => {
 
                   <div className="w-full bg-zinc-100 h-2 rounded-full overflow-hidden">
                     <div
-                      className="h-full rounded-full bg-gradient-to-r from-lime-500 to-emerald-500"
+                      className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-teal-500"
                       style={{
                         width: `${Math.min(Number(court.occupancy_rate || 0), 100)}%`,
                       }}
@@ -419,7 +587,7 @@ const DashboardReport = () => {
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
-        <div className="bg-white p-6 rounded-2xl border border-zinc-100 shadow-sm">
+        <div className="admin-card p-6">
           <h3 className="font-bold text-zinc-800 text-base mb-5">
             Lượt đặt theo khung giờ
           </h3>
@@ -439,7 +607,7 @@ const DashboardReport = () => {
                   <Bar
                     dataKey="booking_count"
                     radius={[8, 8, 0, 0]}
-                    fill="#84cc16"
+                    fill="#10b981"
                   />
                 </BarChart>
               </ResponsiveContainer>
@@ -447,7 +615,7 @@ const DashboardReport = () => {
           </div>
         </div>
 
-        <div className="xl:col-span-2 bg-white p-6 rounded-2xl border border-zinc-100 shadow-sm">
+        <div className="xl:col-span-2 admin-card p-6">
           <div className="flex items-center justify-between mb-5">
             <h3 className="font-bold text-zinc-800 text-base">
               Đơn đặt sân gần đây
@@ -516,7 +684,7 @@ const DashboardReport = () => {
 
                       <td className="py-4">
                         <span
-                          className={`px-3 py-1 rounded-full text-[11px] font-bold ${getStatusClass(
+                          className={`admin-badge px-3 py-1 text-[11px] ${getStatusClass(
                             booking.payment_status,
                           )}`}
                         >
@@ -526,7 +694,7 @@ const DashboardReport = () => {
 
                       <td className="py-4">
                         <span
-                          className={`px-3 py-1 rounded-full text-[11px] font-bold ${getStatusClass(
+                          className={`admin-badge px-3 py-1 text-[11px] ${getStatusClass(
                             booking.status,
                           )}`}
                         >

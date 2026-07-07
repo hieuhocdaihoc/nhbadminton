@@ -27,12 +27,15 @@ import PricingManager from "./pages/admin/PricingManager";
 import TodayBookings from "./pages/admin/TodayBookings";
 import SingleBookings from "./pages/admin/SingleBookings";
 import RecurringBookings from "./pages/admin/RecurringBookings";
+import LongTermBookings from "./pages/admin/LongTermBookings";
+import CreateBooking from "./pages/admin/CreateBooking";
 import Categories from "./pages/admin/Categories";
 import AdditionalServiceManager from "./pages/admin/Services";
 import SupplierManager from "./pages/admin/SupplierManager";
 import InventoryManager from "./pages/admin/InventoryManager";
 import RevenueManager from "./pages/admin/RevenueManager";
 import PromotionManager from "./pages/admin/PromotionManager";
+import SystemSettings from "./pages/admin/SystemSettings";
 import ReviewManager from "./pages/admin/ReviewManager";
 
 const ADMIN_HOME_BY_ROLE = {
@@ -199,6 +202,14 @@ function App() {
           }
         />
         <Route
+          path="/admin/bookings/create"
+          element={
+            <ProtectedAdminPage allowedRoles={["admin", "staff"]}>
+              <CreateBooking />
+            </ProtectedAdminPage>
+          }
+        />
+        <Route
           path="/admin/bookings/today"
           element={
             <ProtectedAdminPage allowedRoles={["admin", "staff"]}>
@@ -219,6 +230,14 @@ function App() {
           element={
             <ProtectedAdminPage allowedRoles={["admin", "staff"]}>
               <RecurringBookings />
+            </ProtectedAdminPage>
+          }
+        />
+        <Route
+          path="/admin/bookings/long-term"
+          element={
+            <ProtectedAdminPage allowedRoles={["admin", "staff"]}>
+              <LongTermBookings />
             </ProtectedAdminPage>
           }
         />
@@ -275,6 +294,14 @@ function App() {
           element={
             <ProtectedAdminPage allowedRoles={["admin", "staff"]}>
               <ReviewManager />
+            </ProtectedAdminPage>
+          }
+        />
+        <Route
+          path="/admin/settings"
+          element={
+            <ProtectedAdminPage allowedRoles={["admin"]}>
+              <SystemSettings />
             </ProtectedAdminPage>
           }
         />

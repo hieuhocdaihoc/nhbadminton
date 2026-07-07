@@ -2,6 +2,9 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { adminBookingService } from "../../services/admin/bookingService";
+import { ClipboardList } from "lucide-react";
+import EmptyState from "../../components/admin/EmptyState";
+import LoadingSpinner from "../../components/admin/LoadingSpinner";
 
 const SingleBookings = () => {
   const location = useLocation();
@@ -111,11 +114,6 @@ const SingleBookings = () => {
       msg = `Xác nhận ${booking.customer_name} đã thanh toán đủ tiền sân?`;
       payload = { payment_status: "paid" };
       actionType = "payment";
-    } else if (type === "checkin") {
-      title = "Check-in khách";
-      msg = `Xác nhận khách hàng ${booking.customer_name} đã đến sân và bắt đầu chơi?`;
-      payload = { status: "playing" };
-      actionType = "status";
     } else if (type === "complete") {
       title = "Hoàn thành ca chơi";
       msg = `Xác nhận kết thúc ca chơi của ${booking.customer_name}?`;
@@ -165,12 +163,14 @@ const SingleBookings = () => {
       fetchData(pagination.current_page, searchTerm);
     } catch (error) {
       console.error(error);
-      alert(error.response?.data?.message || "❌ Có lỗi xảy ra trong quá trình xử lý!");
+      alert(error.response?.data?.message || "Có lỗi xảy ra trong quá trình xử lý!");
     } finally {
       setIsProcessing(false);
-      setTimeout(() => setMessage({ type: "", text: "" }), 3000);
+      setTimeout(() => setMessage({ type: "", text: "" }), 2500);
     }
   };
+
+
 
   // --- LOGIC ĐỔI LỊCH ---
   const openRescheduleModal = (booking) => {
@@ -202,10 +202,10 @@ const SingleBookings = () => {
     } catch (error) {
       const errorMsg =
         error.response?.data?.message || "Có lỗi xảy ra khi đổi lịch!";
-      alert("❌ " + errorMsg);
+      alert(errorMsg);
     } finally {
       setIsProcessing(false);
-      setTimeout(() => setMessage({ type: "", text: "" }), 4000);
+      setTimeout(() => setMessage({ type: "", text: "" }), 2500);
     }
   };
 
@@ -273,10 +273,10 @@ const SingleBookings = () => {
   ];
 
   const inputClass =
-    "w-full bg-[#f8f8fa] border border-zinc-200 rounded-lg px-3.5 py-2.5 text-sm text-zinc-800 outline-none focus:border-zinc-400 focus:ring-1 focus:ring-zinc-200 transition-all placeholder:text-zinc-400";
+    "admin-input placeholder:text-zinc-400";
 
   return (
-    <div className="max-w-[1400px] mx-auto space-y-5">
+    <div className="admin-page-container">
       {/* TOAST MESSAGE */}
       <AnimatePresence>
         {message.text && (
@@ -291,8 +291,8 @@ const SingleBookings = () => {
         )}
       </AnimatePresence>
 
-      {/* TOOLBAR */}
-      <div className="bg-white rounded-xl border border-zinc-200/60 p-4">
+      {/* THANH CÔNG CỤ */}
+      <div className="admin-card p-4">
         <div className="flex flex-col lg:flex-row gap-4 justify-between items-start lg:items-center">
           {/* Search */}
           <div className="relative w-full lg:w-80">
@@ -311,7 +311,7 @@ const SingleBookings = () => {
               placeholder="Tìm tên, SĐT hoặc mã đơn..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-lg text-xs text-zinc-700 outline-none focus:border-zinc-300 focus:bg-white transition-all"
+              className="admin-input pl-10 py-2.5"
             />
           </div>
 
@@ -339,19 +339,15 @@ const SingleBookings = () => {
 
       {/* BOOKING CARDS */}
       {isLoading ? (
-        <div className="bg-white rounded-xl border border-zinc-200/60 p-16 text-center">
-          <div className="inline-block w-6 h-6 border-2 border-zinc-300 border-t-zinc-600 rounded-full animate-spin mb-3" />
-          <p className="text-xs text-zinc-400">Đang tải dữ liệu...</p>
+        <div className="admin-card border-none">
+          <LoadingSpinner label="Đang tải dữ liệu..." />
         </div>
       ) : filteredBookings.length === 0 ? (
-        <div className="bg-white rounded-xl border border-zinc-200/60 p-16 text-center">
-          <p className="text-3xl mb-2 opacity-30">📋</p>
-          <p className="text-sm text-zinc-400">
-            Không tìm thấy đơn đặt sân nào
-          </p>
+        <div className="admin-card border-none">
+          <EmptyState icon={ClipboardList} title="Không tìm thấy đơn đặt sân nào" />
         </div>
       ) : (
-        <div className="bg-white rounded-xl border border-zinc-200/60 overflow-hidden">
+        <div className="admin-card overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[900px]">
               <thead>
@@ -424,7 +420,7 @@ const SingleBookings = () => {
                         isCancelled ? "opacity-45" : ""
                       } ${
                         isNotificationTarget
-                          ? "bg-lime-50 ring-1 ring-inset ring-lime-300"
+                          ? "bg-emerald-50 ring-1 ring-inset ring-emerald-300"
                           : ""
                       }`}
                     >
@@ -481,23 +477,15 @@ const SingleBookings = () => {
                           {b.status === "pending" && (
                             <button
                               onClick={() => requestAction(b, "confirm")}
-                              className="px-2.5 py-1 bg-zinc-900 text-white rounded text-[10px] font-medium hover:bg-zinc-800 transition-colors"
+                              className="admin-btn-secondary px-2.5 py-1 text-[10px] font-medium"
                             >
                               Duyệt
-                            </button>
-                          )}
-                          {b.status === "confirmed" && (
-                            <button
-                              onClick={() => requestAction(b, "checkin")}
-                              className="px-2.5 py-1 bg-violet-600 text-white rounded text-[10px] font-medium hover:bg-violet-700 transition-colors"
-                            >
-                              Check-in
                             </button>
                           )}
                           {b.payment_status !== "paid" && !isCancelled && (
                             <button
                               onClick={() => requestAction(b, "pay")}
-                              className="px-2.5 py-1 bg-lime-600 text-white rounded text-[10px] font-medium hover:bg-lime-700 transition-colors"
+                              className="admin-btn-primary px-2.5 py-1 text-[10px] font-medium"
                             >
                               Thu tiền
                             </button>
@@ -505,7 +493,7 @@ const SingleBookings = () => {
                           {["playing", "confirmed"].includes(b.status) && b.payment_status === "paid" && (
                             <button
                               onClick={() => requestAction(b, "complete")}
-                              className="px-2.5 py-1 bg-emerald-600 text-white rounded text-[10px] font-medium hover:bg-emerald-700 transition-colors"
+                              className="admin-btn-primary px-2.5 py-1 text-[10px] font-medium"
                             >
                               Hoàn thành
                             </button>
@@ -513,7 +501,7 @@ const SingleBookings = () => {
                           {!isCancelled && !["playing", "completed"].includes(b.status) && (
                             <button
                               onClick={() => openRescheduleModal(b)}
-                              className="px-2.5 py-1 border border-zinc-200 text-zinc-500 rounded text-[10px] hover:bg-zinc-50 transition-colors"
+                              className="admin-btn-outline px-2.5 py-1 text-[10px]"
                             >
                               Đổi lịch
                             </button>
@@ -521,7 +509,7 @@ const SingleBookings = () => {
                           {!["playing", "cancelled", "completed"].includes(b.status) && (
                             <button
                               onClick={() => requestAction(b, "cancel")}
-                              className="px-2 py-1 text-zinc-400 rounded text-[10px] hover:text-red-500 hover:bg-red-50 transition-colors"
+                              className="admin-btn-outline px-2.5 py-1 text-[10px] hover:text-red-500 hover:border-red-200"
                             >
                               Hủy
                             </button>
@@ -547,14 +535,14 @@ const SingleBookings = () => {
             <button
               disabled={pagination.current_page === 1}
               onClick={() => fetchData(pagination.current_page - 1, searchTerm)}
-              className="px-3.5 py-2 border border-zinc-200 rounded-lg text-xs text-zinc-600 hover:bg-zinc-50 disabled:opacity-40 transition-colors"
+              className="admin-btn-outline px-3.5 py-2 text-xs disabled:opacity-40"
             >
               ← Trước
             </button>
             <button
               disabled={pagination.current_page === pagination.last_page}
               onClick={() => fetchData(pagination.current_page + 1, searchTerm)}
-              className="px-3.5 py-2 border border-zinc-200 rounded-lg text-xs text-zinc-600 hover:bg-zinc-50 disabled:opacity-40 transition-colors"
+              className="admin-btn-outline px-3.5 py-2 text-xs disabled:opacity-40"
             >
               Tiếp →
             </button>
@@ -562,22 +550,22 @@ const SingleBookings = () => {
         </div>
       )}
 
-      {/* MODAL ĐỔI LỊCH */}
+      {/* CỬA SỔ ĐỔI LỊCH */}
       <AnimatePresence>
         {rescheduleModal.isOpen && (
-          <div className="fixed inset-0 z-50 bg-black/30 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="admin-modal-overlay">
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
               onClick={(e) => e.stopPropagation()}
-              className="bg-white w-full max-w-md rounded-2xl shadow-xl overflow-hidden"
+              className="admin-modal-content"
             >
-              <div className="px-6 py-5 border-b border-zinc-100">
+              <div className="admin-modal-header p-6 border-b border-zinc-100">
                 <h3 className="text-sm font-semibold text-zinc-800">
                   Đổi lịch ca chơi
                 </h3>
-                <p className="text-xs text-zinc-400 mt-0.5">
+                <p className="admin-page-subtitle">
                   Khách:{" "}
                   <span className="text-zinc-600">
                     {rescheduleModal.booking?.customer_name}
@@ -586,7 +574,7 @@ const SingleBookings = () => {
               </div>
               <form onSubmit={handleRescheduleSubmit} className="p-6 space-y-4">
                 <div>
-                  <label className="block text-[11px] font-medium text-zinc-500 mb-1.5">
+                  <label className="admin-form-label">
                     Sân
                   </label>
                   <select
@@ -611,7 +599,7 @@ const SingleBookings = () => {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-[11px] font-medium text-zinc-500 mb-1.5">
+                  <label className="admin-form-label">
                     Ngày
                   </label>
                   <input
@@ -629,7 +617,7 @@ const SingleBookings = () => {
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-[11px] font-medium text-zinc-500 mb-1.5">
+                    <label className="admin-form-label">
                       Bắt đầu
                     </label>
                     <input
@@ -646,7 +634,7 @@ const SingleBookings = () => {
                     />
                   </div>
                   <div>
-                    <label className="block text-[11px] font-medium text-zinc-500 mb-1.5">
+                    <label className="admin-form-label">
                       Kết thúc
                     </label>
                     <input
@@ -673,14 +661,14 @@ const SingleBookings = () => {
                         booking: null,
                       })
                     }
-                    className="flex-1 py-2.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-600 rounded-lg text-xs font-medium transition-colors"
+                    className="admin-btn-outline flex-1 py-2.5 text-xs font-medium"
                   >
                     Hủy
                   </button>
                   <button
                     type="submit"
                     disabled={isProcessing}
-                    className="flex-1 py-2.5 bg-zinc-900 hover:bg-zinc-800 text-white rounded-lg text-xs font-medium transition-colors"
+                    className="admin-btn-secondary flex-1 py-2.5 text-xs font-medium"
                   >
                     {isProcessing ? "Đang xử lý..." : "Lưu lịch mới"}
                   </button>
@@ -691,15 +679,15 @@ const SingleBookings = () => {
         )}
       </AnimatePresence>
 
-      {/* MODAL XÁC NHẬN */}
+      {/* CỬA SỔ XÁC NHẬN */}
       <AnimatePresence>
         {confirmModal.isOpen && (
-          <div className="fixed inset-0 z-50 bg-black/30 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="admin-modal-overlay">
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white w-full max-w-xs rounded-2xl shadow-xl p-6 text-center"
+              className="admin-modal-content max-w-xs p-6 text-center"
             >
               <div className="w-12 h-12 bg-amber-50 rounded-xl flex items-center justify-center text-xl mx-auto mb-4">
                 ⚠️
@@ -720,14 +708,14 @@ const SingleBookings = () => {
                       actionData: null,
                     })
                   }
-                  className="flex-1 py-2.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-600 rounded-lg text-xs font-medium transition-colors"
+                  className="admin-btn-outline flex-1 py-2.5 text-xs font-medium"
                 >
                   Hủy
                 </button>
                 <button
                   onClick={executeAction}
                   disabled={isProcessing}
-                  className="flex-1 py-2.5 bg-zinc-900 hover:bg-zinc-800 text-white rounded-lg text-xs font-medium transition-colors"
+                  className="admin-btn-secondary flex-1 py-2.5 text-xs font-medium"
                 >
                   {isProcessing ? "..." : "Xác nhận"}
                 </button>
@@ -736,6 +724,7 @@ const SingleBookings = () => {
           </div>
         )}
       </AnimatePresence>
+
     </div>
   );
 };

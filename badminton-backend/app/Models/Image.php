@@ -10,10 +10,9 @@ class Image extends Model
     use HasUuid;
 
     protected $table = 'images';
-    public $timestamps = false; // Bảng không có updated_at, MySQL sẽ tự lo created_at
-
     protected $keyType = 'string';
     public $incrementing = false;
+    public $timestamps = false;
 
     protected $fillable = [
         'url',
@@ -21,7 +20,7 @@ class Image extends Model
         'target_type',
         'target_id',
         'sort_order',
-        'is_primary'
+        'is_primary',
     ];
 
     protected $casts = [

@@ -10,7 +10,8 @@ class Court extends Model
     use HasUuid;
 
     protected $table = 'courts';
-    public $timestamps = false; // Bảng này của bạn không thiết kế created_at và updated_at
+
+    public $timestamps = false;
 
     protected $fillable = [
         'name',
@@ -20,32 +21,41 @@ class Court extends Model
         'capacity',
         'location_note',
         'is_maintenance',
-        'status'
+        'status',
     ];
-    // Lấy tất cả hình ảnh của sân này
-    /**
-     * Chức năng: Khai báo quan hệ model có nhiều hình ảnh hiển thị.
-     */
+
+    // Relationships
+
+    /** Quan hệ: Sân có nhiều hình ảnh, sắp xếp theo thứ tự hiển thị */
     public function images()
     {
         return $this->hasMany(Image::class, 'target_id', 'id')
             ->where('target_type', 'court')
             ->orderBy('sort_order', 'asc');
     }
-    /**
-     * Chức năng: Khai báo quan hệ sân có nhiều chi tiết đặt sân.
-     */
+
+    /** Quan hệ: Sân có nhiều chi tiết đặt sân */
     public function bookingDetails()
     {
-        return $this->hasMany(\App\Models\BookingDetail::class, 'court_id', 'id');
+        return $this->hasMany(BookingDetail::class, 'court_id', 'id');
     }
 
-    /**
-     * Chức năng: Khai báo quan hệ model có nhiều đánh giá liên quan.
-     */
+    /** Quan hệ: Sân có nhiều đánh giá */
     public function reviews()
     {
         return $this->hasMany(Review::class, 'target_id', 'id')
             ->where('target_type', 'court');
+    }
+
+    /** Quan hệ: Sân có nhiều mức giá */
+    public function pricing()
+    {
+        return $this->hasMany(CourtPricing::class, 'court_id', 'id');
+    }
+
+    /** Quan hệ: Sân có nhiều lịch đặt định kỳ */
+    public function recurringBookings()
+    {
+        return $this->hasMany(RecurringBooking::class, 'court_id', 'id');
     }
 }

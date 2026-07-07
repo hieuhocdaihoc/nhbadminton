@@ -9,87 +9,68 @@ use Illuminate\Support\Facades\Storage;
 
 class ImageController extends Controller
 {
-    // 1. Upload hình ảnh mới
-    /**
-     * Chức năng: Upload và lưu thông tin ảnh gắn với sân, sản phẩm, danh mục, dịch vụ hoặc người dùng.
-     */
+    private const ALLOWED_TARGET_TYPES = ['court', 'product', 'user', 'category', 'service'];
+    private const ALLOWED_MIMES        = ['jpeg', 'png', 'jpg', 'webp'];
+    private const MAX_FILE_SIZE_KB     = 2048;
+
+    /** Chức năng: Upload và lưu thông tin ảnh gắn với sân, sản phẩm, danh mục, dịch vụ hoặc người dùng. */
     public function store(Request $request)
     {
-        $request->validate([
-            'image' => 'required|image|mimes:jpeg,png,jpg,webp|max:2048', // Tối đa 2MB
-            'target_type' => 'required|in:court,product,user,category,service',
-            'target_id' => 'required|string|size:36',
-            'alt_text' => 'nullable|string|max:255',
-            'sort_order' => 'nullable|integer',
-            'is_primary' => 'nullable|boolean'
+        $validated = $request->validate([
+            'image'       => ['required', 'image', 'mimes:' . implode(',', self::ALLOWED_MIMES), 'max:' . self::MAX_FILE_SIZE_KB],
+            'target_type' => ['required', 'in:' . implode(',', self::ALLOWED_TARGET_TYPES)],
+            'target_id'   => ['required', 'string', 'size:36'],
+            'alt_text'    => ['nullable', 'string', 'max:255'],
+            'sort_order'  => ['nullable', 'integer'],
+            'is_primary'  => ['nullable', 'boolean'],
         ]);
 
-        $isPrimary = $request->is_primary ?? false;
+        $isPrimary = $validated['is_primary'] ?? false;
 
-        // Nếu ảnh này là primary, gỡ primary của các ảnh cũ cùng target
         if ($isPrimary) {
-            Image::where('target_type', $request->target_type)
-                ->where('target_id', $request->target_id)
+            Image::where('target_type', $validated['target_type'])
+                ->where('target_id', $validated['target_id'])
                 ->update(['is_primary' => false]);
         } else {
-            // Nếu chưa có ảnh nào, tự động cho ảnh đầu tiên làm primary
-            $count = Image::where('target_type', $request->target_type)
-                ->where('target_id', $request->target_id)
-                ->count();
-            if ($count === 0) {
+            $exists = Image::where('target_type', $validated['target_type'])
+                ->where('target_id', $validated['target_id'])
+                ->exists();
+            if (!$exists) {
                 $isPrimary = true;
             }
         }
 
-        // Xử lý lưu file ảnh vào thư mục: storage/app/public/uploads/{target_type}
-        $file = $request->file('image');
-        $folder = 'uploads/' . $request->target_type;
+        $file     = $request->file('image');
+        $folder   = 'uploads/' . $validated['target_type'];
         $fileName = time() . '_' . uniqid() . '.' . $file->getClientOriginalExtension();
+        $path     = $file->storeAs($folder, $fileName, 'public');
 
-        // Lưu file vào disk 'public'
-        $path = $file->storeAs($folder, $fileName, 'public');
-
-        // Tạo đường dẫn URL đầy đủ để Frontend dễ hiển thị
-        $imageUrl = asset('storage/' . $path);
-
-        // Lưu thông tin vào Database
         $image = Image::create([
-            'url' => $imageUrl,
-            'alt_text' => $request->alt_text ?? "Hình ảnh " . $request->target_type,
-            'target_type' => $request->target_type,
-            'target_id' => $request->target_id,
-            'sort_order' => $request->sort_order ?? 0,
-            'is_primary' => $isPrimary
+            'url'         => asset('storage/' . $path),
+            'alt_text'    => $validated['alt_text'] ?? 'Hình ảnh ' . $validated['target_type'],
+            'target_type' => $validated['target_type'],
+            'target_id'   => $validated['target_id'],
+            'sort_order'  => $validated['sort_order'] ?? 0,
+            'is_primary'  => $isPrimary,
         ]);
 
         return response()->json([
             'message' => 'Upload hình ảnh thành công',
-            'data' => $image
+            'data'    => $image,
         ], 201);
     }
 
-    // 2. Xóa hình ảnh
-    /**
-     * Chức năng: Xóa bản ghi ảnh và file vật lý nếu còn tồn tại trong storage.
-     */
+    /** Chức năng: Xóa bản ghi ảnh và file vật lý nếu còn tồn tại trong storage. */
     public function destroy($id)
     {
-        $image = Image::find($id);
+        $image = Image::findOrFail($id);
 
-        if (!$image) {
-            return response()->json(['message' => 'Không tìm thấy hình ảnh'], 404);
-        }
-
-        // Tách lấy đường dẫn tương đối từ URL để xóa file vật lý trong ổ cứng
-        // Ví dụ URL: http://127.0.0.1:8000/storage/uploads/court/123.jpg
-        // Cần lấy: uploads/court/123.jpg
         $relativePath = str_replace(asset('storage') . '/', '', $image->url);
 
         if (Storage::disk('public')->exists($relativePath)) {
             Storage::disk('public')->delete($relativePath);
         }
 
-        // Xóa record trong DB
         $image->delete();
 
         return response()->json(['message' => 'Đã xóa hình ảnh thành công']);

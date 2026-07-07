@@ -103,7 +103,7 @@ const SupplierManager = () => {
           text: error.response?.data?.message || "Không thể xóa nhà cung cấp!",
         });
       } finally {
-        setTimeout(() => setMessage({ type: "", text: "" }), 3000);
+        setTimeout(() => setMessage({ type: "", text: "" }), 2500);
       }
     }
   };
@@ -121,23 +121,23 @@ const SupplierManager = () => {
   };
 
   const inputClass =
-    "w-full bg-[#f8f8fa] border border-zinc-200 rounded-lg px-3.5 py-2.5 text-sm text-zinc-800 outline-none focus:border-zinc-400 focus:ring-1 focus:ring-zinc-200 transition-all";
+    "admin-input";
 
   return (
-    <div className="max-w-[1400px] mx-auto space-y-5">
-      {/* HEADER */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <div className="admin-page-container">
+      {/* TIÊU ĐỀ */}
+      <div className="admin-page-header">
         <div>
-          <h2 className="text-base font-semibold text-zinc-800">
+          <h2 className="admin-page-title">
             Nhà cung cấp
           </h2>
-          <p className="text-xs text-zinc-400 mt-0.5">
+          <p className="admin-page-subtitle">
             Quản lý đối tác phân phối hàng hóa và dịch vụ
           </p>
         </div>
       </div>
 
-      {/* TOAST */}
+      {/* THÔNG BÁO (TOAST) */}
       <AnimatePresence>
         {message.text && (
           <motion.div
@@ -151,8 +151,8 @@ const SupplierManager = () => {
         )}
       </AnimatePresence>
 
-      {/* TOOLBAR */}
-      <div className="bg-white rounded-xl border border-zinc-200/60 p-4">
+      {/* THANH CÔNG CỤ */}
+      <div className="admin-card p-4">
         <div className="flex flex-col sm:flex-row gap-3 justify-between items-center">
           <form
             onSubmit={handleSearchSubmit}
@@ -173,7 +173,7 @@ const SupplierManager = () => {
               placeholder="Tìm tên hoặc số điện thoại..."
               value={searchKeyword}
               onChange={(e) => setSearchKeyword(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-lg text-xs text-zinc-700 outline-none focus:border-zinc-300 focus:bg-white transition-all"
+              className="admin-input pl-10 py-2.5"
             />
             <button type="submit" className="hidden"></button>
           </form>
@@ -184,8 +184,8 @@ const SupplierManager = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
-        {/* LIST TABLE (LEFT) */}
-        <div className="lg:col-span-8 bg-white rounded-xl border border-zinc-200/60 overflow-hidden">
+        {/* BẢNG DANH SÁCH (TRÁI) */}
+        <div className="lg:col-span-8 admin-card overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead className="bg-zinc-50/60 border-b border-zinc-100 text-[10px] font-medium text-zinc-400 uppercase tracking-wider">
@@ -266,13 +266,13 @@ const SupplierManager = () => {
                         <div className="flex items-center justify-end gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                           <button
                             onClick={() => handleEditClick(s)}
-                            className="px-2.5 py-1 border border-zinc-200 text-zinc-500 rounded text-[10px] hover:bg-zinc-50 transition-colors"
+                            className="admin-btn-outline px-2.5 py-1 text-[10px]"
                           >
                             Sửa
                           </button>
                           <button
                             onClick={() => handleDeleteClick(s)}
-                            className="px-2 py-1 text-zinc-400 rounded text-[10px] hover:text-red-500 hover:bg-red-50 transition-colors"
+                            className="admin-btn-outline px-2 py-1 text-[10px] hover:text-red-500 hover:border-red-200"
                           >
                             Xóa
                           </button>
@@ -286,8 +286,8 @@ const SupplierManager = () => {
           </div>
         </div>
 
-        {/* FORM (RIGHT) */}
-        <div className="lg:col-span-4 bg-white rounded-xl border border-zinc-200/60 p-5 sticky top-5">
+        {/* BIỂU MẪU (PHẢI) */}
+        <div className="lg:col-span-4 admin-card p-5 sticky top-5">
           <div className="flex items-center justify-between mb-4 pb-3 border-b border-zinc-100">
             <h3 className="text-sm font-semibold text-zinc-800">
               {isEditing ? "Sửa nhà cung cấp" : "Thêm nhà cung cấp"}
@@ -304,7 +304,7 @@ const SupplierManager = () => {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-[11px] font-medium text-zinc-500 mb-1.5">
+              <label className="admin-form-label">
                 Tên công ty / Đối tác *
               </label>
               <input
@@ -319,7 +319,7 @@ const SupplierManager = () => {
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-[11px] font-medium text-zinc-500 mb-1.5">
+                <label className="admin-form-label">
                   Số điện thoại
                 </label>
                 <input
@@ -331,7 +331,7 @@ const SupplierManager = () => {
                 />
               </div>
               <div>
-                <label className="block text-[11px] font-medium text-zinc-500 mb-1.5">
+                <label className="admin-form-label">
                   Người đại diện
                 </label>
                 <input
@@ -347,7 +347,7 @@ const SupplierManager = () => {
             </div>
 
             <div>
-              <label className="block text-[11px] font-medium text-zinc-500 mb-1.5">
+              <label className="admin-form-label">
                 Email liên hệ
               </label>
               <input
@@ -360,7 +360,7 @@ const SupplierManager = () => {
             </div>
 
             <div>
-              <label className="block text-[11px] font-medium text-zinc-500 mb-1.5">
+              <label className="admin-form-label">
                 Địa chỉ
               </label>
               <textarea
@@ -376,7 +376,7 @@ const SupplierManager = () => {
               <button
                 type="submit"
                 disabled={isProcessing || !form.name.trim()}
-                className={`w-full py-2.5 rounded-lg text-xs font-medium text-white transition-colors ${isEditing ? "bg-zinc-900 hover:bg-zinc-800" : "bg-lime-600 hover:bg-lime-700"} ${isProcessing || !form.name.trim() ? "opacity-60 cursor-not-allowed" : ""}`}
+                className={`w-full py-2.5 ${isEditing ? "admin-btn-secondary" : "admin-btn-primary"} ${isProcessing || !form.name.trim() ? "opacity-60 cursor-not-allowed shadow-none hover:translate-y-0" : ""}`}
               >
                 {isProcessing
                   ? "Đang lưu..."

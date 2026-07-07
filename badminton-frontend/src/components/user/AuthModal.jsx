@@ -12,6 +12,9 @@ const AuthModal = ({ isOpen, onClose, initialMode = 'login', onLoginSuccess }) =
     const [isLoading, setIsLoading] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
 
+    // Validate SĐT Việt Nam: 10 số, bắt đầu 03/05/07/08/09
+    const isValidPhone = (p) => /^0[35789][0-9]{8}$/.test(p.replace(/[\s\-]/g, ''));
+
     // XỬ LÝ GỌI API BACKEND THỰC TẾ
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -42,8 +45,24 @@ const AuthModal = ({ isOpen, onClose, initialMode = 'login', onLoginSuccess }) =
                 setErrorMessage(error.response?.data?.message || 'Không thể kết nối đến máy chủ.');
             } finally { setIsLoading(false); }
         } else {
+            // Validate trước khi gọi API
+            if (fullName.trim().length < 2) {
+                setErrorMessage('Họ và tên phải có ít nhất 2 ký tự.');
+                setIsLoading(false);
+                return;
+            }
+            if (!isValidPhone(phone)) {
+                setErrorMessage('Số điện thoại không hợp lệ. Vui lòng nhập số Việt Nam 10 số (bắt đầu bằng 03, 05, 07, 08 hoặc 09).');
+                setIsLoading(false);
+                return;
+            }
+            if (password.length < 6) {
+                setErrorMessage('Mật khẩu phải có ít nhất 6 ký tự.');
+                setIsLoading(false);
+                return;
+            }
             try {
-                await authService.register(fullName, phone, email, password);
+                await authService.register(fullName, phone.replace(/[\s\-]/g, ''), email, password);
                 setMode('login');
                 setErrorMessage('🎉 Đăng ký thành công! Vui lòng đăng nhập.');
                 setPassword('');
@@ -148,7 +167,20 @@ const AuthModal = ({ isOpen, onClose, initialMode = 'login', onLoginSuccess }) =
 
                             <div>
                                 <label className={labelClass}>Số điện thoại *</label>
-                                <input type="tel" required placeholder="09xx xxx xxx" value={phone} onChange={e => setPhone(e.target.value)} className={inputClass} />
+                                <input
+                                    type="tel"
+                                    required
+                                    placeholder="0901234567"
+                                    value={phone}
+                                    onChange={e => setPhone(e.target.value)}
+                                    maxLength={10}
+                                    className={inputClass}
+                                />
+                                {mode === 'register' && phone && !isValidPhone(phone) && (
+                                    <p className="mt-1.5 text-[10px] text-red-400 font-medium">
+                                        Số điện thoại phải là 10 số, bắt đầu bằng 03, 05, 07, 08 hoặc 09.
+                                    </p>
+                                )}
                             </div>
 
                             <div>

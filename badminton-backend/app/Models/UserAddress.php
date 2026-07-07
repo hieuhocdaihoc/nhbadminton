@@ -9,8 +9,8 @@ class UserAddress extends Model
 {
     use HasUuid;
 
-    protected $table = 'user_addresses'; // Khớp với tên bảng thực tế
-    public $timestamps = false; // Bảng này trong DB của bạn chỉ có created_at, không có updated_at
+    protected $table = 'user_addresses';
+    public $timestamps = false;
 
     protected $fillable = [
         'user_id',
@@ -19,13 +19,12 @@ class UserAddress extends Model
         'ward',
         'address_line',
         'address_type',
-        'is_default'
+        'is_default',
     ];
 
-    // Thiết lập quan hệ ngược lại với User
-    /**
-     * Chức năng: Khai báo quan hệ bản ghi thuộc về một người dùng.
-     */
+    // Relationships
+
+    /** Quan hệ: địa chỉ thuộc về một người dùng */
     public function user()
     {
         return $this->belongsTo(User::class, 'user_id', 'id');

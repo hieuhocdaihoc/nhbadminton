@@ -20,7 +20,9 @@ import {
   PackageSearch,
   PanelLeftClose,
   PanelLeftOpen,
+  PlusCircle,
   RefreshCcw,
+  Settings,
   ShieldCheck,
   TicketPercent,
   Truck,
@@ -31,6 +33,15 @@ import {
 } from "lucide-react";
 import { authService } from "../services/auth/authService";
 import { adminNotificationService } from "../services/admin/notificationService";
+import { staffShiftService } from "../services/admin/staffShiftService";
+import MySchedule from "../pages/admin/MySchedule";
+
+// Bảng định tuyến: prefix mã đơn → đường dẫn admin tương ứng
+const BOOKING_CODE_ROUTES = {
+  "REC_":  "/admin/bookings/recurring",
+  "LTB_":  "/admin/bookings/long-term",
+  "BILL_": "/admin/bookings/single",
+};
 
 const menuGroups = [
   {
@@ -70,6 +81,13 @@ const menuGroups = [
     label: "Đặt sân",
     items: [
       {
+        name: "Tạo đơn mới",
+        path: "/admin/bookings/create",
+        icon: PlusCircle,
+        desc: "Đặt sân cho khách walk-in tại quầy",
+        roles: ["admin", "staff"],
+      },
+      {
         name: "Lịch đặt hôm nay",
         path: "/admin/bookings/today",
         icon: CalendarCheck2,
@@ -88,6 +106,13 @@ const menuGroups = [
         path: "/admin/bookings/recurring",
         icon: CalendarClock,
         desc: "Khách thuê sân theo lịch cố định",
+        roles: ["admin", "staff"],
+      },
+      {
+        name: "Hợp đồng dài hạn",
+        path: "/admin/bookings/long-term",
+        icon: CalendarClock,
+        desc: "Khách tự chọn ngày trong khoảng thời gian",
         roles: ["admin", "staff"],
       },
     ],
@@ -177,6 +202,18 @@ const menuGroups = [
       },
     ],
   },
+  {
+    label: "Hệ thống",
+    items: [
+      {
+        name: "Cấu hình hệ thống",
+        path: "/admin/settings",
+        icon: Settings,
+        desc: "Địa chỉ, hotline, giờ hoạt động, mạng xã hội",
+        roles: ["admin"],
+      },
+    ],
+  },
 ];
 
 const getAdminHomeByRole = (role) =>
@@ -211,6 +248,7 @@ const AdminLayout = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [adminUser] = useState(readStoredAdminUser);
+  const [shiftStatus, setShiftStatus] = useState(null); // null=loading, object={is_on_shift,...}
   const [notificationOpen, setNotificationOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -220,6 +258,27 @@ const AdminLayout = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const currentRole = adminUser?.role || "admin";
+
+  // Kiểm tra ca làm cho nhân viên (staff)
+  useEffect(() => {
+    if (currentRole !== "staff") return;
+
+    let stopped = false;
+
+    const checkShift = async () => {
+      try {
+        const res = await staffShiftService.getMyShifts();
+        if (!stopped) setShiftStatus(res.data?.data ?? { is_on_shift: false, upcoming_shifts: [] });
+      } catch (_) {
+        if (!stopped) setShiftStatus({ is_on_shift: false, upcoming_shifts: [] });
+      }
+    };
+
+    checkShift();
+    // Kiểm tra lại mỗi 3 phút
+    const interval = setInterval(checkShift, 3 * 60 * 1000);
+    return () => { stopped = true; clearInterval(interval); };
+  }, [currentRole]);
 
   const fetchNotifications = async ({ force = false } = {}) => {
     const now = Date.now();
@@ -347,7 +406,7 @@ const AdminLayout = ({ children }) => {
 
   const getNotificationBookingCode = (notification) => {
     const text = `${notification.title || ""} ${notification.content || ""}`;
-    return text.match(/\b(?:BILL|REC)_[A-Z0-9]+\b/i)?.[0]?.toUpperCase() || "";
+    return text.match(/\b(?:BILL|REC|LTB)_[A-Z0-9]+\b/i)?.[0]?.toUpperCase() || "";
   };
 
   const handleMarkNotificationRead = async (notification) => {
@@ -371,21 +430,10 @@ const AdminLayout = ({ children }) => {
 
     const bookingCode = getNotificationBookingCode(notification);
 
-    if (bookingCode.startsWith("REC_")) {
-      navigate("/admin/bookings/recurring", {
-        state: { notificationBookingCode: bookingCode },
-      });
-      return;
-    }
-
-    if (bookingCode.startsWith("BILL_")) {
-      navigate("/admin/bookings/single", {
-        state: { notificationBookingCode: bookingCode },
-      });
-      return;
-    }
-
-    navigate("/admin/bookings/single");
+    const prefix = Object.keys(BOOKING_CODE_ROUTES).find((p) => bookingCode.startsWith(p));
+    navigate(prefix ? BOOKING_CODE_ROUTES[prefix] : "/admin/bookings/single", {
+      state: { notificationBookingCode: bookingCode },
+    });
   };
 
   const handleMarkAllNotificationsRead = async () => {
@@ -419,7 +467,7 @@ const AdminLayout = ({ children }) => {
           <button
             type="button"
             onClick={() => navigate(getAdminHomeByRole(currentRole))}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-lime-400 text-sm font-black tracking-tight text-slate-950 shadow-lg shadow-lime-500/20"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-400 to-emerald-600 text-sm font-black tracking-tight text-white shadow-lg shadow-emerald-500/20"
             title="NH Badminton"
           >
             NH
@@ -430,7 +478,7 @@ const AdminLayout = ({ children }) => {
               <p className="truncate text-sm font-bold leading-tight">
                 NH Badminton
               </p>
-              <p className="mt-0.5 truncate text-[10px] font-semibold uppercase tracking-[0.18em] text-lime-300">
+                <p className="mt-0.5 truncate text-[10px] font-semibold uppercase tracking-[0.18em] text-emerald-400">
                 Admin workspace
               </p>
             </div>
@@ -468,17 +516,17 @@ const AdminLayout = ({ children }) => {
                       type="button"
                       title={!isExpanded ? item.name : undefined}
                       onClick={() => handleNavigate(item.path)}
-                      className={`group relative flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold transition-all ${
+                      className={`group relative flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold transition-all duration-200 ${
                         isActive
-                          ? "bg-white text-slate-950 shadow-lg shadow-black/10"
-                          : "text-slate-400 hover:bg-white/8 hover:text-white"
+                          ? "bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/25"
+                          : "text-slate-400 hover:bg-white/5 hover:text-white"
                       } ${!isExpanded ? "justify-center" : ""}`}
                     >
                       <span
                         className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors ${
                           isActive
-                            ? "bg-lime-400 text-slate-950"
-                            : "bg-white/5 text-slate-400 group-hover:bg-white/10 group-hover:text-lime-300"
+                            ? "bg-white/20 text-white"
+                            : "bg-white/5 text-slate-400 group-hover:bg-white/10 group-hover:text-emerald-400"
                         }`}
                       >
                         <Icon className="h-4.5 w-4.5" />
@@ -510,9 +558,17 @@ const AdminLayout = ({ children }) => {
               !isExpanded ? "justify-center" : ""
             }`}
           >
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-lime-300 to-emerald-400 text-xs font-black text-slate-950">
-              {getInitials(adminUser?.full_name)}
-            </div>
+            {adminUser?.avatar_url ? (
+              <img
+                src={adminUser.avatar_url}
+                alt={adminUser.full_name}
+                className="h-10 w-10 shrink-0 rounded-xl object-cover"
+              />
+            ) : (
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-400 to-teal-500 text-xs font-black text-white">
+                {getInitials(adminUser?.full_name)}
+              </div>
+            )}
 
             {isExpanded && (
               <div className="min-w-0">
@@ -541,6 +597,27 @@ const AdminLayout = ({ children }) => {
       </aside>
     );
   };
+
+  if (currentRole === "staff") {
+    if (shiftStatus === null) {
+      return (
+        <div className="flex min-h-screen items-center justify-center bg-[#f4f6f8]">
+          <div className="text-center">
+            <div className="inline-block h-8 w-8 animate-spin rounded-full border-2 border-zinc-300 border-t-emerald-500 mb-3" />
+            <p className="text-xs text-zinc-400">Đang kiểm tra ca làm...</p>
+          </div>
+        </div>
+      );
+    }
+    if (!shiftStatus.is_on_shift) {
+      return (
+        <MySchedule
+          upcomingShifts={shiftStatus.upcoming_shifts ?? []}
+          staffName={adminUser?.full_name ?? ""}
+        />
+      );
+    }
+  }
 
   return (
     <div className="admin-shell flex min-h-screen bg-[#f4f6f8] text-slate-900">
@@ -603,7 +680,7 @@ const AdminLayout = ({ children }) => {
                 <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">
                   <span>{activeGroup?.label || "Admin"}</span>
                   <ChevronLeft className="h-3 w-3 rotate-180" />
-                  <span className="truncate text-lime-700">NH Badminton</span>
+                  <span className="truncate text-emerald-600">NH Badminton</span>
                 </div>
                 <h1 className="mt-0.5 truncate text-lg font-black tracking-tight text-slate-950">
                   {activeItem.name}
@@ -652,7 +729,7 @@ const AdminLayout = ({ children }) => {
                           <button
                             type="button"
                             onClick={handleMarkAllNotificationsRead}
-                            className="rounded-lg px-2 py-1 text-[11px] font-bold text-lime-700 hover:bg-lime-50"
+                            className="rounded-lg px-2 py-1 text-[11px] font-bold text-emerald-600 hover:bg-emerald-50"
                           >
                             Đọc tất cả
                           </button>
@@ -681,7 +758,7 @@ const AdminLayout = ({ children }) => {
                                 handleMarkNotificationRead(notification)
                               }
                               className={`block w-full border-b border-slate-100 px-4 py-3 text-left transition-colors last:border-b-0 hover:bg-slate-50 ${
-                                notification.is_read ? "bg-white" : "bg-lime-50/60"
+                                notification.is_read ? "bg-white" : "bg-emerald-50/60"
                               }`}
                             >
                               <div className="flex items-start gap-3">
@@ -689,7 +766,7 @@ const AdminLayout = ({ children }) => {
                                   className={`mt-1 h-2 w-2 shrink-0 rounded-full ${
                                     notification.is_read
                                       ? "bg-slate-200"
-                                      : "bg-lime-500"
+                                      : "bg-emerald-500"
                                   }`}
                                 />
                                 <span className="min-w-0 flex-1">

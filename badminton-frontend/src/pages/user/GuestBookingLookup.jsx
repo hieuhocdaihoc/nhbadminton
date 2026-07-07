@@ -19,40 +19,40 @@ const currency = (value) => `${Number(value || 0).toLocaleString("vi-VN")} đ`;
 const statusMap = {
   pending: {
     label: "Chờ xác nhận",
-    className: "bg-amber-500/10 text-amber-300 border-amber-500/20",
+    className: "user-badge-warning",
   },
   confirmed: {
     label: "Đã xác nhận",
-    className: "bg-sky-500/10 text-sky-300 border-sky-500/20",
+    className: "user-badge-info",
   },
   completed: {
     label: "Hoàn thành",
-    className: "bg-emerald-500/10 text-emerald-300 border-emerald-500/20",
+    className: "user-badge-success",
   },
   cancelled: {
     label: "Đã hủy",
-    className: "bg-red-500/10 text-red-300 border-red-500/20",
+    className: "user-badge-danger",
   },
 };
 
 const paymentMap = {
   unpaid: {
     label: "Chưa thanh toán",
-    className: "bg-amber-500/10 text-amber-300 border-amber-500/20",
+    className: "user-badge-warning",
   },
   partially_paid: {
     label: "Thanh toán một phần",
-    className: "bg-sky-500/10 text-sky-300 border-sky-500/20",
+    className: "user-badge-info",
   },
   paid: {
     label: "Đã thanh toán",
-    className: "bg-emerald-500/10 text-emerald-300 border-emerald-500/20",
+    className: "user-badge-success",
   },
 };
 
 const Pill = ({ item }) => (
   <span
-    className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-bold ${item.className}`}
+    className={`user-badge ${item.className}`}
   >
     {item.label}
   </span>
@@ -103,7 +103,7 @@ const GuestBookingLookup = () => {
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
       <section className="border-b border-zinc-800/70 bg-[radial-gradient(circle_at_top_left,rgba(132,204,22,0.18),transparent_34%),linear-gradient(135deg,#09090b_0%,#18181b_55%,#0f172a_100%)]">
-        <div className="mx-auto grid max-w-6xl gap-8 px-4 py-12 sm:px-6 lg:grid-cols-[0.95fr_1.05fr] lg:px-8 lg:py-16">
+        <div className="user-page-container grid gap-8 py-12 lg:grid-cols-[0.95fr_1.05fr] lg:py-16">
           <motion.div
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
@@ -128,7 +128,7 @@ const GuestBookingLookup = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.08 }}
             onSubmit={handleSubmit}
-            className="rounded-2xl border border-zinc-800 bg-zinc-900/80 p-5 shadow-2xl shadow-black/30 backdrop-blur"
+            className="user-card-glass"
           >
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="block">
@@ -141,7 +141,7 @@ const GuestBookingLookup = () => {
                   value={form.booking_code}
                   onChange={handleChange}
                   placeholder="VD: BILL_AB12CD"
-                  className="h-12 w-full rounded-xl border border-zinc-700 bg-zinc-950 px-4 text-sm font-bold text-white outline-none transition focus:border-lime-400"
+                  className="user-input"
                   required
                 />
               </label>
@@ -155,7 +155,7 @@ const GuestBookingLookup = () => {
                   value={form.customer_phone}
                   onChange={handleChange}
                   placeholder="VD: 0901234567"
-                  className="h-12 w-full rounded-xl border border-zinc-700 bg-zinc-950 px-4 text-sm font-bold text-white outline-none transition focus:border-lime-400"
+                  className="user-input"
                   required
                 />
               </label>
@@ -163,7 +163,7 @@ const GuestBookingLookup = () => {
             <button
               type="submit"
               disabled={isLoading}
-              className="mt-5 inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-lime-500 px-5 text-sm font-black uppercase tracking-wide text-zinc-950 transition hover:bg-lime-400 disabled:cursor-not-allowed disabled:opacity-60"
+              className="user-btn-primary w-full mt-5"
             >
               {isLoading ? (
                 <Loader2 className="h-5 w-5 animate-spin" />
@@ -181,7 +181,7 @@ const GuestBookingLookup = () => {
         </div>
       </section>
 
-      <section className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
+      <section className="user-page-container py-8">
         {!booking ? (
           <div className="rounded-2xl border border-dashed border-zinc-800 bg-zinc-900/35 px-6 py-16 text-center">
             <FileSearch className="mx-auto h-10 w-10 text-zinc-700" />
@@ -195,7 +195,7 @@ const GuestBookingLookup = () => {
             animate={{ opacity: 1, y: 0 }}
             className="grid gap-5 lg:grid-cols-[1.25fr_0.75fr]"
           >
-            <div className="rounded-2xl border border-zinc-800 bg-zinc-900/55 p-5">
+            <div className="user-card-glass p-6">
               <div className="flex flex-col gap-3 border-b border-zinc-800 pb-5 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <p className="text-xs font-bold uppercase tracking-wide text-zinc-500">
@@ -314,7 +314,7 @@ const GuestBookingLookup = () => {
               )}
             </div>
 
-            <aside className="rounded-2xl border border-zinc-800 bg-zinc-900/55 p-5">
+            <aside className="user-card-glass p-6">
               <div className="mb-5 flex items-center gap-2">
                 <WalletCards className="h-5 w-5 text-lime-300" />
                 <h3 className="text-sm font-black uppercase tracking-wide text-zinc-300">

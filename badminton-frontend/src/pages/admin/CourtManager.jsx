@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { adminCourtService } from "../../services/admin/courtService";
+import { Grid3X3 } from "lucide-react";
+import EmptyState from "../../components/admin/EmptyState";
+import LoadingSpinner from "../../components/admin/LoadingSpinner";
 
 const CourtManager = () => {
   const [courts, setCourts] = useState([]);
@@ -118,39 +121,39 @@ const CourtManager = () => {
   const maintenanceCourts = totalCourts - activeCourts;
 
   const inputClass =
-    "w-full bg-[#f8f8fa] border border-zinc-200 rounded-lg px-3.5 py-2.5 text-sm text-zinc-800 outline-none focus:border-zinc-400 focus:ring-1 focus:ring-zinc-200 transition-all";
+    "admin-input";
 
   return (
-    <div className="max-w-[1400px] mx-auto space-y-5">
-      {/* HEADER + STATS */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <div className="admin-page-container">
+      {/* TIÊU ĐỀ + THỐNG KÊ */}
+      <div className="admin-page-header">
         <div>
-          <h2 className="text-base font-semibold text-zinc-800">Quản lý sân</h2>
-          <p className="text-xs text-zinc-400 mt-0.5">
+          <h2 className="admin-page-title">Quản lý sân</h2>
+          <p className="admin-page-subtitle">
             Cơ sở vật chất, thảm trải và đèn chiếu sáng
           </p>
         </div>
         <div className="flex gap-2.5">
-          <div className="bg-white border border-zinc-200/60 px-4 py-2 rounded-lg text-center min-w-[70px]">
-            <p className="text-lg font-bold text-zinc-800">{totalCourts}</p>
-            <p className="text-[10px] text-zinc-400 uppercase">Tổng sân</p>
+          <div className="admin-stat-badge badge-default">
+            <p className="admin-stat-value val-default">{totalCourts}</p>
+            <p className="admin-stat-label lbl-default">Tổng sân</p>
           </div>
-          <div className="bg-emerald-50 border border-emerald-200/60 px-4 py-2 rounded-lg text-center min-w-[70px]">
-            <p className="text-lg font-bold text-emerald-600">{activeCourts}</p>
-            <p className="text-[10px] text-emerald-500 uppercase">Sẵn sàng</p>
+          <div className="admin-stat-badge badge-success">
+            <p className="admin-stat-value val-success">{activeCourts}</p>
+            <p className="admin-stat-label lbl-success">Sẵn sàng</p>
           </div>
           {maintenanceCourts > 0 && (
-            <div className="bg-red-50 border border-red-200/60 px-4 py-2 rounded-lg text-center min-w-[70px]">
-              <p className="text-lg font-bold text-red-500">
+            <div className="admin-stat-badge badge-danger">
+              <p className="admin-stat-value val-danger">
                 {maintenanceCourts}
               </p>
-              <p className="text-[10px] text-red-400 uppercase">Bảo trì</p>
+              <p className="admin-stat-label lbl-danger">Bảo trì</p>
             </div>
           )}
         </div>
       </div>
 
-      {/* TOAST */}
+      {/* THÔNG BÁO (TOAST) */}
       <AnimatePresence>
         {message.text && (
           <motion.div
@@ -164,35 +167,36 @@ const CourtManager = () => {
         )}
       </AnimatePresence>
 
-      {/* TOOLBAR */}
-      <div className="bg-white rounded-xl border border-zinc-200/60 p-4 flex justify-between items-center">
+      {/* THANH CÔNG CỤ */}
+      <div className="admin-card p-4 flex justify-between items-center">
         <p className="text-xs text-zinc-500">{totalCourts} sân đang quản lý</p>
         <button
           onClick={handleOpenCreate}
-          className="px-4 py-2 bg-zinc-900 hover:bg-zinc-800 text-white rounded-lg text-xs font-medium transition-colors"
+          className="admin-btn-primary"
         >
           + Thêm sân mới
         </button>
       </div>
 
-      {/* COURT GRID */}
+      {/* LƯỚI SÂN */}
       {isLoading ? (
-        <div className="bg-white rounded-xl border border-zinc-200/60 p-16 text-center">
-          <div className="inline-block w-6 h-6 border-2 border-zinc-300 border-t-zinc-600 rounded-full animate-spin mb-3" />
-          <p className="text-xs text-zinc-400">Đang tải...</p>
+        <div className="admin-card border-none">
+          <LoadingSpinner label="Đang tải..." />
         </div>
       ) : courts.length === 0 ? (
-        <div className="bg-white rounded-xl border border-zinc-200/60 p-16 text-center">
-          <p className="text-3xl mb-2 opacity-30">🏸</p>
-          <p className="text-sm text-zinc-400">
-            Chưa có sân nào trong hệ thống
-          </p>
-          <button
-            onClick={handleOpenCreate}
-            className="mt-4 px-4 py-2 bg-zinc-900 text-white rounded-lg text-xs font-medium hover:bg-zinc-800 transition-colors"
-          >
-            Thêm sân đầu tiên
-          </button>
+        <div className="admin-card border-none">
+          <EmptyState
+            icon={Grid3X3}
+            title="Chưa có sân nào trong hệ thống"
+            action={
+              <button
+                onClick={handleOpenCreate}
+                className="admin-btn-secondary px-4 py-2"
+              >
+                Thêm sân đầu tiên
+              </button>
+            }
+          />
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -204,15 +208,15 @@ const CourtManager = () => {
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.04 }}
-                className={`bg-white rounded-xl border overflow-hidden transition-all group ${isActive ? "border-zinc-200/60 hover:border-zinc-300" : "border-zinc-200/60 opacity-60"}`}
+                className={`admin-card overflow-hidden group ${isActive ? "border-zinc-200/60 hover:border-zinc-300" : "border-zinc-200/60 opacity-60"}`}
               >
-                {/* Color strip */}
+                {/* Dải màu */}
                 <div
-                  className={`h-1 ${isActive ? "bg-lime-500" : "bg-zinc-300"}`}
+                  className={`h-1 ${isActive ? "bg-emerald-500" : "bg-zinc-300"}`}
                 />
 
                 <div className="p-5">
-                  {/* Header */}
+                  {/* TIÊU ĐỀ */}
                   <div className="flex items-start justify-between gap-2 mb-4">
                     <div>
                       <span className="text-[10px] font-mono text-zinc-400">
@@ -232,7 +236,7 @@ const CourtManager = () => {
                     </span>
                   </div>
 
-                  {/* Details */}
+                  {/* Chi tiết */}
                   <div className="space-y-2.5 text-xs border-t border-zinc-100 pt-4">
                     <div className="flex justify-between">
                       <span className="text-zinc-400">Bề mặt</span>
@@ -254,17 +258,17 @@ const CourtManager = () => {
                     </div>
                   </div>
 
-                  {/* Actions */}
+                  {/* Hành động */}
                   <div className="mt-4 pt-3 border-t border-zinc-100 flex items-center justify-end gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                     <button
                       onClick={() => handleOpenEdit(court)}
-                      className="px-3 py-1.5 text-zinc-500 hover:bg-zinc-100 text-[11px] font-medium rounded-lg transition-colors"
+                      className="admin-btn-outline"
                     >
                       Chỉnh sửa
                     </button>
                     <button
                       onClick={() => handleDeleteCourt(court.id, court.name)}
-                      className="px-3 py-1.5 text-zinc-400 hover:text-red-500 hover:bg-red-50 text-[11px] font-medium rounded-lg transition-colors"
+                      className="admin-btn-danger"
                     >
                       Xóa
                     </button>
@@ -276,21 +280,21 @@ const CourtManager = () => {
         </div>
       )}
 
-      {/* MODAL */}
+      {/* CỬA SỔ (MODAL) */}
       <AnimatePresence>
         {isModalOpen && (
           <div
             onClick={() => setIsModalOpen(false)}
-            className="fixed inset-0 z-50 bg-black/30 backdrop-blur-sm flex items-center justify-center p-4"
+            className="admin-modal-overlay"
           >
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
               onClick={(e) => e.stopPropagation()}
-              className="bg-white w-full max-w-md rounded-2xl shadow-xl overflow-hidden"
+              className="admin-modal-content"
             >
-              <div className="px-6 py-5 border-b border-zinc-100 flex items-center justify-between">
+              <div className="admin-modal-header">
                 <div>
                   <h4 className="text-sm font-semibold text-zinc-800">
                     {modalMode === "create"
@@ -310,7 +314,7 @@ const CourtManager = () => {
               </div>
               <form onSubmit={handleSubmitForm} className="p-6 space-y-4">
                 <div>
-                  <label className="block text-[11px] font-medium text-zinc-500 mb-1.5">
+                  <label className="admin-form-label">
                     Tên sân *
                   </label>
                   <input
@@ -324,7 +328,7 @@ const CourtManager = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-medium text-zinc-500 mb-1.5">
+                  <label className="admin-form-label">
                     Mã tra cứu *
                   </label>
                   <input
@@ -339,7 +343,7 @@ const CourtManager = () => {
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-[11px] font-medium text-zinc-500 mb-1.5">
+                    <label className="admin-form-label">
                       Loại thảm
                     </label>
                     <input
@@ -352,7 +356,7 @@ const CourtManager = () => {
                     />
                   </div>
                   <div>
-                    <label className="block text-[11px] font-medium text-zinc-500 mb-1.5">
+                    <label className="admin-form-label">
                       Sức chứa
                     </label>
                     <input
@@ -366,13 +370,35 @@ const CourtManager = () => {
                   </div>
                 </div>
                 <div className="flex items-center justify-between py-1">
+                  <span className="text-xs text-zinc-600">Hệ thống đèn chiếu sáng</span>
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, has_lighting: !formData.has_lighting })}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${formData.has_lighting ? "bg-zinc-900" : "bg-zinc-300"}`}
+                  >
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${formData.has_lighting ? "translate-x-6" : "translate-x-1"}`} />
+                  </button>
+                </div>
+                <div>
+                  <label className="admin-form-label">
+                    Vị trí trong trung tâm
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="VD: Khu A - Tầng 1, Cụm sân chính..."
+                    value={formData.location_note}
+                    onChange={(e) => setFormData({ ...formData, location_note: e.target.value })}
+                    className={inputClass}
+                  />
+                </div>
+                <div className="flex items-center justify-between py-1">
                   <span className="text-xs text-zinc-600">Trạng thái</span>
                   <select
                     value={formData.status}
                     onChange={(e) =>
                       setFormData({ ...formData, status: e.target.value })
                     }
-                    className="bg-[#f8f8fa] border border-zinc-200 rounded-lg text-xs px-3 py-2 text-zinc-700 outline-none focus:border-zinc-400 transition-colors"
+                    className="admin-input"
                   >
                     <option value="active">Hoạt động</option>
                     <option value="inactive">Bảo trì</option>
@@ -382,14 +408,14 @@ const CourtManager = () => {
                   <button
                     type="button"
                     onClick={() => setIsModalOpen(false)}
-                    className="flex-1 py-2.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-600 rounded-lg text-xs font-medium transition-colors"
+                    className="admin-btn-outline flex-1 py-2.5 text-xs font-medium"
                   >
                     Hủy
                   </button>
                   <button
                     type="submit"
                     disabled={isSaving}
-                    className={`flex-1 py-2.5 bg-zinc-900 hover:bg-zinc-800 text-white rounded-lg text-xs font-medium transition-colors ${isSaving ? "opacity-60" : ""}`}
+                    className="admin-btn-secondary flex-1 py-2.5 text-xs font-medium disabled:opacity-60"
                   >
                     {isSaving ? "Đang lưu..." : "Lưu dữ liệu"}
                   </button>

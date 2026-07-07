@@ -33,6 +33,11 @@ const TodayBookings = () => {
   const [itemRows, setItemRows] = useState([{ ...emptyItemRow }]);
   const [isAddingItem, setIsAddingItem] = useState(false);
 
+  const [checkInModal, setCheckInModal] = useState({ isOpen: false, booking: null });
+  const [checkInForm, setCheckInForm] = useState({ phone: "", booking_code: "" });
+  const [checkInError, setCheckInError] = useState("");
+  const [isCheckingIn, setIsCheckingIn] = useState(false);
+
   const todayFormatted = new Date().toLocaleDateString("vi-VN", {
     weekday: "long",
     year: "numeric",
@@ -173,13 +178,49 @@ const TodayBookings = () => {
   const handleUpdatePayment = async (id, payment_status) => {
     try {
       setMessage({ type: "", text: "" });
-
       await adminBookingService.updatePayment(id, { payment_status });
+      setMessage({ type: "success", text: "✓ Cập nhật thanh toán thành công!" });
+      fetchTodayData();
+    } catch (error) {
+      alert(error.response?.data?.message || "Thao tác thất bại!");
+    }
+  };
 
-      setMessage({
-        type: "success",
-        text: "✓ Cập nhật thanh toán thành công!",
+  const openCheckInModal = (booking) => {
+    setCheckInModal({ isOpen: true, booking });
+    setCheckInForm({ phone: "", booking_code: "" });
+    setCheckInError("");
+  };
+
+  const handleCheckIn = async (e) => {
+    e.preventDefault();
+    setCheckInError("");
+    if (!checkInForm.phone.trim() || !checkInForm.booking_code.trim()) {
+      setCheckInError("Vui lòng nhập đầy đủ số điện thoại và mã đơn.");
+      return;
+    }
+    setIsCheckingIn(true);
+    try {
+      await adminBookingService.checkIn(checkInModal.booking.id, {
+        phone: checkInForm.phone.trim(),
+        booking_code: checkInForm.booking_code.trim(),
       });
+      setCheckInModal({ isOpen: false, booking: null });
+      setMessage({ type: "success", text: "✓ Check-in thành công! Khách đã vào sân." });
+      fetchTodayData();
+    } catch (error) {
+      setCheckInError(error.response?.data?.message || "Check-in thất bại. Vui lòng thử lại.");
+    } finally {
+      setIsCheckingIn(false);
+    }
+  };
+
+  const handleCheckout = async (id) => {
+    if (!window.confirm("Xác nhận thu tiền và hoàn thành ca chơi này?")) return;
+    try {
+      setMessage({ type: "", text: "" });
+      await adminBookingService.checkout(id);
+      setMessage({ type: "success", text: "✓ Thu tiền và hoàn thành thành công!" });
       fetchTodayData();
     } catch (error) {
       alert(error.response?.data?.message || "Thao tác thất bại!");
@@ -251,7 +292,7 @@ const TodayBookings = () => {
       alert(error.response?.data?.message || "Có lỗi xảy ra khi thêm món!");
     } finally {
       setIsAddingItem(false);
-      setTimeout(() => setMessage({ type: "", text: "" }), 3000);
+      setTimeout(() => setMessage({ type: "", text: "" }), 2500);
     }
   };
 
@@ -340,7 +381,7 @@ const TodayBookings = () => {
   ).length;
 
   const inputClass =
-    "w-full bg-[#f8f8fa] border border-zinc-200 rounded-lg px-3.5 py-2.5 text-sm text-zinc-800 outline-none focus:border-zinc-400 focus:ring-1 focus:ring-zinc-200 transition-all";
+    "admin-input";
 
   const filterTabs = [
     { key: "all", label: "Tất cả", count: filteredBookings.length },
@@ -350,22 +391,22 @@ const TodayBookings = () => {
   ];
 
   return (
-    <div className="max-w-[1400px] mx-auto space-y-5">
-      {/* HEADER */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <div className="admin-page-container">
+      {/* TIÊU ĐỀ */}
+      <div className="admin-page-header">
         <div>
-          <h2 className="text-base font-semibold text-zinc-800">
+          <h2 className="admin-page-title">
             Ca đấu hôm nay
           </h2>
-          <p className="text-xs text-zinc-400 mt-0.5">{todayFormatted}</p>
+          <p className="admin-page-subtitle">{todayFormatted}</p>
         </div>
 
         <div className="flex gap-2.5">
-          <div className="bg-white border border-zinc-200/60 px-4 py-2 rounded-lg text-center min-w-[70px]">
-            <p className="text-lg font-bold text-zinc-800">
+          <div className="admin-stat-badge badge-default">
+            <p className="admin-stat-value val-default">
               {filteredBookings.length}
             </p>
-            <p className="text-[10px] text-zinc-400 uppercase">Đang xem</p>
+            <p className="admin-stat-label lbl-default">Đang xem</p>
           </div>
 
           {(unpaidCount > 0 || partialCount > 0) && (
@@ -379,7 +420,7 @@ const TodayBookings = () => {
         </div>
       </div>
 
-      {/* TOAST */}
+      {/* THÔNG BÁO (TOAST) */}
       <AnimatePresence>
         {message.text && (
           <motion.div
@@ -397,8 +438,8 @@ const TodayBookings = () => {
         )}
       </AnimatePresence>
 
-      {/* TOOLBAR */}
-      <div className="bg-white rounded-xl border border-zinc-200/60 p-4">
+      {/* THANH CÔNG CỤ */}
+      <div className="admin-card p-4">
         <div className="flex flex-col xl:flex-row gap-3 justify-between items-start xl:items-center">
           <div className="flex flex-col sm:flex-row gap-3 w-full xl:w-auto">
             <div className="relative w-full sm:w-72">
@@ -418,14 +459,14 @@ const TodayBookings = () => {
                 placeholder="Tìm tên hoặc SĐT..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-lg text-xs text-zinc-700 outline-none focus:border-zinc-300 focus:bg-white transition-all"
+                className="admin-input pl-10 py-2.5"
               />
             </div>
 
             <select
               value={filterCourt}
               onChange={(e) => setFilterCourt(e.target.value)}
-              className="w-full sm:w-44 px-3 py-2.5 bg-zinc-50 border border-zinc-200 rounded-lg text-xs text-zinc-700 outline-none focus:border-zinc-300 focus:bg-white transition-all"
+              className="admin-input w-full sm:w-44 px-3 py-2.5 text-xs"
             >
               <option value="all">Tất cả sân</option>
 
@@ -469,17 +510,17 @@ const TodayBookings = () => {
 
       {/* TABLE */}
       {isLoading ? (
-        <div className="bg-white rounded-xl border border-zinc-200/60 p-16 text-center">
+        <div className="admin-card p-16 text-center">
           <div className="inline-block w-6 h-6 border-2 border-zinc-300 border-t-zinc-600 rounded-full animate-spin mb-3" />
           <p className="text-xs text-zinc-400">Đang tải...</p>
         </div>
       ) : filteredBookings.length === 0 ? (
-        <div className="bg-white rounded-xl border border-zinc-200/60 p-16 text-center">
+        <div className="admin-card p-16 text-center">
           <p className="text-3xl mb-2 opacity-30">📭</p>
           <p className="text-sm text-zinc-400">Không tìm thấy ca đấu nào</p>
         </div>
       ) : (
-        <div className="bg-white rounded-xl border border-zinc-200/60 overflow-hidden">
+        <div className="admin-card overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[1100px]">
               <thead>
@@ -541,7 +582,7 @@ const TodayBookings = () => {
                   );
                   const serviceAmount = Number(b.subtotal_service || 0);
                   const totalAmount = Number(b.total_price || 0);
-                  const paidAmount = Number(b.deposit_amount || 0);
+                  const paidAmount = totalAmount - Number(b.remaining_amount || 0);
                   const remainingAmount = Number(b.remaining_amount || 0);
 
                   const isOnlyProshopDebt =
@@ -579,7 +620,7 @@ const TodayBookings = () => {
                         </span>
 
                         {b._groupDetails?.length > 1 && (
-                          <p className="text-[10px] text-lime-600 font-semibold mt-0.5">
+                          <p className="text-[10px] text-emerald-600 font-semibold mt-0.5">
                             Gộp {b._groupDetails.length} khung liền nhau
                           </p>
                         )}
@@ -593,7 +634,7 @@ const TodayBookings = () => {
                         {!isCancelled && (
                           <button
                             onClick={() => openAddItemModal(b)}
-                            className="px-2.5 py-1 text-zinc-500 border border-dashed border-zinc-300 rounded text-[10px] hover:bg-zinc-50 hover:border-zinc-400 transition-colors"
+                            className="admin-btn-outline border-dashed px-2.5 py-1 text-[10px]"
                           >
                             + Thêm dịch vụ sử dụng
                           </button>
@@ -651,9 +692,9 @@ const TodayBookings = () => {
                               ✓ Đã thu đủ
                             </p>
                           ) : isOnlyProshopDebt ? (
-                            <p className="text-[10px] font-bold text-violet-600">
-                              Còn thu Pro-shop
-                            </p>
+                            <div className="admin-debt-alert">
+                              <span>⚠ Nợ Pro-shop</span>
+                            </div>
                           ) : b.payment_status === "partially_paid" ? (
                             <p className="text-[10px] font-bold text-amber-600">
                               ⚠ Thanh toán một phần
@@ -681,7 +722,7 @@ const TodayBookings = () => {
                         <div className="flex items-center justify-end gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                           <button
                             onClick={() => handleOpenBill(b)}
-                            className="px-2.5 py-1 border border-zinc-200 text-zinc-500 rounded text-[10px] hover:bg-zinc-50 transition-colors"
+                            className="admin-btn-outline px-2.5 py-1 text-[10px]"
                             title="Xem Bill"
                           >
                             🧾 Bill
@@ -689,10 +730,8 @@ const TodayBookings = () => {
 
                           {b.status === "pending" && (
                             <button
-                              onClick={() =>
-                                handleUpdateStatus(b.id, "confirmed")
-                              }
-                              className="px-2.5 py-1 bg-zinc-900 text-white rounded text-[10px] font-medium hover:bg-zinc-800 transition-colors"
+                              onClick={() => handleUpdateStatus(b.id, "confirmed")}
+                              className="admin-btn-secondary px-2.5 py-1 text-[10px] font-medium"
                             >
                               Duyệt
                             </button>
@@ -700,10 +739,8 @@ const TodayBookings = () => {
 
                           {b.status === "confirmed" && (
                             <button
-                              onClick={() =>
-                                handleUpdateStatus(b.id, "playing")
-                              }
-                              className="px-2.5 py-1 bg-violet-600 text-white rounded text-[10px] font-medium hover:bg-violet-700 transition-colors"
+                              onClick={() => openCheckInModal(b)}
+                              className="admin-btn-primary px-2.5 py-1 text-[10px] font-medium"
                             >
                               Check-in
                             </button>
@@ -712,33 +749,24 @@ const TodayBookings = () => {
                           {b.payment_status !== "paid" && !isCancelled && (
                             <button
                               onClick={() => handleUpdatePayment(b.id, "paid")}
-                              className="px-2.5 py-1 bg-lime-600 text-white rounded text-[10px] font-medium hover:bg-lime-700 transition-colors"
+                              className="admin-btn-primary px-2.5 py-1 text-[10px] font-medium"
                             >
-                              {isOnlyProshopDebt
-                                ? "Thu Pro-shop"
-                                : b.payment_status === "partially_paid"
-                                  ? "Thu phần còn lại"
-                                  : "Thu tiền"}
+                              Thu tiền
                             </button>
                           )}
 
-                          {["playing", "confirmed"].includes(b.status) &&
-                            b.payment_status === "paid" && (
-                              <button
-                                onClick={() => {
-                                  if (
-                                    window.confirm(
-                                      "Xác nhận hoàn thành ca chơi này?",
-                                    )
-                                  ) {
-                                    handleUpdateStatus(b.id, "completed");
-                                  }
-                                }}
-                                className="px-2.5 py-1 bg-emerald-600 text-white rounded text-[10px] font-medium hover:bg-emerald-700 transition-colors"
-                              >
-                                Hoàn thành
-                              </button>
-                            )}
+                          {b.payment_status === "paid" && !isCancelled && b.status !== "completed" && (
+                            <button
+                              onClick={() => {
+                                if (window.confirm("Xác nhận hoàn thành ca chơi này?")) {
+                                  handleUpdateStatus(b.id, "completed");
+                                }
+                              }}
+                              className="admin-btn-primary px-2.5 py-1 text-[10px] font-medium"
+                            >
+                              Hoàn thành
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -754,7 +782,7 @@ const TodayBookings = () => {
       <AnimatePresence>
         {addItemModal.isOpen && (
           <div
-            className="fixed inset-0 z-50 bg-black/30 backdrop-blur-sm flex items-center justify-center p-4"
+            className="admin-modal-overlay"
             onClick={handleCloseAddItemModal}
           >
             <motion.div
@@ -762,14 +790,14 @@ const TodayBookings = () => {
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
               onClick={(e) => e.stopPropagation()}
-              className="bg-white w-full max-w-2xl rounded-2xl shadow-xl overflow-hidden"
+              className="admin-modal-content max-w-2xl"
             >
-              <div className="px-6 py-5 border-b border-zinc-100">
+              <div className="admin-modal-header p-6 border-b border-zinc-100">
                 <h3 className="text-sm font-semibold text-zinc-800">
                   Bán thêm dịch vụ / sản phẩm
                 </h3>
 
-                <p className="text-xs text-zinc-400 mt-0.5">
+                <p className="admin-page-subtitle">
                   Khách:{" "}
                   <span className="text-zinc-600">
                     {addItemModal.booking?.customer_name}
@@ -790,7 +818,7 @@ const TodayBookings = () => {
                     <button
                       type="button"
                       onClick={handleAddItemRow}
-                      className="text-[11px] font-medium text-lime-600 hover:text-lime-700"
+                      className="text-[11px] font-medium text-emerald-600 hover:text-emerald-700"
                     >
                       + Thêm dòng
                     </button>
@@ -853,7 +881,7 @@ const TodayBookings = () => {
                           )}
 
                           {services.length > 0 && (
-                            <optgroup label="🏸 Dịch vụ">
+                            <optgroup label="Dịch vụ">
                               {services.map((s) => (
                                 <option
                                   key={`s_${s.id}`}
@@ -870,7 +898,7 @@ const TodayBookings = () => {
 
                       <div className="grid grid-cols-2 gap-3">
                         <div>
-                          <label className="block text-[11px] font-medium text-zinc-500 mb-1.5">
+                          <label className="admin-form-label">
                             Số lượng
                           </label>
 
@@ -891,7 +919,7 @@ const TodayBookings = () => {
                         </div>
 
                         <div>
-                          <label className="block text-[11px] font-medium text-zinc-500 mb-1.5">
+                          <label className="admin-form-label">
                             Ghi chú
                           </label>
 
@@ -914,7 +942,7 @@ const TodayBookings = () => {
                   <button
                     type="button"
                     onClick={handleCloseAddItemModal}
-                    className="flex-1 py-2.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-600 rounded-lg text-xs font-medium transition-colors"
+                    className="admin-btn-outline flex-1 py-2.5 text-xs font-medium"
                   >
                     Hủy
                   </button>
@@ -922,7 +950,7 @@ const TodayBookings = () => {
                   <button
                     type="submit"
                     disabled={isAddingItem}
-                    className="flex-1 py-2.5 bg-zinc-900 hover:bg-zinc-800 text-white rounded-lg text-xs font-medium transition-colors disabled:opacity-60"
+                    className="admin-btn-secondary flex-1 py-2.5 text-xs font-medium disabled:opacity-60"
                   >
                     {isAddingItem
                       ? "Đang thêm..."
@@ -940,7 +968,7 @@ const TodayBookings = () => {
         {isBillModalOpen && selectedBill && (
           <div
             onClick={() => setIsBillModalOpen(false)}
-            className="fixed inset-0 z-50 bg-black/30 backdrop-blur-sm flex items-center justify-center p-4"
+            className="admin-modal-overlay"
           >
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
@@ -1110,18 +1138,95 @@ const TodayBookings = () => {
               <div className="flex gap-2 font-sans print:hidden">
                 <button
                   onClick={() => setIsBillModalOpen(false)}
-                  className="flex-1 py-2.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-600 rounded-lg text-xs font-medium transition-colors"
+                  className="admin-btn-outline flex-1 py-2.5 text-xs font-medium"
                 >
                   Đóng
                 </button>
 
                 <button
                   onClick={() => alert("Kết nối máy in...")}
-                  className="flex-1 py-2.5 bg-zinc-900 hover:bg-zinc-800 text-white rounded-lg text-xs font-medium transition-colors"
+                  className="admin-btn-secondary flex-1 py-2.5 text-xs font-medium"
                 >
                   🖨️ In Bill
                 </button>
               </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ── CỬA SỔ NHẬN SÂN (CHECK-IN) ── */}
+      <AnimatePresence>
+        {checkInModal.isOpen && (
+          <div className="admin-modal-overlay">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="admin-modal-content max-w-sm p-6"
+            >
+              <div className="flex items-center gap-3 mb-5">
+                <div className="w-10 h-10 rounded-full bg-violet-100 flex items-center justify-center">
+                  <svg className="w-5 h-5 text-violet-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="font-semibold text-zinc-800 text-sm">Xác nhận Check-in</h3>
+                  <p className="text-xs text-zinc-500">Sân {checkInModal.booking?.court_name} · {checkInModal.booking?.customer_name || "Khách vãng lai"}</p>
+                </div>
+              </div>
+
+              <form onSubmit={handleCheckIn} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-medium text-zinc-600 mb-1.5">
+                    Số điện thoại khách
+                  </label>
+                  <input
+                    type="tel"
+                    placeholder="Nhập SĐT của khách"
+                    value={checkInForm.phone}
+                    onChange={(e) => setCheckInForm({ ...checkInForm, phone: e.target.value })}
+                    className="admin-input w-full px-3 py-2.5 text-sm"
+                    autoFocus
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-zinc-600 mb-1.5">
+                    Mã đơn đặt sân
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="VD: BK-20240624-001"
+                    value={checkInForm.booking_code}
+                    onChange={(e) => setCheckInForm({ ...checkInForm, booking_code: e.target.value })}
+                    className="admin-input w-full px-3 py-2.5 text-sm font-mono"
+                  />
+                </div>
+
+                {checkInError && (
+                  <div className="bg-red-50 border border-red-200 text-red-700 text-xs rounded-lg px-3 py-2.5">
+                    ⚠ {checkInError}
+                  </div>
+                )}
+
+                <div className="flex gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setCheckInModal({ isOpen: false, booking: null })}
+                    className="admin-btn-outline flex-1 py-2.5 text-sm font-medium"
+                  >
+                    Hủy
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isCheckingIn}
+                    className="admin-btn-primary bg-violet-600 hover:bg-violet-700 border-transparent text-white flex-1 py-2.5 text-sm font-medium disabled:opacity-60"
+                  >
+                    {isCheckingIn ? "Đang xác minh..." : "Xác nhận Check-in"}
+                  </button>
+                </div>
+              </form>
             </motion.div>
           </div>
         )}

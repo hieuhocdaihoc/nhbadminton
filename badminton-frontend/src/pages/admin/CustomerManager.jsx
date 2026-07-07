@@ -220,21 +220,21 @@ const CustomerManager = () => {
     "w-full bg-[#f8f8fa] border border-zinc-200 rounded-lg px-3.5 py-2 text-sm text-zinc-800 outline-none focus:border-zinc-400 focus:ring-1 focus:ring-zinc-200 transition-all";
 
   return (
-    <div className="max-w-[1400px] mx-auto space-y-5">
-      {/* HEADER */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <div className="admin-page-container">
+      {/* TIÊU ĐỀ */}
+      <div className="admin-page-header">
         <div>
-          <h2 className="text-base font-semibold text-zinc-800">
+          <h2 className="admin-page-title">
             Quản lý khách hàng
           </h2>
-          <p className="text-xs text-zinc-400 mt-0.5">
+          <p className="admin-page-subtitle">
             Danh sách người dùng, điểm tích lũy và thẻ thành viên
           </p>
         </div>
         <div className="flex gap-2.5">
-          <div className="bg-white border border-zinc-200/60 px-4 py-2 rounded-lg text-center min-w-[70px]">
-            <p className="text-lg font-bold text-zinc-800">{totalCustomers}</p>
-            <p className="text-[10px] text-zinc-400 uppercase">Tổng</p>
+          <div className="admin-stat-badge badge-default">
+            <p className="admin-stat-value val-default">{totalCustomers}</p>
+            <p className="admin-stat-label lbl-default">Tổng</p>
           </div>
           <div className="bg-blue-50 border border-blue-200/60 px-4 py-2 rounded-lg text-center min-w-[70px]">
             <p className="text-lg font-bold text-blue-600">{activeCustomers}</p>
@@ -243,7 +243,7 @@ const CustomerManager = () => {
         </div>
       </div>
 
-      {/* TOAST */}
+      {/* THÔNG BÁO (TOAST) */}
       <AnimatePresence>
         {message.text && (
           <motion.div
@@ -257,8 +257,8 @@ const CustomerManager = () => {
         )}
       </AnimatePresence>
 
-      {/* TOOLBAR */}
-      <div className="bg-white rounded-xl border border-zinc-200/60 p-4">
+      {/* THANH CÔNG CỤ */}
+      <div className="admin-card p-4">
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1 sm:max-w-md">
             <svg
@@ -291,10 +291,10 @@ const CustomerManager = () => {
         </div>
       </div>
 
-      {/* MAIN CONTENT: 8-4 GRID */}
+      {/* NỘI DUNG CHÍNH: LƯỚI 8-4 */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
-        {/* TABLE (LEFT) */}
-        <div className="lg:col-span-8 bg-white rounded-xl border border-zinc-200/60 overflow-hidden">
+        {/* BẢNG (TRÁI) */}
+        <div className="lg:col-span-8 admin-card overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead className="bg-zinc-50/60 border-b border-zinc-100 text-[10px] font-medium text-zinc-400 uppercase tracking-wider">
@@ -348,9 +348,17 @@ const CustomerManager = () => {
                       >
                         <td className="py-3.5 px-5">
                           <div className="flex items-center gap-3">
-                            <div className="w-9 h-9 rounded-lg bg-zinc-100 border border-zinc-200/60 flex items-center justify-center text-zinc-500 font-semibold shrink-0">
-                              {user.full_name?.charAt(0)?.toUpperCase()}
-                            </div>
+                            {user.avatar_url ? (
+                              <img
+                                src={user.avatar_url}
+                                alt={user.full_name}
+                                className="w-9 h-9 rounded-lg object-cover border border-zinc-200/60 shrink-0"
+                              />
+                            ) : (
+                              <div className="w-9 h-9 rounded-lg bg-zinc-100 border border-zinc-200/60 flex items-center justify-center text-zinc-500 font-semibold shrink-0">
+                                {user.full_name?.charAt(0)?.toUpperCase()}
+                              </div>
+                            )}
                             <div className="min-w-0">
                               <div className="flex items-center gap-1.5">
                                 <p
@@ -399,28 +407,28 @@ const CustomerManager = () => {
                           <div className="flex items-center justify-end gap-1 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
                             <button
                               onClick={() => handleViewDetail(user.id)}
-                              className="px-2 py-1 text-zinc-500 hover:text-zinc-700 text-[10px] font-medium transition-colors"
+                              className="admin-btn-outline px-2 py-1 text-[10px]"
                               title="Chi tiết"
                             >
                               Chi tiết
                             </button>
                             <button
                               onClick={() => handleOpenReset(user)}
-                              className="px-2 py-1 text-amber-600 hover:bg-amber-50 text-[10px] font-medium rounded transition-colors"
+                              className="admin-btn-outline px-2 py-1 text-[10px] text-amber-600 border-amber-200 hover:bg-amber-50"
                               title="Reset MK"
                             >
                               Key
                             </button>
                             <button
                               onClick={() => handleEditClick(user)}
-                              className="px-2 py-1 text-blue-600 hover:bg-blue-50 text-[10px] font-medium rounded transition-colors"
+                              className="admin-btn-outline px-2 py-1 text-[10px] text-blue-600 border-blue-200 hover:bg-blue-50"
                               title="Sửa"
                             >
                               Sửa
                             </button>
                             <button
                               onClick={() => handleToggleStatus(user)}
-                              className={`px-2 py-1 text-[10px] font-medium rounded transition-colors ${isActive ? "text-red-500 hover:bg-red-50" : "text-emerald-600 hover:bg-emerald-50"}`}
+                              className={`admin-btn-outline px-2 py-1 text-[10px] ${isActive ? "text-red-500 border-red-200 hover:bg-red-50" : "text-emerald-600 border-emerald-200 hover:bg-emerald-50"}`}
                               title={isActive ? "Khóa" : "Mở khóa"}
                             >
                               {isActive ? "Khóa" : "Mở"}
@@ -443,14 +451,14 @@ const CustomerManager = () => {
                 <button
                   disabled={pagination.current_page === 1}
                   onClick={() => fetchCustomers(pagination.current_page - 1)}
-                  className="px-3 py-1.5 bg-white border border-zinc-200 hover:bg-zinc-50 disabled:opacity-50 rounded-lg text-xs font-medium text-zinc-600 transition-colors"
+                  className="admin-btn-outline"
                 >
                   Trước
                 </button>
                 <button
                   disabled={pagination.current_page === pagination.last_page}
                   onClick={() => fetchCustomers(pagination.current_page + 1)}
-                  className="px-3 py-1.5 bg-white border border-zinc-200 hover:bg-zinc-50 disabled:opacity-50 rounded-lg text-xs font-medium text-zinc-600 transition-colors"
+                  className="admin-btn-outline"
                 >
                   Tiếp
                 </button>
@@ -459,8 +467,8 @@ const CustomerManager = () => {
           )}
         </div>
 
-        {/* FORM (RIGHT) */}
-        <div className="lg:col-span-4 bg-white rounded-xl border border-zinc-200/60 p-5 sticky top-5">
+        {/* BIỂU MẪU (PHẢI) */}
+        <div className="lg:col-span-4 admin-card p-5 sticky top-5">
           <div className="flex items-center justify-between mb-4 pb-3 border-b border-zinc-100">
             <h3 className="text-sm font-semibold text-zinc-800">
               {isEditing ? "Sửa khách hàng" : "Thêm khách hàng"}
@@ -477,7 +485,7 @@ const CustomerManager = () => {
 
           <form onSubmit={handleSubmitForm} className="space-y-4">
             <div>
-              <label className="block text-[11px] font-medium text-zinc-500 mb-1.5">
+              <label className="admin-form-label">
                 Họ tên KH *
               </label>
               <input
@@ -494,12 +502,14 @@ const CustomerManager = () => {
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-[11px] font-medium text-zinc-500 mb-1.5">
+                <label className="admin-form-label">
                   SĐT *
                 </label>
                 <input
                   type="text"
                   required
+                  pattern="0[35789][0-9]{8}"
+                  title="Số điện thoại Việt Nam 10 số, bắt đầu bằng 03, 05, 07, 08 hoặc 09"
                   value={form.phone}
                   onChange={(e) => setForm({ ...form, phone: e.target.value })}
                   className={inputClass}
@@ -507,7 +517,7 @@ const CustomerManager = () => {
                 />
               </div>
               <div>
-                <label className="block text-[11px] font-medium text-zinc-500 mb-1.5">
+                <label className="admin-form-label">
                   Trạng thái
                 </label>
                 <select
@@ -522,7 +532,7 @@ const CustomerManager = () => {
             </div>
 
             <div>
-              <label className="block text-[11px] font-medium text-zinc-500 mb-1.5">
+              <label className="admin-form-label">
                 Email
               </label>
               <input
@@ -536,12 +546,13 @@ const CustomerManager = () => {
 
             {!isEditing && (
               <div>
-                <label className="block text-[11px] font-medium text-zinc-500 mb-1.5">
+                <label className="admin-form-label">
                   Mật khẩu khởi tạo *
                 </label>
                 <input
                   type="password"
                   required
+                  minLength={6}
                   value={form.password}
                   onChange={(e) =>
                     setForm({ ...form, password: e.target.value })
@@ -554,7 +565,7 @@ const CustomerManager = () => {
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-[11px] font-medium text-zinc-500 mb-1.5">
+                <label className="admin-form-label">
                   Giới tính
                 </label>
                 <select
@@ -569,7 +580,7 @@ const CustomerManager = () => {
                 </select>
               </div>
               <div>
-                <label className="block text-[11px] font-medium text-zinc-500 mb-1.5">
+                <label className="admin-form-label">
                   Ngày sinh
                 </label>
                 <input
@@ -584,7 +595,7 @@ const CustomerManager = () => {
             </div>
 
             <div>
-              <label className="block text-[11px] font-medium text-zinc-500 mb-1.5">
+              <label className="admin-form-label">
                 Hạng thành viên
               </label>
               <input
@@ -602,7 +613,7 @@ const CustomerManager = () => {
               <button
                 type="submit"
                 disabled={isSaving || !form.full_name.trim()}
-                className={`w-full py-2.5 rounded-lg text-xs font-medium text-white transition-colors ${isEditing ? "bg-zinc-900 hover:bg-zinc-800" : "bg-lime-600 hover:bg-lime-700"} ${isSaving || !form.full_name.trim() ? "opacity-60 cursor-not-allowed" : ""}`}
+                className={`w-full py-2.5 ${isEditing ? "admin-btn-secondary" : "admin-btn-primary"} ${isSaving || !form.full_name.trim() ? "opacity-60 cursor-not-allowed shadow-none hover:translate-y-0" : ""}`}
               >
                 {isSaving
                   ? "Đang xử lý..."
@@ -615,16 +626,16 @@ const CustomerManager = () => {
         </div>
       </div>
 
-      {/* MODALS */}
+      {/* CÁC CỬA SỔ (MODALS) */}
       <AnimatePresence>
-        {/* DETAIL MODAL */}
+        {/* CỬA SỔ CHI TIẾT */}
         {isDetailOpen && detailUser && (
-          <div className="fixed inset-0 z-50 bg-black/30 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="admin-modal-overlay">
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white w-full max-w-sm rounded-2xl shadow-xl overflow-hidden"
+              className="admin-modal-content max-w-sm"
             >
               <div className="px-6 py-4 border-b border-zinc-100 flex items-center justify-between">
                 <h3 className="text-sm font-semibold text-zinc-800">
@@ -643,9 +654,17 @@ const CustomerManager = () => {
               </div>
               <div className="p-6">
                 <div className="flex items-center gap-4 mb-6">
-                  <div className="w-14 h-14 rounded-full bg-zinc-100 border border-zinc-200 flex items-center justify-center text-zinc-500 text-xl font-bold">
-                    {detailUser.full_name?.charAt(0)?.toUpperCase()}
-                  </div>
+                  {detailUser.avatar_url ? (
+                    <img
+                      src={detailUser.avatar_url}
+                      alt={detailUser.full_name}
+                      className="w-14 h-14 rounded-full object-cover border border-zinc-200"
+                    />
+                  ) : (
+                    <div className="w-14 h-14 rounded-full bg-zinc-100 border border-zinc-200 flex items-center justify-center text-zinc-500 text-xl font-bold">
+                      {detailUser.full_name?.charAt(0)?.toUpperCase()}
+                    </div>
+                  )}
                   <div>
                     <div className="flex items-center gap-1.5">
                       <h4 className="text-base font-bold text-zinc-800">
@@ -705,16 +724,16 @@ const CustomerManager = () => {
 
                     <div className="grid grid-cols-2 gap-3">
                       <div className="bg-zinc-50 border border-zinc-100 rounded-xl p-3">
-                        <p className="text-[10px] text-zinc-400 uppercase">
+                        <p className="admin-stat-label lbl-default">
                           Tổng đơn
                         </p>
-                        <p className="text-lg font-bold text-zinc-800">
+                        <p className="admin-stat-value val-default">
                           {bookingStats.total_bookings}
                         </p>
                       </div>
 
                       <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3">
-                        <p className="text-[10px] text-emerald-500 uppercase">
+                        <p className="admin-stat-label lbl-success">
                           Hoàn thành
                         </p>
                         <p className="text-lg font-bold text-emerald-700">
@@ -778,14 +797,14 @@ const CustomerManager = () => {
           </div>
         )}
 
-        {/* RESET PASSWORD MODAL */}
+        {/* CỬA SỔ ĐẶT LẠI MẬT KHẨU */}
         {isResetOpen && resetUser && (
-          <div className="fixed inset-0 z-50 bg-black/30 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="admin-modal-overlay">
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white w-full max-w-sm rounded-2xl shadow-xl overflow-hidden"
+              className="admin-modal-content max-w-sm"
             >
               <div className="px-6 py-4 border-b border-zinc-100 flex items-center justify-between">
                 <h3 className="text-sm font-semibold text-zinc-800">
@@ -804,7 +823,7 @@ const CustomerManager = () => {
                   <strong>{resetUser.full_name}</strong>
                 </div>
                 <div>
-                  <label className="block text-[11px] font-medium text-zinc-500 mb-1.5">
+                  <label className="admin-form-label">
                     Mật khẩu mới *
                   </label>
                   <input
@@ -820,7 +839,7 @@ const CustomerManager = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-medium text-zinc-500 mb-1.5">
+                  <label className="admin-form-label">
                     Xác nhận mật khẩu *
                   </label>
                   <input
@@ -845,7 +864,7 @@ const CustomerManager = () => {
                       isSaving ||
                       resetForm.password !== resetForm.password_confirmation
                     }
-                    className={`w-full py-2.5 rounded-lg text-xs font-medium text-white transition-colors bg-amber-500 hover:bg-amber-600 ${isSaving || resetForm.password !== resetForm.password_confirmation ? "opacity-60 cursor-not-allowed" : ""}`}
+                    className={`w-full py-2.5 admin-btn-primary bg-amber-500 hover:bg-amber-600 border-amber-600 ${isSaving || resetForm.password !== resetForm.password_confirmation ? "opacity-60 cursor-not-allowed shadow-none hover:translate-y-0" : ""}`}
                   >
                     {isSaving ? "Đang xử lý..." : "Xác nhận cấp lại"}
                   </button>

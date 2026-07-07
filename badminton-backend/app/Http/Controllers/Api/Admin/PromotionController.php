@@ -9,10 +9,11 @@ use Illuminate\Validation\Rule;
 
 class PromotionController extends Controller
 {
-    // Lay danh sach voucher de admin theo doi va loc theo trang thai.
-    /**
-     * Chức năng: Lấy danh sách voucher/mã giảm giá, có hỗ trợ lọc trạng thái và tìm kiếm.
-     */
+    private const CODE_PATTERN = '/^[A-Z0-9_\-]+$/i';
+    private const DISCOUNT_TYPES = ['fixed', 'percent'];
+    private const STATUSES = ['active', 'inactive'];
+
+    /** Chức năng: Lấy danh sách voucher/mã giảm giá, có hỗ trợ lọc trạng thái và tìm kiếm. */
     public function index(Request $request)
     {
         $query = Promotion::query();
@@ -23,74 +24,47 @@ class PromotionController extends Controller
 
         if ($request->filled('keyword')) {
             $keyword = $request->keyword;
-            $query->where(function ($q) use ($keyword) {
-                $q->where('code', 'like', "%{$keyword}%")
-                    ->orWhere('name', 'like', "%{$keyword}%");
-            });
+            $query->where(fn($q) => $q->where('code', 'like', "%{$keyword}%")
+                ->orWhere('name', 'like', "%{$keyword}%"));
         }
 
         return response()->json([
             'status' => 'success',
-            'data' => $query->orderBy('code')->get(),
+            'data'   => $query->orderBy('code')->get(),
         ]);
     }
 
-    // Tao voucher moi cho khach nhap khi dat san.
-    /**
-     * Chức năng: Tạo mới voucher với loại giảm giá, giá trị giảm và điều kiện điểm nếu có.
-     */
+    /** Chức năng: Tạo mới voucher với loại giảm giá, giá trị giảm và điều kiện điểm nếu có. */
     public function store(Request $request)
     {
         $data = $this->validatedData($request);
-        $data['code'] = strtoupper(trim($data['code']));
-        $data['status'] = $data['status'] ?? 'active';
-        $data['per_user_limit'] = $data['per_user_limit'] ?? 1;
+        $data['code']               = strtoupper(trim($data['code']));
+        $data['status']             = $data['status'] ?? 'active';
+        $data['per_user_limit']     = $data['per_user_limit'] ?? 1;
         $data['min_points_required'] = $data['min_points_required'] ?? 0;
 
         $promotion = Promotion::create($data);
 
         return response()->json([
-            'status' => 'success',
+            'status'  => 'success',
             'message' => 'Tao ma giam gia thanh cong!',
-            'data' => $promotion,
+            'data'    => $promotion,
         ], 201);
     }
 
-    // Xem chi tiet mot voucher.
-    /**
-     * Chức năng: Lấy chi tiết một voucher.
-     */
+    /** Chức năng: Lấy chi tiết một voucher. */
     public function show($id)
     {
-        $promotion = Promotion::find($id);
-
-        if (!$promotion) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Khong tim thay ma giam gia.',
-            ], 404);
-        }
-
         return response()->json([
             'status' => 'success',
-            'data' => $promotion,
+            'data'   => Promotion::findOrFail($id),
         ]);
     }
 
-    // Cap nhat thong tin voucher, cho phep giu nguyen code hien tai.
-    /**
-     * Chức năng: Cập nhật thông tin voucher và điều kiện áp dụng.
-     */
+    /** Chức năng: Cập nhật thông tin voucher và điều kiện áp dụng. */
     public function update(Request $request, $id)
     {
-        $promotion = Promotion::find($id);
-
-        if (!$promotion) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Khong tim thay ma giam gia.',
-            ], 404);
-        }
+        $promotion = Promotion::findOrFail($id);
 
         $data = $this->validatedData($request, $id);
 
@@ -101,39 +75,26 @@ class PromotionController extends Controller
         $promotion->update($data);
 
         return response()->json([
-            'status' => 'success',
+            'status'  => 'success',
             'message' => 'Cap nhat ma giam gia thanh cong!',
-            'data' => $promotion,
+            'data'    => $promotion,
         ]);
     }
 
-    // An voucher thay vi xoa cung de giu lich su booking da ap dung ma.
-    /**
-     * Chức năng: Ẩn hoặc ngưng áp dụng voucher bằng trạng thái inactive.
-     */
+    /** Chức năng: Ẩn hoặc ngưng áp dụng voucher bằng trạng thái inactive. */
     public function destroy($id)
     {
-        $promotion = Promotion::find($id);
-
-        if (!$promotion) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Khong tim thay ma giam gia.',
-            ], 404);
-        }
-
+        $promotion = Promotion::findOrFail($id);
         $promotion->status = 'inactive';
         $promotion->save();
 
         return response()->json([
-            'status' => 'success',
+            'status'  => 'success',
             'message' => 'Da tam an ma giam gia.',
         ]);
     }
 
-    /**
-     * Chức năng: Validate và chuẩn hóa dữ liệu voucher dùng chung cho tạo mới và cập nhật.
-     */
+    /** Chức năng: Validate và chuẩn hóa dữ liệu voucher dùng chung cho tạo mới và cập nhật. */
     private function validatedData(Request $request, ?string $ignoreId = null): array
     {
         return $request->validate([
@@ -141,14 +102,25 @@ class PromotionController extends Controller
                 $ignoreId ? 'sometimes' : 'required',
                 'string',
                 'max:50',
+                'regex:' . self::CODE_PATTERN,
                 Rule::unique('promotions', 'code')->ignore($ignoreId),
             ],
-            'name' => 'required|string|max:150',
-            'discount_type' => 'required|in:fixed,percent',
-            'discount_value' => 'required|numeric|min:0',
-            'per_user_limit' => 'nullable|integer|min:1',
-            'min_points_required' => 'nullable|integer|min:0',
-            'status' => 'nullable|in:active,inactive',
+            'name'               => ['required', 'string', 'max:150'],
+            'discount_type'      => ['required', 'in:fixed,percent'],
+            'discount_value'     => [
+                'required', 'numeric', 'min:1',
+                function ($attribute, $value, $fail) use ($request) {
+                    if ($request->discount_type === 'percent' && $value > 100) {
+                        $fail('Giảm giá theo phần trăm không được vượt quá 100%.');
+                    }
+                },
+            ],
+            'per_user_limit'      => ['nullable', 'integer', 'min:1'],
+            'min_points_required' => ['nullable', 'integer', 'min:0'],
+            'status'              => ['nullable', 'in:active,inactive'],
+        ], [
+            'code.regex'         => 'Mã voucher chỉ được chứa chữ cái không dấu, số, dấu gạch dưới (_) và gạch ngang (-).',
+            'discount_value.min' => 'Giá trị giảm phải lớn hơn 0.',
         ]);
     }
 }

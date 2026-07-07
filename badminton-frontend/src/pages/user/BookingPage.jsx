@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { courtService } from "../../services/user/courtService";
@@ -33,6 +33,77 @@ const BookingPage = () => {
       .toISOString()
       .split("T")[0],
   });
+
+  // Ngày trong tuần: 1=T2, 2=T3, ..., 7=CN (ISO)
+  const DAY_OPTIONS = [
+    { value: 1, label: "T2" },
+    { value: 2, label: "T3" },
+    { value: 3, label: "T4" },
+    { value: 4, label: "T5" },
+    { value: 5, label: "T6" },
+    { value: 6, label: "T7" },
+    { value: 7, label: "CN" },
+  ];
+
+  // Khởi tạo với ngày tương ứng ngày đang chọn
+  const initDayOfWeek = (() => {
+    const d = new Date(dateParam).getDay();
+    return d === 0 ? 7 : d;
+  })();
+
+  const [selectedDays, setSelectedDays] = useState([initDayOfWeek]);
+
+  const toggleDay = (value) => {
+    setSelectedDays((prev) =>
+      prev.includes(value) ? prev.filter((d) => d !== value) : [...prev, value]
+    );
+  };
+
+  // --- TRẠNG THÁI DÀI HẠN (LONG TERM) ---
+  const [longTermRange, setLongTermRange] = useState({
+    startDate: dateParam,
+    endDate: new Date(new Date(dateParam).getTime() + 60 * 24 * 60 * 60 * 1000)
+      .toISOString()
+      .split("T")[0],
+  });
+  const [specificDates, setSpecificDates] = useState([]);
+
+  const toggleSpecificDate = (dateStr) => {
+    setSpecificDates((prev) =>
+      prev.includes(dateStr) ? prev.filter((d) => d !== dateStr) : [...prev, dateStr]
+    );
+  };
+
+  // Sinh ra tất cả các ngày trong khoảng longTermRange (theo tuần để hiển thị lưới)
+  const buildLongTermWeeks = () => {
+    const start = new Date(longTermRange.startDate);
+    const end = new Date(longTermRange.endDate);
+    if (isNaN(start) || isNaN(end) || start > end) return [];
+
+    // Tìm thứ Hai đầu tuần của start
+    const firstMonday = new Date(start);
+    const dayOfWeek = firstMonday.getDay(); // 0=CN, 1=T2...
+    const diff = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+    firstMonday.setDate(firstMonday.getDate() + diff);
+
+    const weeks = [];
+    const cur = new Date(firstMonday);
+
+    while (cur <= end) {
+      const week = [];
+      for (let i = 0; i < 7; i++) {
+        const d = new Date(cur);
+        const dStr = d.toLocaleDateString("sv-SE");
+        const inRange = dStr >= longTermRange.startDate && dStr <= longTermRange.endDate;
+        const isPast = dStr < todayStr;
+        week.push({ date: d, dateStr: dStr, inRange, isPast });
+        cur.setDate(cur.getDate() + 1);
+      }
+      weeks.push(week);
+    }
+
+    return weeks;
+  };
 
   const [customerForm, setCustomerForm] = useState({
     fullName: "",
@@ -110,38 +181,39 @@ const BookingPage = () => {
   }, [courtIdParam, dateParam]);
 
   useEffect(() => {
-    if (!isPaymentModalOpen || !paymentInfo?.booking_id) {
+    if (!isPaymentModalOpen || !paymentInfo?.intent_code) {
       return;
     }
 
     const intervalId = setInterval(async () => {
       try {
-        const res = await bookingService.getPaymentInfo(paymentInfo.booking_id);
-        const latestPayment = res.data?.data;
+        const res = await bookingService.getIntentStatus(paymentInfo.intent_code);
+        const data = res.data?.data;
 
-        if (latestPayment?.payment_status === "paid") {
+        if (data?.expired) {
           clearInterval(intervalId);
           setIsPaymentModalOpen(false);
           setPaymentInfo(null);
+          setCreatedBookingInfo(null);
+          alert("QR thanh toán đã hết hạn. Vui lòng đặt lại.");
+          return;
+        }
+
+        if (data?.paid) {
+          clearInterval(intervalId);
+          setIsPaymentModalOpen(false);
+          setPaymentInfo(null);
+          setCreatedBookingInfo(null);
 
           if (isLoggedIn()) {
-            alert(
-              "Thanh toán thành công! Đơn đặt sân đã được xác nhận.",
-            );
+            alert("Thanh toán thành công! Đơn đặt sân đã được xác nhận.");
             navigate("/booking-history");
           } else {
             setSuccessModal({
               isOpen: true,
               title: "Thanh toán thành công!",
-              message:
-                "Đơn của bạn đã được xác nhận. Vui lòng lưu lại mã đơn để tra cứu sau này.",
-              bookings: createdBookingInfo?.bookings || [
-                {
-                  booking_id: latestPayment.booking_id,
-                  booking_code: latestPayment.booking_code,
-                  total_price: latestPayment.total_price,
-                },
-              ],
+              message: "Đơn của bạn đã được xác nhận. Vui lòng lưu lại mã đơn để tra cứu sau này.",
+              bookings: [],
             });
           }
         }
@@ -151,7 +223,7 @@ const BookingPage = () => {
     }, 3000);
 
     return () => clearInterval(intervalId);
-  }, [isPaymentModalOpen, paymentInfo, createdBookingInfo, navigate]);
+  }, [isPaymentModalOpen, paymentInfo, navigate]);
 
   const handleToggleSlot = (slot) => {
     setPromotionPreview(null);
@@ -217,7 +289,7 @@ const BookingPage = () => {
     setIsSubmitting(true);
 
     try {
-      const isPrepaid = bookingType === "recurring" ? true : !payLater;
+      const isPrepaid = (bookingType === "recurring" || bookingType === "long_term") ? true : !payLater;
       const totalAmount = selectedSlots.reduce(
         (acc, s) => acc + Number(s.price),
         0,
@@ -240,43 +312,55 @@ const BookingPage = () => {
           start: s.start_time,
           end: s.end_time,
         }));
-      } else {
+      } else if (bookingType === "recurring") {
+        if (selectedDays.length === 0) {
+          setIsSubmitting(false);
+          return alert("Vui lòng chọn ít nhất một ngày trong tuần!");
+        }
+
         const sortedSlots = [...selectedSlots].sort((a, b) =>
           a.start_time.localeCompare(b.start_time),
         );
 
-        payload.start_date = dateParam;
+        payload.start_date = recurringRange.startDate;
         payload.end_date = recurringRange.endDate;
         payload.start_time = sortedSlots[0].start_time;
         payload.end_time = sortedSlots[sortedSlots.length - 1].end_time;
+        payload.days_of_week = selectedDays;
 
-        const jsDayOfWeek = new Date(dateParam).getDay();
-        payload.day_of_week = jsDayOfWeek === 0 ? 7 : jsDayOfWeek;
+      } else if (bookingType === "long_term") {
+        if (specificDates.length === 0) {
+          setIsSubmitting(false);
+          return alert("Vui lòng chọn ít nhất một ngày cụ thể trên lịch!");
+        }
+
+        const sortedSlots = [...selectedSlots].sort((a, b) =>
+          a.start_time.localeCompare(b.start_time),
+        );
+
+        payload.lt_start_date = longTermRange.startDate;
+        payload.lt_end_date = longTermRange.endDate;
+        payload.lt_start_time = sortedSlots[0].start_time;
+        payload.lt_end_time = sortedSlots[sortedSlots.length - 1].end_time;
+        payload.specific_dates = specificDates;
       }
 
+      if (isPrepaid) {
+        // Thanh toán online: tạo intent trước, chưa tạo booking
+        const intentRes = await bookingService.preparePayment(payload);
+        const intentData = intentRes.data?.data;
+        setCreatedBookingInfo({ intent_code: intentData.intent_code });
+        setPaymentInfo(intentData);
+        setIsPaymentModalOpen(true);
+        return;
+      }
+
+      // Giữ chỗ / thanh toán tại sân: tạo booking ngay
       const response = await bookingService.createBooking(payload);
 
       if (response.status === 201 || response.data?.status === "success") {
         const responseData = response.data?.data || response.data;
-        const bookingId =
-          responseData?.booking_id || responseData?.payment_booking_id;
-
         setCreatedBookingInfo(responseData);
-
-        if (isPrepaid) {
-          if (!bookingId) {
-            alert(
-              "Đơn đã tạo nhưng chưa lấy được mã thanh toán. Vui lòng kiểm tra backend trả booking_id.",
-            );
-            return;
-          }
-
-          const paymentRes = await bookingService.getPaymentInfo(bookingId);
-
-          setPaymentInfo(paymentRes.data?.data);
-          setIsPaymentModalOpen(true);
-          return;
-        }
 
         if (isLoggedIn()) {
           alert(
@@ -306,20 +390,15 @@ const BookingPage = () => {
   };
 
   const handleClosePaymentModal = () => {
+    // Intent tự hết hạn sau 30 phút — không cần cancel gì thêm.
+    // Booking chưa được tạo nên không có gì để rollback.
     setIsPaymentModalOpen(false);
     setPaymentInfo(null);
-
-    if (isLoggedIn()) {
-      navigate("/booking-history");
-    } else if (createdBookingInfo?.bookings?.length > 0) {
-      setSuccessModal({
-        isOpen: true,
-        title: "Đơn đặt sân đã được tạo!",
-        message:
-          "Nếu bạn đã chuyển khoản, hệ thống sẽ xác nhận sau khi nhận giao dịch. Vui lòng lưu mã đơn để tra cứu.",
-        bookings: createdBookingInfo.bookings,
-      });
-    }
+    setCreatedBookingInfo(null);
+    setSelectedSlots([]);
+    setSpecificDates([]);
+    setPromotionCode("");
+    setPromotionPreview(null);
   };
 
   const morningSlots = slots.filter((s) => s.start_time < "12:00");
@@ -327,18 +406,38 @@ const BookingPage = () => {
     (s) => s.start_time >= "12:00" && s.start_time < "18:00",
   );
   const eveningSlots = slots.filter((s) => s.start_time >= "18:00");
-  const totalPrice = selectedSlots.reduce((acc, s) => acc + Number(s.price), 0);
-  const previewDiscount = promotionPreview?.discount_amount || 0;
+  const perSessionPrice = selectedSlots.reduce((acc, s) => acc + Number(s.price), 0);
+
+  const recurringSessionCount = useMemo(() => {
+    if (bookingType !== "recurring" || selectedDays.length === 0) return 1;
+    const start = new Date(recurringRange.startDate);
+    const end = new Date(recurringRange.endDate);
+    if (isNaN(start) || isNaN(end) || start > end) return 1;
+    let count = 0;
+    const cur = new Date(start);
+    while (cur <= end) {
+      const dow = cur.getDay() === 0 ? 7 : cur.getDay();
+      if (selectedDays.includes(dow)) count++;
+      cur.setDate(cur.getDate() + 1);
+    }
+    return Math.max(count, 1);
+  }, [bookingType, recurringRange, selectedDays]);
+
+  const sessionMultiplier =
+    bookingType === "long_term" ? Math.max(specificDates.length, 1)
+    : bookingType === "recurring" ? recurringSessionCount
+    : 1;
+  const totalPrice = perSessionPrice * sessionMultiplier;
+  const previewDiscount = (promotionPreview?.discount_amount || 0) * sessionMultiplier;
   const estimatedTotal = Math.max(0, totalPrice - previewDiscount);
 
-  const inputClass =
-    "w-full px-4 py-3.5 bg-zinc-800/60 border border-zinc-700/60 rounded-2xl text-sm font-medium text-white placeholder-zinc-500 focus:outline-none focus:border-lime-400 focus:shadow-[0_0_12px_rgba(163,230,53,0.2)] transition-all duration-300";
+  const inputClass = "user-input";
 
   return (
     <div className="bg-zinc-950 min-h-screen py-10 relative overflow-hidden">
       <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-lime-500/[0.03] rounded-full blur-3xl pointer-events-none" />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+      <div className="user-page-container relative z-10">
         <button
           onClick={() => navigate("/#courts")}
           className="inline-flex items-center gap-2 text-xs font-bold text-zinc-500 hover:text-lime-400 mb-8 transition-colors uppercase tracking-widest"
@@ -361,7 +460,7 @@ const BookingPage = () => {
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="bg-zinc-900/60 border border-zinc-800 p-6 rounded-3xl flex flex-col sm:flex-row justify-between items-center gap-4"
+              className="user-card-glass flex flex-col sm:flex-row justify-between items-center gap-4"
             >
               <div className="flex items-center gap-4">
                 <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-lime-500 to-emerald-500 text-zinc-950 flex items-center justify-center font-black text-xl shadow-lg shadow-lime-500/20">
@@ -393,7 +492,7 @@ const BookingPage = () => {
                       date: e.target.value,
                     })
                   }
-                  className="bg-zinc-900 px-4 py-2 rounded-xl border border-zinc-700 text-sm font-bold text-lime-400 focus:outline-none focus:border-lime-400 transition-colors"
+                  className="user-input py-2 w-auto"
                 />
               </div>
             </motion.div>
@@ -402,7 +501,7 @@ const BookingPage = () => {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.1 }}
-              className="bg-zinc-900/60 border border-zinc-800 p-6 sm:p-8 rounded-3xl"
+              className="user-card-glass"
             >
               <h3 className="font-extrabold text-base text-white mb-8 flex items-center gap-2 uppercase tracking-wide">
                 <span className="w-1.5 h-5 bg-lime-500 rounded-full" />
@@ -539,12 +638,13 @@ const BookingPage = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.15 }}
-            className="bg-zinc-900/80 backdrop-blur-xl rounded-3xl border border-zinc-800 overflow-hidden sticky top-8 shadow-2xl shadow-black/30"
+            className="user-card-glass p-0 overflow-hidden sticky top-8 shadow-2xl shadow-black/30"
           >
-            <div className="grid grid-cols-2 bg-zinc-800/80 p-1.5 m-3 rounded-2xl">
+            <div className="grid grid-cols-3 bg-zinc-800/80 p-1.5 m-3 rounded-2xl">
               {[
-                { type: "single", label: "Đặt lẻ 1 ngày" },
-                { type: "recurring", label: "Đặt định kỳ" },
+                { type: "single", label: "Đặt lẻ" },
+                { type: "recurring", label: "Định kỳ" },
+                { type: "long_term", label: "Dài hạn" },
               ].map((t) => (
                 <button
                   key={t.type}
@@ -615,46 +715,189 @@ const BookingPage = () => {
                     </p>
 
                     <div className="grid grid-cols-2 gap-2">
-                      <input
-                        type="date"
-                        value={recurringRange.startDate}
-                        disabled
-                        className="bg-zinc-800 p-2.5 rounded-xl text-xs font-bold text-zinc-500 border border-zinc-700 opacity-60"
-                      />
+                      <div>
+                        <p className="text-[9px] text-zinc-500 mb-1">Từ ngày</p>
+                        <input
+                          type="date"
+                          value={recurringRange.startDate}
+                          min={todayStr}
+                          onChange={(e) =>
+                            setRecurringRange((r) => ({
+                              ...r,
+                              startDate: e.target.value,
+                            }))
+                          }
+                          className="user-input py-2.5"
+                        />
+                      </div>
 
-                      <input
-                        type="date"
-                        value={recurringRange.endDate}
-                        onChange={(e) =>
-                          setRecurringRange((r) => ({
-                            ...r,
-                            endDate: e.target.value,
-                          }))
-                        }
-                        className="bg-zinc-800 p-2.5 rounded-xl text-xs font-bold text-white border border-zinc-700 focus:outline-none focus:border-purple-400 transition-colors"
-                      />
+                      <div>
+                        <p className="text-[9px] text-zinc-500 mb-1">Đến ngày</p>
+                        <input
+                          type="date"
+                          value={recurringRange.endDate}
+                          min={recurringRange.startDate}
+                          onChange={(e) =>
+                            setRecurringRange((r) => ({
+                              ...r,
+                              endDate: e.target.value,
+                            }))
+                          }
+                          className="user-input py-2.5"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <p className="text-[9px] text-zinc-500 mb-2">Các ngày lặp trong tuần</p>
+                      <div className="flex gap-1.5 flex-wrap">
+                        {DAY_OPTIONS.map((d) => (
+                          <button
+                            key={d.value}
+                            type="button"
+                            onClick={() => toggleDay(d.value)}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                              selectedDays.includes(d.value)
+                                ? "bg-purple-500 text-white"
+                                : "bg-zinc-800 text-zinc-400 border border-zinc-700 hover:border-purple-400"
+                            }`}
+                          >
+                            {d.label}
+                          </button>
+                        ))}
+                      </div>
                     </div>
 
                     <p className="text-[9px] text-purple-400/70 italic">
-                      * Tự động lặp khung giờ đã chọn cho các tuần
-                      tiếp theo.
+                      * Khung giờ đã chọn sẽ lặp vào các ngày được đánh dấu trong suốt thời hạn hợp đồng.
                     </p>
                   </motion.div>
                 )}
               </AnimatePresence>
 
-              <div className="pt-5 border-t border-dashed border-zinc-700/50 flex justify-between items-end">
-                <span className="text-xs font-bold text-zinc-500 uppercase">
-                  Tổng cộng:
-                </span>
+              <AnimatePresence>
+                {bookingType === "long_term" && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="bg-amber-500/10 p-4 rounded-2xl border border-amber-500/20 space-y-3 overflow-hidden"
+                  >
+                    <p className="text-[10px] font-bold text-amber-400 uppercase tracking-widest">
+                      Lịch dài hạn — chọn từng ngày cụ thể
+                    </p>
 
-                <div className="text-right">
-                  <span className="text-3xl font-black text-lime-400 tracking-tighter">
-                    {totalPrice.toLocaleString()}
-                  </span>
-                  <span className="text-xs text-zinc-500 font-semibold ml-1">
-                    VNĐ
-                  </span>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <p className="text-[9px] text-zinc-500 mb-1">Từ ngày</p>
+                        <input
+                          type="date"
+                          value={longTermRange.startDate}
+                          min={todayStr}
+                          onChange={(e) => {
+                            setLongTermRange((r) => ({ ...r, startDate: e.target.value }));
+                            setSpecificDates([]);
+                          }}
+                          className="user-input py-2.5 focus:border-amber-400"
+                        />
+                      </div>
+                      <div>
+                        <p className="text-[9px] text-zinc-500 mb-1">Đến ngày</p>
+                        <input
+                          type="date"
+                          value={longTermRange.endDate}
+                          min={longTermRange.startDate}
+                          onChange={(e) => {
+                            setLongTermRange((r) => ({ ...r, endDate: e.target.value }));
+                            setSpecificDates([]);
+                          }}
+                          className="user-input py-2.5 focus:border-amber-400"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Lưới lịch */}
+                    <div className="space-y-1">
+                      <div className="grid grid-cols-7 gap-0.5 mb-1">
+                        {["T2","T3","T4","T5","T6","T7","CN"].map((d) => (
+                          <div key={d} className="text-center text-[9px] font-bold text-zinc-500 py-1">{d}</div>
+                        ))}
+                      </div>
+                      {buildLongTermWeeks().map((week, wi) => (
+                        <div key={wi} className="grid grid-cols-7 gap-0.5">
+                          {week.map(({ date, dateStr, inRange, isPast }) => {
+                            const isSelected = specificDates.includes(dateStr);
+                            const disabled = !inRange || isPast;
+                            return (
+                              <button
+                                key={dateStr}
+                                type="button"
+                                disabled={disabled}
+                                onClick={() => toggleSpecificDate(dateStr)}
+                                className={`rounded-lg py-1.5 text-[10px] font-bold transition-colors ${
+                                  disabled
+                                    ? "text-zinc-700 cursor-not-allowed"
+                                    : isSelected
+                                      ? "bg-amber-500 text-zinc-950"
+                                      : "bg-zinc-800 text-zinc-300 hover:bg-amber-500/20 hover:text-amber-300"
+                                }`}
+                              >
+                                {date.getDate()}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      ))}
+                    </div>
+
+                    {specificDates.length > 0 && (
+                      <div className="bg-amber-500/5 rounded-xl p-2 border border-amber-500/10">
+                        <p className="text-[9px] text-amber-400 font-bold mb-1">
+                          Đã chọn {specificDates.length} ngày:
+                        </p>
+                        <div className="flex flex-wrap gap-1">
+                          {[...specificDates].sort().map((d) => (
+                            <span key={d} className="text-[9px] bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded-md font-mono">
+                              {new Date(d).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" })}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <p className="text-[9px] text-amber-400/70 italic">
+                      * Mỗi tuần có thể chọn ngày khác nhau. Tất cả dùng chung khung giờ đã chọn ở trên.
+                    </p>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              <div className="pt-5 border-t border-dashed border-zinc-700/50">
+                {bookingType === "long_term" && specificDates.length > 0 && (
+                  <div className="flex justify-between items-center text-xs text-zinc-500 mb-1.5">
+                    <span>{perSessionPrice.toLocaleString()}đ/ngày</span>
+                    <span>× {specificDates.length} ngày</span>
+                  </div>
+                )}
+                <div className="flex justify-between items-end">
+                  <div>
+                    <span className="text-xs font-bold text-zinc-500 uppercase">
+                      {bookingType === "long_term" ? "Ước tính:" : "Tổng cộng:"}
+                    </span>
+                    {bookingType === "long_term" && (
+                      <p className="text-[10px] text-amber-500/70 mt-0.5">
+                        * Giá cuối tuần có thể khác ngày thường
+                      </p>
+                    )}
+                  </div>
+                  <div className="text-right">
+                    <span className="text-3xl font-black text-lime-400 tracking-tighter">
+                      {totalPrice.toLocaleString()}
+                    </span>
+                    <span className="text-xs text-zinc-500 font-semibold ml-1">
+                      VNĐ
+                    </span>
+                  </div>
                 </div>
               </div>
 
@@ -766,6 +1009,10 @@ const BookingPage = () => {
                       </p>
                     </button>
                   </div>
+                ) : bookingType === "long_term" ? (
+                  <div className="p-3 bg-amber-500/10 text-amber-400 text-[10px] font-bold text-center rounded-xl uppercase border border-amber-500/20 tracking-wider">
+                    Đặt dài hạn bắt buộc thanh toán online trước
+                  </div>
                 ) : (
                   <div className="p-3 bg-purple-500/10 text-purple-400 text-[10px] font-bold text-center rounded-xl uppercase border border-purple-500/20 tracking-wider">
                     Đặt sân định kỳ bắt buộc thanh toán online
@@ -789,11 +1036,7 @@ const BookingPage = () => {
                       ? { scale: 0.98 }
                       : {}
                   }
-                  className={`w-full py-4 rounded-2xl font-extrabold text-sm uppercase tracking-widest transition-all duration-300 flex items-center justify-center gap-2 ${
-                    selectedSlots.length > 0 && !isSubmitting
-                      ? "bg-lime-500 hover:bg-lime-400 text-zinc-950 shadow-xl shadow-lime-500/20"
-                      : "bg-zinc-800 text-zinc-600 cursor-not-allowed"
-                  }`}
+                  className={`user-btn-primary w-full py-4 ${selectedSlots.length === 0 ? "opacity-50 cursor-not-allowed" : ""}`}
                 >
                   {isSubmitting && (
                     <span className="w-4 h-4 border-2 border-zinc-950 border-t-transparent rounded-full animate-spin" />
@@ -803,7 +1046,9 @@ const BookingPage = () => {
                     ? "Đang xử lý..."
                     : bookingType === "recurring"
                       ? "Thanh toán lịch định kỳ"
-                      : payLater
+                      : bookingType === "long_term"
+                        ? `Thanh toán dài hạn (${specificDates.length} ngày)`
+                        : payLater
                         ? "Xác nhận giữ chỗ"
                         : `Thanh toán ${
                             estimatedTotal > 0
@@ -870,7 +1115,7 @@ const BookingPage = () => {
                   <div className="flex justify-between gap-4">
                     <span className="text-zinc-500">Số tiền</span>
                     <span className="font-extrabold text-lime-600 text-right">
-                      {Number(paymentInfo.remaining_amount || 0).toLocaleString(
+                      {Number(paymentInfo.remaining_amount ?? paymentInfo.amount ?? 0).toLocaleString(
                         "vi-VN",
                       )}{" "}
                       VNĐ
@@ -995,7 +1240,7 @@ const BookingPage = () => {
                       });
                       navigate("/guest-booking-lookup");
                     }}
-                    className="w-full py-3 rounded-2xl bg-lime-500 text-zinc-950 text-xs font-extrabold hover:bg-lime-400"
+                    className="user-btn-primary w-full py-3"
                   >
                     Tra cứu đơn
                   </button>
@@ -1010,7 +1255,7 @@ const BookingPage = () => {
                       });
                       navigate("/");
                     }}
-                    className="w-full py-3 rounded-2xl bg-zinc-900 text-white text-xs font-bold hover:bg-zinc-800"
+                    className="user-btn-secondary w-full py-3"
                   >
                     Tôi đã lưu mã đơn
                   </button>

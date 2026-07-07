@@ -60,7 +60,7 @@ const PromotionManager = () => {
 
   const showMessage = (type, text) => {
     setMessage({ type, text });
-    setTimeout(() => setMessage({ type: "", text: "" }), 2600);
+    setTimeout(() => setMessage({ type: "", text: "" }), 2500);
   };
 
   const handleSubmit = async (event) => {
@@ -121,24 +121,23 @@ const PromotionManager = () => {
     }
   };
 
-  const inputClass =
-    "w-full rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm font-medium text-slate-800 outline-none transition focus:border-lime-400 focus:bg-white";
+  const inputClass = "admin-input w-full px-3.5 py-2.5 text-sm";
 
   return (
     <div className="mx-auto max-w-[1400px] space-y-5">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-base font-semibold text-slate-900">
+          <h2 className="admin-page-title text-2xl">
             Mã giảm giá
           </h2>
-          <p className="mt-0.5 text-xs text-slate-500">
+          <p className="admin-page-subtitle text-sm mt-1">
             Tạo voucher cho khách nhập khi đặt sân.
           </p>
         </div>
         <button
           type="button"
           onClick={() => setForm(emptyForm)}
-          className="inline-flex items-center gap-2 rounded-lg bg-slate-950 px-4 py-2.5 text-xs font-bold text-white hover:bg-slate-800"
+          className="admin-btn-secondary flex items-center gap-2 px-4 py-2.5 text-xs font-bold"
         >
           <Plus className="h-4 w-4" />
           Tạo mã mới
@@ -163,7 +162,7 @@ const PromotionManager = () => {
       </AnimatePresence>
 
       <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-12">
-        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white lg:col-span-8">
+        <div className="admin-card overflow-hidden lg:col-span-8">
           <div className="flex flex-col gap-3 border-b border-slate-100 bg-slate-50/70 p-4 sm:flex-row">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -174,13 +173,13 @@ const PromotionManager = () => {
                   event.key === "Enter" && fetchPromotions()
                 }
                 placeholder="Tìm theo mã hoặc tên chương trình"
-                className="h-10 w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-sm outline-none focus:border-lime-400"
+                className="admin-input h-10 w-full pl-9 pr-3 text-sm"
               />
             </div>
             <select
               value={statusFilter}
               onChange={(event) => setStatusFilter(event.target.value)}
-              className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-600 outline-none focus:border-lime-400"
+              className="admin-input h-10 px-3 text-sm"
             >
               <option value="">Tất cả</option>
               <option value="active">Đang hoạt động</option>
@@ -189,7 +188,7 @@ const PromotionManager = () => {
             <button
               type="button"
               onClick={fetchPromotions}
-              className="h-10 rounded-lg bg-lime-500 px-4 text-xs font-black uppercase text-slate-950 hover:bg-lime-400"
+              className="admin-btn-primary px-4 h-10 text-xs font-black uppercase"
             >
               Lọc
             </button>
@@ -230,7 +229,7 @@ const PromotionManager = () => {
                     >
                       <td className="px-5 py-4">
                         <div className="flex items-center gap-3">
-                          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-lime-100 text-lime-700">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700">
                             <TicketPercent className="h-5 w-5" />
                           </div>
                           <div>
@@ -258,10 +257,10 @@ const PromotionManager = () => {
                       </td>
                       <td className="px-3 py-4 text-center">
                         <span
-                          className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold ${
+                          className={`admin-badge px-3 py-1 text-[10px] ${
                             promotion.status === "active"
-                              ? "bg-emerald-50 text-emerald-700"
-                              : "bg-slate-100 text-slate-500"
+                              ? "badge-success"
+                              : "badge-neutral"
                           }`}
                         >
                           {promotion.status === "active"
@@ -273,7 +272,7 @@ const PromotionManager = () => {
                         <button
                           type="button"
                           onClick={() => handleEdit(promotion)}
-                          className="mr-2 rounded border border-slate-200 px-2.5 py-1 text-[10px] font-bold text-slate-500 hover:bg-slate-50"
+                          className="admin-btn-outline px-2.5 py-1 mr-2 text-[10px]"
                         >
                           Sửa
                         </button>
@@ -281,7 +280,7 @@ const PromotionManager = () => {
                           <button
                             type="button"
                             onClick={() => handleHide(promotion)}
-                            className="rounded px-2.5 py-1 text-[10px] font-bold text-red-500 hover:bg-red-50"
+                            className="admin-btn-danger px-2.5 py-1 text-[10px]"
                           >
                             Ẩn
                           </button>
@@ -297,7 +296,7 @@ const PromotionManager = () => {
 
         <form
           onSubmit={handleSubmit}
-          className="sticky top-5 rounded-xl border border-slate-200 bg-white p-5 lg:col-span-4"
+          className="sticky top-5 admin-card p-5 lg:col-span-4"
         >
           <div className="mb-4 flex items-center justify-between border-b border-slate-100 pb-3">
             <h3 className="text-sm font-black text-slate-900">
@@ -426,7 +425,7 @@ const PromotionManager = () => {
                     onClick={() => setForm({ ...form, status: value })}
                     className={`rounded-lg border py-2 text-xs font-bold ${
                       form.status === value
-                        ? "border-lime-300 bg-lime-50 text-lime-700"
+                        ? "border-emerald-300 bg-emerald-50 text-emerald-700"
                         : "border-transparent bg-slate-50 text-slate-400"
                     }`}
                   >
@@ -438,7 +437,7 @@ const PromotionManager = () => {
             <button
               type="submit"
               disabled={isProcessing}
-              className="flex w-full items-center justify-center gap-2 rounded-lg bg-lime-500 py-3 text-xs font-black uppercase text-slate-950 hover:bg-lime-400 disabled:opacity-60"
+              className="admin-btn-primary flex w-full items-center justify-center gap-2 py-3 text-xs font-black uppercase disabled:opacity-60"
             >
               <Percent className="h-4 w-4" />
               {isProcessing
