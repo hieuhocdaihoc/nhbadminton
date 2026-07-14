@@ -9,14 +9,16 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('reviews', function (Blueprint $table) {
-            $table->string('status', 50)
-                ->default('pending')
-                ->after('staff_reply')
-                ->comment('Trạng thái kiểm duyệt: pending, approved, hidden');
-        });
+        if (!Schema::hasColumn('reviews', 'status')) {
+            Schema::table('reviews', function (Blueprint $table) {
+                $table->string('status', 50)
+                    ->default('pending')
+                    ->after('staff_reply')
+                    ->comment('Trạng thái kiểm duyệt: pending, approved, hidden');
+            });
 
-        DB::table('reviews')->update(['status' => 'approved']);
+            DB::table('reviews')->update(['status' => 'approved']);
+        }
     }
 
     public function down(): void

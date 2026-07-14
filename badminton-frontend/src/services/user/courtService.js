@@ -10,4 +10,7 @@ export const courtService = {
     // Lấy lưới giờ trống
     getCourtSlots: (id, date) =>
         axiosClient.get(`/courts/${id}/availability?date=${date}&mode=grid`),
+
+    // Lấy bảng giá tổng hợp cho trang chủ (grouped by day_type)
+    getPublicPricings: () => axiosClient.get('/pricings/public'),
 };

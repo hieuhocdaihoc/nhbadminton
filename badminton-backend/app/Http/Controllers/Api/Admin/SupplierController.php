@@ -11,7 +11,8 @@ class SupplierController extends Controller
     /** Chức năng: Lấy danh sách nhà cung cấp, hỗ trợ tìm kiếm theo tên hoặc số điện thoại. */
     public function index(Request $request)
     {
-        $query = Supplier::query();
+        $query = Supplier::withCount('purchaseOrders')
+            ->withSum('purchaseOrders as total_import_amount', 'total_amount');
 
         if ($request->filled('keyword')) {
             $keyword = $request->query('keyword');
@@ -21,7 +22,13 @@ class SupplierController extends Controller
 
         $suppliers = $query->orderBy('name', 'asc')->get();
 
-        return response()->json(['status' => 'success', 'data' => $suppliers]);
+        $stats = [
+            'total'               => $suppliers->count(),
+            'total_orders'        => (int) $suppliers->sum('purchase_orders_count'),
+            'total_import_amount' => (float) $suppliers->sum('total_import_amount'),
+        ];
+
+        return response()->json(['status' => 'success', 'data' => $suppliers, 'stats' => $stats]);
     }
 
     /** Chức năng: Tạo mới thông tin nhà cung cấp. */

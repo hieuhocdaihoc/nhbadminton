@@ -1,7 +1,13 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { Fragment, useState, useEffect, useMemo, useCallback } from "react";
 import { useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { adminBookingService } from "../../services/admin/bookingService";
+import {
+  dayDiffFromToday,
+  groupByProximity,
+  relativeDayLabel,
+  relativeDayStyle,
+} from "../../utils/bookingDateGroups";
 
 const RecurringBookings = () => {
   const location = useLocation();
@@ -131,6 +137,37 @@ const RecurringBookings = () => {
     );
   }, [sessions, sessionSearchTerm]);
 
+  // Buổi chơi chia nhóm theo độ gần: Hôm nay → Ngày mai → 7 ngày tới → Sắp tới → Đã diễn ra
+  const groupedSessions = useMemo(
+    () =>
+      groupByProximity(
+        filteredSessions,
+        (s) => s.details?.[0]?.booking_date,
+        (s) => s.details?.[0]?.start_time || "",
+      ),
+    [filteredSessions],
+  );
+
+  // Trạng thái hiệu lực của hợp đồng để sắp xếp + hiển thị badge:
+  // rank 0 = đang chạy (sắp hết hạn trước), 1 = sắp bắt đầu (gần nhất trước), 2 = đã kết thúc (mới nhất trước)
+  const masterLifecycle = (m) => {
+    const startDiff = dayDiffFromToday(m.start_date);
+    const endDiff = dayDiffFromToday(m.end_date);
+    if (endDiff !== null && endDiff < 0)
+      return { rank: 2, sort: -endDiff, label: "Đã kết thúc", cls: "bg-zinc-100 text-zinc-400" };
+    if (startDiff !== null && startDiff > 0)
+      return { rank: 1, sort: startDiff, label: startDiff === 1 ? "Bắt đầu ngày mai" : `Bắt đầu sau ${startDiff} ngày`, cls: "bg-blue-50 text-blue-700" };
+    return { rank: 0, sort: endDiff ?? 0, label: "Đang chạy", cls: "bg-emerald-50 text-emerald-700" };
+  };
+
+  const sortedMasters = useMemo(() => {
+    return [...filteredMasters].sort((a, b) => {
+      const la = masterLifecycle(a);
+      const lb = masterLifecycle(b);
+      return la.rank !== lb.rank ? la.rank - lb.rank : la.sort - lb.sort;
+    });
+  }, [filteredMasters]);
+
   // --- ACTIONS ---
   const requestAction = (sessionBooking, type) => {
     let title = "";
@@ -138,12 +175,7 @@ const RecurringBookings = () => {
     let payload = {};
     let actionType = "status";
 
-    if (type === "confirm") {
-      title = "Xác nhận duyệt ca";
-      msg = "Xác nhận giữ sân cho ca đá này?";
-      payload = { status: "confirmed" };
-      actionType = "status";
-    } else if (type === "complete") {
+    if (type === "complete") {
       title = "Hoàn thành ca chơi";
       msg = "Xác nhận kết thúc ca chơi này?";
       payload = { status: "completed" };
@@ -243,12 +275,6 @@ const RecurringBookings = () => {
 
   // --- UTILS ---
   const statusConfig = {
-    pending: {
-      dot: "bg-amber-400",
-      text: "text-amber-700",
-      bg: "bg-amber-50",
-      label: "Chờ",
-    },
     confirmed: {
       dot: "bg-blue-500",
       text: "text-blue-700",
@@ -332,10 +358,11 @@ const RecurringBookings = () => {
                 <div className="w-5 h-5 border-2 border-zinc-300 border-t-zinc-600 rounded-full animate-spin" />
               </div>
             ) : (
-              filteredMasters.map((m) => {
+              sortedMasters.map((m) => {
                 const isSelected = selectedMaster?.id === m.id;
                 const isNotificationTarget =
                   location.state?.notificationBookingCode === m.recurring_code;
+                const lifecycle = masterLifecycle(m);
                 return (
                   <button
                     key={m.id}
@@ -357,9 +384,9 @@ const RecurringBookings = () => {
                         {m.recurring_code}
                       </span>
                       <span
-                        className={`text-[10px] ${isSelected ? "text-zinc-400" : "text-zinc-400"}`}
+                        className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${isSelected ? "bg-zinc-800 text-zinc-300" : lifecycle.cls}`}
                       >
-                        {m.court?.name}
+                        {lifecycle.label}
                       </span>
                     </div>
                     <p
@@ -376,6 +403,7 @@ const RecurringBookings = () => {
                       className={`mt-2 pt-2 border-t border-dashed flex justify-between items-center text-[10px] ${isSelected ? "border-zinc-700 text-zinc-400" : "border-zinc-100 text-zinc-400"}`}
                     >
                       <span>
+                        {m.court?.name ? `${m.court.name} · ` : ""}
                         {formatDaysOfWeek(m.days_of_week ?? m.day_of_week)}
                       </span>
                       <span className="font-mono">
@@ -389,14 +417,13 @@ const RecurringBookings = () => {
           </div>
         </div>
 
-        {/* PHẢI — BẢNG CHI TIẾT BUỔI CHƠI */}
+        {/* PHẢI — DANH SÁCH BUỔI CHƠI DẠNG CARD */}
         <div className="col-span-8 admin-card border-none flex flex-col min-h-0 overflow-hidden">
-          {/* Session Header */}
+          {/* Header */}
           <div className="shrink-0 px-5 py-3.5 border-b border-zinc-100 flex justify-between items-center">
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-lg bg-zinc-100 flex items-center justify-center text-zinc-500 font-medium text-xs shrink-0">
-                {selectedMaster?.user?.full_name?.charAt(0).toUpperCase() ||
-                  "?"}
+                {selectedMaster?.user?.full_name?.charAt(0).toUpperCase() || "?"}
               </div>
               <div>
                 <h3 className="text-sm font-medium text-zinc-800">
@@ -406,13 +433,10 @@ const RecurringBookings = () => {
                   <div className="flex items-center gap-2 mt-0.5 text-[11px] text-zinc-400">
                     <span>{selectedMaster.user?.phone}</span>
                     <span>·</span>
-                    <span>
-                      {formatDaysOfWeek(selectedMaster.days_of_week ?? selectedMaster.day_of_week)}
-                    </span>
+                    <span>{formatDaysOfWeek(selectedMaster.days_of_week ?? selectedMaster.day_of_week)}</span>
                     <span>·</span>
                     <span className="font-mono">
-                      {formatVN(selectedMaster.start_date)} →{" "}
-                      {formatVN(selectedMaster.end_date)}
+                      {formatVN(selectedMaster.start_date)} → {formatVN(selectedMaster.end_date)}
                     </span>
                   </div>
                 )}
@@ -420,15 +444,8 @@ const RecurringBookings = () => {
             </div>
             {selectedMaster && (
               <div className="relative w-44">
-                <svg
-                  className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-400"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                >
-                  <circle cx="11" cy="11" r="8" />
-                  <path d="m21 21-4.3-4.3" />
+                <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />
                 </svg>
                 <input
                   type="text"
@@ -441,151 +458,153 @@ const RecurringBookings = () => {
             )}
           </div>
 
-          {/* Bảng buổi chơi */}
-          <div className="flex-1 overflow-auto">
-            <table className="w-full text-left text-xs whitespace-nowrap">
-              <thead className="bg-zinc-50/60 sticky top-0 z-10 border-b border-zinc-100">
-                <tr className="text-[10px] font-medium text-zinc-400 uppercase tracking-wider">
-                  <th className="py-2.5 px-5" style={{ width: "150px" }}>
-                    Mã ca
-                  </th>
-                  <th className="py-2.5 px-3" style={{ width: "100px" }}>
-                    Ngày
-                  </th>
-                  <th className="py-2.5 px-3" style={{ width: "100px" }}>
-                    Giờ
-                  </th>
-                  <th
-                    className="py-2.5 px-3 text-right"
-                    style={{ width: "90px" }}
-                  >
-                    Số tiền
-                  </th>
-                  <th
-                    className="py-2.5 px-3 text-center"
-                    style={{ width: "80px" }}
-                  >
-                    Trạng thái
-                  </th>
-                  <th
-                    className="py-2.5 px-5 text-right"
-                    style={{ width: "200px" }}
-                  >
-                    Thao tác
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {!selectedMaster ? (
-                  <tr>
-                    <td
-                      colSpan="6"
-                      className="py-20 text-center text-xs text-zinc-300"
-                    >
-                      ← Chọn hợp đồng bên trái để xem chi tiết
-                    </td>
-                  </tr>
-                ) : isLoadingSessions ? (
-                  <tr>
-                    <td colSpan="6" className="py-20 text-center">
-                      <div className="inline-block w-5 h-5 border-2 border-zinc-300 border-t-zinc-600 rounded-full animate-spin" />
-                    </td>
-                  </tr>
-                ) : (
-                  filteredSessions.map((s) => {
-                    const sc = statusConfig[s.status] || statusConfig.pending;
-                    const isCancelled = s.status === "cancelled";
-                    return (
-                      <tr
-                        key={s.id}
-                        className={`border-b border-zinc-100 last:border-b-0 hover:bg-zinc-50/40 transition-colors group ${isCancelled ? "opacity-45" : ""}`}
-                      >
-                        <td className="py-3 px-5 font-mono text-[11px] text-zinc-700">
-                          {s.booking_code}
-                        </td>
-                        <td className="py-3 px-3 text-xs text-zinc-600">
-                          {s.details?.[0]?.booking_date
-                            ? formatVN(s.details[0].booking_date)
-                            : "—"}
-                        </td>
-                        <td className="py-3 px-3">
-                          <span className="text-xs font-mono text-zinc-600">
-                            {s.details?.[0]?.start_time?.slice(0, 5)} –{" "}
-                            {s.details?.[0]?.end_time?.slice(0, 5)}
-                          </span>
-                        </td>
-                        <td className="py-3 px-3 text-right">
-                          <p className="text-xs font-semibold text-zinc-800">
-                            {Number(s.total_price).toLocaleString()}₫
-                          </p>
-                          <p
-                            className={`text-[10px] ${s.payment_status === "paid" ? "text-emerald-600" : "text-amber-500"}`}
+          {/* Nội dung card */}
+          <div className="flex-1 overflow-y-auto p-4">
+            {!selectedMaster ? (
+              <div className="flex items-center justify-center h-full text-xs text-zinc-300">
+                ← Chọn hợp đồng bên trái để xem chi tiết
+              </div>
+            ) : isLoadingSessions ? (
+              <div className="flex items-center justify-center h-full">
+                <div className="w-5 h-5 border-2 border-zinc-300 border-t-zinc-600 rounded-full animate-spin" />
+              </div>
+            ) : (
+              <div className="space-y-5">
+                {groupedSessions.map((group) => (
+                  <div key={group.key}>
+                    {/* Nhãn nhóm */}
+                    <div className="flex items-center gap-2 mb-2.5">
+                      <span className={`text-[10px] font-bold uppercase tracking-widest ${
+                        group.key === "today" ? "text-emerald-600" :
+                        group.key === "past"  ? "text-zinc-400"    : "text-zinc-500"
+                      }`}>
+                        {group.label}
+                      </span>
+                      <span className="text-[10px] text-zinc-400 bg-zinc-100 px-1.5 py-0.5 rounded-full font-medium">
+                        {group.items.length} buổi
+                      </span>
+                      <div className="flex-1 h-px bg-zinc-100" />
+                    </div>
+
+                    {/* Cards */}
+                    <div className="space-y-2">
+                      {group.items.map((s) => {
+                        const sc = statusConfig[s.status] || statusConfig.confirmed;
+                        const isCancelled   = s.status === "cancelled";
+                        const isCompleted   = s.status === "completed";
+                        const isPast        = isCancelled || isCompleted;
+
+                        const accentBorder = {
+                          confirmed : "border-l-blue-400",
+                          playing   : "border-l-violet-500",
+                          completed : "border-l-emerald-400",
+                          cancelled : "border-l-zinc-300",
+                        }[s.status] ?? "border-l-blue-400";
+
+                        const cardBg = {
+                          confirmed : "bg-white",
+                          playing   : "bg-violet-50/40",
+                          completed : "bg-emerald-50/30",
+                          cancelled : "bg-zinc-50/60",
+                        }[s.status] ?? "bg-white";
+
+                        return (
+                          <div
+                            key={s.id}
+                            className={`flex items-center gap-4 rounded-lg border border-zinc-100 border-l-[3px] ${accentBorder} ${cardBg} px-4 py-3 transition-shadow hover:shadow-sm ${isPast ? "opacity-60" : ""}`}
                           >
-                            {s.payment_status === "paid"
-                              ? "✓ Đã thu"
-                              : "○ Chưa thu"}
-                          </p>
-                        </td>
-                        <td className="py-3 px-3 text-center">
-                          <span
-                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium ${sc.bg} ${sc.text}`}
-                          >
-                            <span
-                              className={`w-1.5 h-1.5 rounded-full ${sc.dot}`}
-                            />
-                            {sc.label}
-                          </span>
-                        </td>
-                        <td className="py-3 px-5 text-right">
-                          <div className="flex items-center justify-end gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
-                            {s.status === "pending" && (
-                              <button
-                                onClick={() => requestAction(s, "confirm")}
-                                className="admin-btn-secondary px-2.5 py-1 text-[10px] font-medium"
-                              >
-                                Duyệt
-                              </button>
-                            )}
-                            {s.payment_status !== "paid" && !isCancelled && (
-                              <button
-                                onClick={() => requestAction(s, "pay")}
-                                className="admin-btn-primary px-2.5 py-1 text-[10px] font-medium"
-                              >
-                                Thu
-                              </button>
-                            )}
-                            {["playing", "confirmed"].includes(s.status) && s.payment_status === "paid" && (
-                              <button
-                                onClick={() => requestAction(s, "complete")}
-                                className="admin-btn-primary px-2.5 py-1 text-[10px] font-medium"
-                              >
-                                Hoàn thành
-                              </button>
-                            )}
-                            {!["playing", "cancelled", "completed"].includes(s.status) && (
-                              <button
-                                onClick={() => openRescheduleModal(s)}
-                                className="admin-btn-outline px-2.5 py-1 text-[10px]"
-                              >
-                                Đổi lịch
-                              </button>
-                            )}
-                            {!["playing", "cancelled", "completed"].includes(s.status) && (
-                              <button
-                                onClick={() => requestAction(s, "cancel")}
-                                className="admin-btn-outline px-2 py-1 text-[10px] hover:text-red-500 hover:border-red-200"
-                              >
-                                Hủy
-                              </button>
-                            )}
+                            {/* Ngày + giờ */}
+                            <div className="w-24 shrink-0">
+                              <p className="text-xs font-semibold text-zinc-700">
+                                {s.details?.[0]?.booking_date ? formatVN(s.details[0].booking_date) : "—"}
+                              </p>
+                              <p className="text-[11px] font-mono text-zinc-500 mt-0.5">
+                                {s.details?.[0]?.start_time?.slice(0,5)} – {s.details?.[0]?.end_time?.slice(0,5)}
+                              </p>
+                              {s.details?.[0]?.booking_date && (
+                                <span className={`inline-block mt-1 px-1.5 py-0.5 rounded text-[9px] font-medium ${relativeDayStyle(s.details[0].booking_date)}`}>
+                                  {relativeDayLabel(s.details[0].booking_date)}
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Mã ca */}
+                            <div className="w-28 shrink-0">
+                              <p className="text-[10px] text-zinc-400 mb-0.5">Mã ca</p>
+                              <p className="text-[11px] font-mono text-zinc-600">{s.booking_code}</p>
+                            </div>
+
+                            {/* Sân */}
+                            <div className="w-20 shrink-0">
+                              <p className="text-[10px] text-zinc-400 mb-0.5">Sân</p>
+                              <p className="text-[11px] text-zinc-600">{s.details?.[0]?.court?.name || "—"}</p>
+                            </div>
+
+                            {/* Tiền */}
+                            <div className="w-24 shrink-0 text-right">
+                              <p className="text-xs font-bold text-zinc-800">
+                                {Number(s.total_price).toLocaleString()}₫
+                              </p>
+                              <span className={`inline-flex items-center gap-1 mt-0.5 text-[10px] font-medium ${
+                                s.payment_status === "paid"
+                                  ? "text-emerald-600"
+                                  : "text-amber-500"
+                              }`}>
+                                {s.payment_status === "paid" ? "✓ Đã thu" : "○ Chưa thu"}
+                              </span>
+                            </div>
+
+                            {/* Trạng thái */}
+                            <div className="shrink-0">
+                              <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold ${sc.bg} ${sc.text}`}>
+                                <span className={`w-1.5 h-1.5 rounded-full ${sc.dot}`} />
+                                {sc.label}
+                              </span>
+                            </div>
+
+                            {/* Thao tác */}
+                            <div className="ml-auto flex items-center gap-1.5 shrink-0">
+                              {s.payment_status !== "paid" && !isCancelled && (
+                                <button
+                                  onClick={() => requestAction(s, "pay")}
+                                  className="admin-btn-primary px-2.5 py-1 text-[10px] font-medium"
+                                >
+                                  Thu tiền
+                                </button>
+                              )}
+                              {["playing", "confirmed"].includes(s.status) && s.payment_status === "paid" && (
+                                <button
+                                  onClick={() => requestAction(s, "complete")}
+                                  className="admin-btn-primary px-2.5 py-1 text-[10px] font-medium"
+                                >
+                                  Hoàn thành
+                                </button>
+                              )}
+                              {!["playing", "cancelled", "completed"].includes(s.status) && (
+                                <button
+                                  onClick={() => openRescheduleModal(s)}
+                                  className="admin-btn-outline px-2.5 py-1 text-[10px]"
+                                >
+                                  Đổi lịch
+                                </button>
+                              )}
+                              {!["playing", "cancelled", "completed"].includes(s.status) && (
+                                <button
+                                  onClick={() => requestAction(s, "cancel")}
+                                  className="admin-btn-outline px-2 py-1 text-[10px] hover:text-red-500 hover:border-red-200"
+                                >
+                                  Hủy
+                                </button>
+                              )}
+                            </div>
                           </div>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>

@@ -12,6 +12,10 @@ const emptyForm = {
   discount_value: "",
   per_user_limit: 1,
   min_points_required: 0,
+  valid_from: "",
+  valid_to: "",
+  auto_apply: false,
+  description: "",
   status: "active",
 };
 
@@ -67,12 +71,19 @@ const PromotionManager = () => {
     event.preventDefault();
     setIsProcessing(true);
 
+    // Voucher trong ngày (auto_apply): áp cho MỌI đơn trong thời gian hiệu lực nên
+    // không giới hạn lượt dùng và không yêu cầu điểm (0 = không giới hạn).
+    // Voucher nhập mã: dành cho tài khoản cụ thể nên phải có số lượt/khách.
     const payload = {
       ...form,
       code: form.code.trim().toUpperCase(),
       discount_value: Number(form.discount_value),
-      per_user_limit: Number(form.per_user_limit || 1),
-      min_points_required: Number(form.min_points_required || 0),
+      per_user_limit: form.auto_apply ? 0 : Number(form.per_user_limit || 1),
+      min_points_required: form.auto_apply ? 0 : Number(form.min_points_required || 0),
+      valid_from: form.valid_from || null,
+      valid_to: form.valid_to || null,
+      auto_apply: Boolean(form.auto_apply),
+      description: form.description || null,
     };
 
     try {
@@ -103,8 +114,13 @@ const PromotionManager = () => {
       name: promotion.name || "",
       discount_type: promotion.discount_type || "fixed",
       discount_value: promotion.discount_value || "",
-      per_user_limit: promotion.per_user_limit || 1,
+      // Voucher trong ngày lưu 0 (không giới hạn) — nếu đổi sang loại nhập mã thì mặc định 1
+      per_user_limit: Number(promotion.per_user_limit) > 0 ? promotion.per_user_limit : 1,
       min_points_required: promotion.min_points_required || 0,
+      valid_from: promotion.valid_from?.slice(0, 10) || "",
+      valid_to: promotion.valid_to?.slice(0, 10) || "",
+      auto_apply: Boolean(promotion.auto_apply),
+      description: promotion.description || "",
       status: promotion.status || "active",
     });
   };
@@ -246,14 +262,26 @@ const PromotionManager = () => {
                         {formatDiscount(promotion)}
                       </td>
                       <td className="px-3 py-4 text-xs text-slate-500">
-                        <p>{promotion.per_user_limit || 1} lượt / khách</p>
-                        <p>
-                          Tối thiểu{" "}
-                          {Number(
-                            promotion.min_points_required || 0,
-                          ).toLocaleString("vi-VN")}{" "}
-                          điểm
-                        </p>
+                        {promotion.auto_apply ? (
+                          <span className="admin-badge px-2 py-0.5 text-[10px] bg-amber-50 text-amber-700 border border-amber-200">
+                            Trong ngày — áp mọi đơn
+                          </span>
+                        ) : (
+                          <>
+                            <p>
+                              {Number(promotion.per_user_limit) > 0
+                                ? `${promotion.per_user_limit} lượt / khách`
+                                : "Không giới hạn lượt"}
+                            </p>
+                            <p>
+                              Tối thiểu{" "}
+                              {Number(
+                                promotion.min_points_required || 0,
+                              ).toLocaleString("vi-VN")}{" "}
+                              điểm
+                            </p>
+                          </>
+                        )}
                       </td>
                       <td className="px-3 py-4 text-center">
                         <span
@@ -314,6 +342,46 @@ const PromotionManager = () => {
           </div>
 
           <div className="space-y-4">
+            {/* LOẠI VOUCHER — quyết định các trường hiển thị bên dưới */}
+            <div>
+              <label className="mb-1.5 block text-[11px] font-bold text-slate-500">
+                Loại voucher
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setForm({ ...form, auto_apply: false })}
+                  className={`rounded-lg border p-2.5 text-left ${
+                    !form.auto_apply
+                      ? "border-emerald-300 bg-emerald-50"
+                      : "border-slate-200 bg-slate-50 opacity-60"
+                  }`}
+                >
+                  <span className={`block text-xs font-bold ${!form.auto_apply ? "text-emerald-700" : "text-slate-500"}`}>
+                    Nhập mã
+                  </span>
+                  <span className={`block text-[10px] mt-0.5 ${!form.auto_apply ? "text-emerald-600" : "text-slate-400"}`}>
+                    Khách nhập mã khi đặt, giới hạn lượt dùng theo tài khoản
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setForm({ ...form, auto_apply: true })}
+                  className={`rounded-lg border p-2.5 text-left ${
+                    form.auto_apply
+                      ? "border-amber-300 bg-amber-50"
+                      : "border-slate-200 bg-slate-50 opacity-60"
+                  }`}
+                >
+                  <span className={`block text-xs font-bold ${form.auto_apply ? "text-amber-700" : "text-slate-500"}`}>
+                    Trong ngày — tự động
+                  </span>
+                  <span className={`block text-[10px] mt-0.5 ${form.auto_apply ? "text-amber-600" : "text-slate-400"}`}>
+                    Tự áp cho mọi đơn trong thời gian hiệu lực, không giới hạn lượt
+                  </span>
+                </button>
+              </div>
+            </div>
             <div>
               <label className="mb-1.5 block text-[11px] font-bold text-slate-500">
                 Mã code *
@@ -377,39 +445,88 @@ const PromotionManager = () => {
                 />
               </div>
             </div>
+            {/* Voucher trong ngày áp cho mọi đơn nên không cần lượt dùng / điểm tối thiểu */}
+            {!form.auto_apply && (
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="mb-1.5 block text-[11px] font-bold text-slate-500">
+                    Lượt/khách *
+                  </label>
+                  <input
+                    required
+                    type="number"
+                    min="1"
+                    value={form.per_user_limit}
+                    onChange={(event) =>
+                      setForm({ ...form, per_user_limit: event.target.value })
+                    }
+                    className={inputClass}
+                  />
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-[11px] font-bold text-slate-500">
+                    Điểm tối thiểu
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={form.min_points_required}
+                    onChange={(event) =>
+                      setForm({
+                        ...form,
+                        min_points_required: event.target.value,
+                      })
+                    }
+                    className={inputClass}
+                  />
+                </div>
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="mb-1.5 block text-[11px] font-bold text-slate-500">
-                  Lượt/khách
+                  Hiệu lực từ
                 </label>
                 <input
-                  type="number"
-                  min="1"
-                  value={form.per_user_limit}
+                  type="date"
+                  value={form.valid_from}
                   onChange={(event) =>
-                    setForm({ ...form, per_user_limit: event.target.value })
+                    setForm({ ...form, valid_from: event.target.value })
                   }
                   className={inputClass}
                 />
               </div>
               <div>
                 <label className="mb-1.5 block text-[11px] font-bold text-slate-500">
-                  Điểm tối thiểu
+                  Hết hạn
                 </label>
                 <input
-                  type="number"
-                  min="0"
-                  value={form.min_points_required}
+                  type="date"
+                  value={form.valid_to}
                   onChange={(event) =>
-                    setForm({
-                      ...form,
-                      min_points_required: event.target.value,
-                    })
+                    setForm({ ...form, valid_to: event.target.value })
                   }
                   className={inputClass}
                 />
               </div>
             </div>
+            {form.auto_apply && (
+              <div>
+                <label className="mb-1.5 block text-[11px] font-bold text-slate-500">
+                  Mô tả dịp áp dụng
+                </label>
+                <input
+                  type="text"
+                  maxLength={255}
+                  value={form.description}
+                  onChange={(event) =>
+                    setForm({ ...form, description: event.target.value })
+                  }
+                  placeholder="VD: Kỷ niệm 1 năm thành lập sân"
+                  className={inputClass}
+                />
+              </div>
+            )}
             <div>
               <label className="mb-1.5 block text-[11px] font-bold text-slate-500">
                 Trạng thái

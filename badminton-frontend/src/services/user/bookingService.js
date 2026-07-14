@@ -29,11 +29,22 @@ export const bookingService = {
         return axiosClient.get(`/booking-intents/${intentCode}/status`);
     },
 
-    cancelUnpaid: (payload) => {
-        return axiosClient.delete('/bookings/cancel-unpaid', { data: payload });
-    },
-
     sendRequest: (payload) => {
         return axiosClient.post('/user/booking-request', payload);
+    },
+
+    // Đổi lịch tự động theo chính sách báo trước/báo sau
+    rescheduleSession: (payload) => {
+        return axiosClient.post('/user/bookings/reschedule', payload);
+    },
+
+    // Thống kê số buổi của tài khoản
+    getMyBookingStats: () => {
+        return axiosClient.get('/user/booking-stats');
+    },
+
+    // Mã giảm giá ngày đặc biệt đang tự động áp dụng hôm nay
+    getAutoPromotion: () => {
+        return axiosClient.get('/promotions/auto-today');
     },
 };

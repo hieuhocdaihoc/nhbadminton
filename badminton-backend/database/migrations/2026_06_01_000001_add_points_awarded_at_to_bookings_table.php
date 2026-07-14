@@ -8,9 +8,11 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('bookings', function (Blueprint $table) {
-            $table->dateTime('points_awarded_at')->nullable()->after('payment_status');
-        });
+        if (!Schema::hasColumn('bookings', 'points_awarded_at')) {
+            Schema::table('bookings', function (Blueprint $table) {
+                $table->dateTime('points_awarded_at')->nullable()->after('payment_status');
+            });
+        }
     }
 
     public function down(): void

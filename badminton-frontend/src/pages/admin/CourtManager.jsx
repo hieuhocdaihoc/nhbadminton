@@ -4,8 +4,10 @@ import { adminCourtService } from "../../services/admin/courtService";
 import { Grid3X3 } from "lucide-react";
 import EmptyState from "../../components/admin/EmptyState";
 import LoadingSpinner from "../../components/admin/LoadingSpinner";
+import CourtPerformance from "./CourtPerformance";
 
 const CourtManager = () => {
+  const [activeTab, setActiveTab] = useState("list");
   const [courts, setCourts] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState({ type: "", text: "" });
@@ -103,15 +105,15 @@ const CourtManager = () => {
   };
 
   const handleDeleteCourt = async (id, name) => {
-    if (!window.confirm(`Xóa vĩnh viễn "${name}" khỏi hệ thống?`)) return;
+    if (!window.confirm(`Xóa "${name}"? Nếu sân chưa từng có đơn đặt nào sẽ bị xóa vĩnh viễn, ngược lại chỉ chuyển sang ngưng hoạt động.`)) return;
     try {
-      await adminCourtService.deleteCourt(id);
-      setMessage({ type: "success", text: `Đã xóa ${name}.` });
+      const res = await adminCourtService.deleteCourt(id);
+      setMessage({ type: "success", text: res.data?.message || `Đã xử lý ${name}.` });
       fetchCourts();
     } catch (error) {
       setMessage({
         type: "error",
-        text: "Không thể xóa — sân đang vướng dữ liệu booking.",
+        text: error.response?.data?.message || "Thao tác thất bại.",
       });
     }
   };
@@ -130,28 +132,55 @@ const CourtManager = () => {
         <div>
           <h2 className="admin-page-title">Quản lý sân</h2>
           <p className="admin-page-subtitle">
-            Cơ sở vật chất, thảm trải và đèn chiếu sáng
+            Cơ sở vật chất và báo cáo hiệu suất sử dụng sân
           </p>
         </div>
-        <div className="flex gap-2.5">
-          <div className="admin-stat-badge badge-default">
-            <p className="admin-stat-value val-default">{totalCourts}</p>
-            <p className="admin-stat-label lbl-default">Tổng sân</p>
-          </div>
-          <div className="admin-stat-badge badge-success">
-            <p className="admin-stat-value val-success">{activeCourts}</p>
-            <p className="admin-stat-label lbl-success">Sẵn sàng</p>
-          </div>
-          {maintenanceCourts > 0 && (
-            <div className="admin-stat-badge badge-danger">
-              <p className="admin-stat-value val-danger">
-                {maintenanceCourts}
-              </p>
-              <p className="admin-stat-label lbl-danger">Bảo trì</p>
+        {activeTab === "list" && (
+          <div className="flex gap-2.5">
+            <div className="admin-stat-badge badge-default">
+              <p className="admin-stat-value val-default">{totalCourts}</p>
+              <p className="admin-stat-label lbl-default">Tổng sân</p>
             </div>
-          )}
-        </div>
+            <div className="admin-stat-badge badge-success">
+              <p className="admin-stat-value val-success">{activeCourts}</p>
+              <p className="admin-stat-label lbl-success">Sẵn sàng</p>
+            </div>
+            {maintenanceCourts > 0 && (
+              <div className="admin-stat-badge badge-danger">
+                <p className="admin-stat-value val-danger">
+                  {maintenanceCourts}
+                </p>
+                <p className="admin-stat-label lbl-danger">Bảo trì</p>
+              </div>
+            )}
+          </div>
+        )}
       </div>
+
+      {/* TAB CHUYỂN GIỮA DANH SÁCH SÂN VÀ HIỆU SUẤT */}
+      <div className="flex gap-1 border-b border-zinc-200">
+        {[
+          { key: "list", label: "Danh sách sân" },
+          { key: "performance", label: "Hiệu suất & doanh thu" },
+        ].map((t) => (
+          <button
+            key={t.key}
+            onClick={() => setActiveTab(t.key)}
+            className={`px-4 py-2.5 text-xs font-semibold border-b-2 -mb-px transition-colors ${
+              activeTab === t.key
+                ? "border-emerald-500 text-emerald-600"
+                : "border-transparent text-zinc-400 hover:text-zinc-600"
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === "performance" && <CourtPerformance embedded />}
+
+      {activeTab === "list" && (
+        <>
 
       {/* THÔNG BÁO (TOAST) */}
       <AnimatePresence>
@@ -425,8 +454,11 @@ const CourtManager = () => {
           </div>
         )}
       </AnimatePresence>
+        </>
+      )}
     </div>
   );
 };
 
 export default CourtManager;
+

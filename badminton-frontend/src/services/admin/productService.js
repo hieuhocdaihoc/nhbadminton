@@ -31,4 +31,9 @@ export const adminProductService = {
     // Gọi thẳng vào route PUT của resource, gửi kèm payload status = active
     return axiosClient.put(`/admin/products/${id}`, { status: "active" });
   },
+
+  // 6. Báo cáo tồn kho: top bán chạy, cần nhập thêm, giá trị tồn kho theo danh mục
+  getReport: () => {
+    return axiosClient.get("/admin/products-report");
+  },
 };

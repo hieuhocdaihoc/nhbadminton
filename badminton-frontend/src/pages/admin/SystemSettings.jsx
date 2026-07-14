@@ -156,6 +156,36 @@ const SystemSettings = () => {
           </div>
         </div>
 
+        {/* ═══ KHỐI RIÊNG: ĐẶT CỌC & THANH TOÁN ═══ */}
+        <div className="admin-card p-5">
+          <h3 className="text-sm font-semibold text-zinc-800 mb-1">
+            Đặt cọc & thanh toán
+          </h3>
+          <p className="text-[11px] text-zinc-400 mb-4">
+            Tỷ lệ % tổng tiền đơn mà khách cần chuyển khoản trước để giữ chỗ khi đặt
+            sân lẻ (phần còn lại thanh toán tại sân). Không hoàn lại tiền cọc nếu
+            khách hủy hoặc không đến.
+          </p>
+          <div className="max-w-[200px]">
+            <label className="admin-form-label">
+              Tỷ lệ đặt cọc (%)
+            </label>
+            <div className="relative">
+              <input
+                type="number"
+                min="1"
+                max="100"
+                step="1"
+                value={settings.deposit_percent || ""}
+                onChange={(e) => handleChange("deposit_percent", e.target.value)}
+                placeholder="20"
+                className={inputClass}
+              />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-zinc-400 font-bold">%</span>
+            </div>
+          </div>
+        </div>
+
         {/* ═══ KHỐI RIÊNG: HOTLINE + EMAIL ═══ */}
         <div className="admin-card p-5">
           <h3 className="text-sm font-semibold text-zinc-800 mb-4 pb-3 border-b border-zinc-100">

@@ -115,8 +115,13 @@ class PromotionController extends Controller
                     }
                 },
             ],
-            'per_user_limit'      => ['nullable', 'integer', 'min:1'],
+            // 0 = không giới hạn lượt (voucher trong ngày tự động áp cho mọi đơn)
+            'per_user_limit'      => ['nullable', 'integer', 'min:0'],
             'min_points_required' => ['nullable', 'integer', 'min:0'],
+            'valid_from'          => ['nullable', 'date'],
+            'valid_to'            => ['nullable', 'date', 'after_or_equal:valid_from'],
+            'auto_apply'          => ['nullable', 'boolean'],
+            'description'         => ['nullable', 'string', 'max:255'],
             'status'              => ['nullable', 'in:active,inactive'],
         ], [
             'code.regex'         => 'Mã voucher chỉ được chứa chữ cái không dấu, số, dấu gạch dưới (_) và gạch ngang (-).',

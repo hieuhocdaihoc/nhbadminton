@@ -29,7 +29,6 @@ import SingleBookings from "./pages/admin/SingleBookings";
 import RecurringBookings from "./pages/admin/RecurringBookings";
 import LongTermBookings from "./pages/admin/LongTermBookings";
 import CreateBooking from "./pages/admin/CreateBooking";
-import Categories from "./pages/admin/Categories";
 import AdditionalServiceManager from "./pages/admin/Services";
 import SupplierManager from "./pages/admin/SupplierManager";
 import InventoryManager from "./pages/admin/InventoryManager";
@@ -238,14 +237,6 @@ function App() {
           element={
             <ProtectedAdminPage allowedRoles={["admin", "staff"]}>
               <LongTermBookings />
-            </ProtectedAdminPage>
-          }
-        />
-        <Route
-          path="/admin/categories"
-          element={
-            <ProtectedAdminPage allowedRoles={["admin", "staff"]}>
-              <Categories />
             </ProtectedAdminPage>
           }
         />

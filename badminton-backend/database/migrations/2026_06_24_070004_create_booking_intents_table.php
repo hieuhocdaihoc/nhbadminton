@@ -11,6 +11,9 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (Schema::hasTable('booking_intents')) {
+            return;
+        }
         Schema::create('booking_intents', function (Blueprint $table) {
             $table->uuid('id')->primary();
             $table->string('intent_code', 20)->unique(); // PAY_XXXXXX

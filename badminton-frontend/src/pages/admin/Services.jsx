@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { adminAdditionalService } from "../../services/admin/additionalService";
 
 const Services = () => {
+  const [activeTab, setActiveTab] = useState("list");
   const [services, setServices] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [message, setMessage] = useState({ type: "", text: "" });
@@ -42,6 +43,35 @@ const Services = () => {
   useEffect(() => {
     fetchServices();
   }, []);
+
+  const stats = useMemo(() => {
+    const active = services.filter((s) => s.status === "active").length;
+    const avgPrice = services.length
+      ? services.reduce((sum, s) => sum + Number(s.price || 0), 0) / services.length
+      : 0;
+    return { total: services.length, active, inactive: services.length - active, avgPrice };
+  }, [services]);
+
+  // Báo cáo theo loại dịch vụ — tính trực tiếp từ danh sách đã tải (không phân trang)
+  const reportByType = useMemo(() => {
+    const map = {};
+    services.forEach((s) => {
+      const key = s.service_type || "other";
+      if (!map[key]) map[key] = { count: 0, active: 0, totalPrice: 0 };
+      map[key].count += 1;
+      if (s.status === "active") map[key].active += 1;
+      map[key].totalPrice += Number(s.price || 0);
+    });
+    return Object.entries(map)
+      .map(([type, v]) => ({
+        type,
+        label: TYPE_LABELS[type] || type,
+        count: v.count,
+        active: v.active,
+        avgPrice: v.count ? v.totalPrice / v.count : 0,
+      }))
+      .sort((a, b) => b.count - a.count);
+  }, [services]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -138,8 +168,84 @@ const Services = () => {
             Quản lý giá thuê vợt, huấn luyện viên, dịch vụ ngoài
           </p>
         </div>
+        <div className="admin-stat-group">
+          <div className="admin-stat-badge badge-default">
+            <p className="admin-stat-value val-default">{stats.total}</p>
+            <p className="admin-stat-label lbl-default">Tổng dịch vụ</p>
+          </div>
+          <div className="admin-stat-badge badge-success">
+            <p className="admin-stat-value val-success">{stats.active}</p>
+            <p className="admin-stat-label lbl-success">Đang hoạt động</p>
+          </div>
+          {stats.inactive > 0 && (
+            <div className="admin-stat-badge badge-neutral">
+              <p className="admin-stat-value val-default">{stats.inactive}</p>
+              <p className="admin-stat-label lbl-default">Tạm ngưng</p>
+            </div>
+          )}
+          <div className="admin-stat-badge badge-default">
+            <p className="admin-stat-value val-default">{Math.round(stats.avgPrice).toLocaleString()}đ</p>
+            <p className="admin-stat-label lbl-default">Giá TB</p>
+          </div>
+        </div>
       </div>
 
+      {/* TAB CHUYỂN GIỮA DANH SÁCH VÀ BÁO CÁO */}
+      <div className="flex gap-1 border-b border-zinc-200">
+        {[
+          { key: "list", label: "Danh sách" },
+          { key: "report", label: "Báo cáo theo loại" },
+        ].map((t) => (
+          <button
+            key={t.key}
+            onClick={() => setActiveTab(t.key)}
+            className={`px-4 py-2.5 text-xs font-semibold border-b-2 -mb-px transition-colors ${
+              activeTab === t.key
+                ? "border-emerald-500 text-emerald-600"
+                : "border-transparent text-zinc-400 hover:text-zinc-600"
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === "report" && (
+        <div className="admin-card overflow-hidden">
+          <div className="px-5 py-3.5 border-b border-zinc-100">
+            <h3 className="text-sm font-medium text-zinc-800">Thống kê theo loại dịch vụ</h3>
+          </div>
+          {reportByType.length === 0 ? (
+            <p className="p-16 text-center text-sm text-zinc-400">Chưa có dịch vụ nào.</p>
+          ) : (
+            <table className="w-full">
+              <thead>
+                <tr className="text-[10px] font-medium text-zinc-400 uppercase tracking-wider bg-zinc-50/60 border-b border-zinc-100">
+                  <th className="text-left py-3 px-5">Loại dịch vụ</th>
+                  <th className="text-right py-3 px-3">Số lượng</th>
+                  <th className="text-right py-3 px-3">Đang hoạt động</th>
+                  <th className="text-right py-3 px-5">Giá trung bình</th>
+                </tr>
+              </thead>
+              <tbody>
+                {reportByType.map((r) => (
+                  <tr key={r.type} className="border-b border-zinc-100 last:border-b-0">
+                    <td className="py-3 px-5 text-sm font-medium text-zinc-800">{r.label}</td>
+                    <td className="py-3 px-3 text-right text-sm text-zinc-600">{r.count}</td>
+                    <td className="py-3 px-3 text-right text-sm text-emerald-600 font-semibold">{r.active}</td>
+                    <td className="py-3 px-5 text-right text-sm font-semibold text-zinc-800">
+                      {Math.round(r.avgPrice).toLocaleString()}đ
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
+
+      {activeTab === "list" && (
+        <>
       {/* THÔNG BÁO (TOAST) */}
       <AnimatePresence>
         {message.text && (
@@ -411,6 +517,8 @@ const Services = () => {
           </form>
         </div>
       </div>
+        </>
+      )}
     </div>
   );
 };

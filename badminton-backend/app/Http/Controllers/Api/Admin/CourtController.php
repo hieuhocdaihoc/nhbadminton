@@ -5,12 +5,13 @@ namespace App\Http\Controllers\Api\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Court;
 use App\Models\Booking;
+use App\Models\CourtPriceHistory;
 use App\Models\RecurringBooking;
 use Illuminate\Http\Request;
 
 class CourtController extends Controller
 {
-    private const ACTIVE_BOOKING_STATUSES = ['pending', 'confirmed', 'playing'];
+    private const ACTIVE_BOOKING_STATUSES = ['confirmed', 'playing'];
     private const COURT_STATUSES = ['active', 'inactive'];
 
     /** Chức năng: Lấy danh sách sân cho khu vực quản trị. */
@@ -84,7 +85,11 @@ class CourtController extends Controller
         ]);
     }
 
-    /** Chức năng: Ngưng hoạt động sân bằng cách chuyển trạng thái thay vì xóa dữ liệu. */
+    /**
+     * Chức năng: Xóa sân. Nếu sân chưa từng phát sinh đơn đặt nào (kể cả lịch sử) thì
+     * xóa hẳn khỏi hệ thống; nếu đã từng có đơn (dù không còn buổi nào sắp tới) thì
+     * chỉ chuyển trạng thái ngưng hoạt động để giữ nguyên vẹn lịch sử đặt sân.
+     */
     public function destroy($id)
     {
         $court = Court::findOrFail($id);
@@ -96,10 +101,21 @@ class CourtController extends Controller
             ], 422);
         }
 
+        $hasHistory = $court->bookingDetails()->exists() || $court->recurringBookings()->exists();
+
+        if (!$hasHistory) {
+            CourtPriceHistory::where('court_id', $court->id)->delete();
+            $court->pricing()->delete();
+            $court->images()->delete();
+            $court->delete();
+
+            return response()->json(['message' => 'Đã xóa vĩnh viễn sân khỏi hệ thống.']);
+        }
+
         $court->status = 'inactive';
         $court->save();
 
-        return response()->json(['message' => 'Đã ngưng hoạt động sân. Lịch sử đặt sân vẫn được lưu giữ.']);
+        return response()->json(['message' => 'Sân đã từng có lịch sử đặt sân nên chỉ được chuyển sang ngưng hoạt động (không xóa được) để giữ nguyên dữ liệu cũ.']);
     }
 
     /** Chức năng: Lấy danh sách sân đang public cho khách xem và đặt lịch. */
@@ -129,7 +145,7 @@ class CourtController extends Controller
             fn($q) => $q->whereHas(
                 'details',
                 fn($d) => $d->where('court_id', $courtId)->where('booking_date', '>=', today())
-            )->whereIn('status', ['pending', 'confirmed'])
+            )->whereIn('status', ['confirmed'])
         )->count();
 
         return $singleCount + $recurringCount;

@@ -43,6 +43,7 @@ Route::get('/settings', [SystemSettingController::class, 'index']);
 Route::get('/courts', [CourtController::class, 'getPublicCourts']);
 Route::get('/courts/{id}', [CourtController::class, 'show']);
 Route::get('/courts/{id}/pricing', [CourtPricingController::class, 'getPublicPricing']);
+Route::get('/pricings/public', [CourtPricingController::class, 'getPublicAllPricings']);
 Route::post('/courts/calculate-price', [CourtPricingController::class, 'calculatePrice']);
 // Webhook nhận thông báo thanh toán từ SePay
 Route::post('/sepay/webhook', [SePayController::class, 'webhook']);
@@ -54,9 +55,10 @@ Route::get('/booking-intents/{code}/status', [SePayController::class, 'intentSta
 Route::get('/courts/{id}/availability', [UserBooking::class, 'getCourtAvailability']);
 Route::post('/bookings', [UserBooking::class, 'store']);
 Route::post('/bookings/prepare', [UserBooking::class, 'preparePayment']);
-Route::delete('/bookings/cancel-unpaid', [UserBooking::class, 'cancelUnpaid']);
 Route::post('/bookings/guest-lookup', [UserBooking::class, 'lookupGuestBooking']);
 Route::post('/bookings/validate-promotion', [UserBooking::class, 'validatePromotion']);
+// Mã giảm giá ngày đặc biệt đang hiệu lực (tự động áp) — cho banner trang đặt sân
+Route::get('/promotions/auto-today', [UserBooking::class, 'autoPromotion']);
 Route::get('/reviews', [UserReviewController::class, 'index']);
 
 /*
@@ -70,6 +72,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/user/bookings', [UserBooking::class, 'getUserBookings'])
         ->middleware('role:customer');
     Route::post('/user/booking-request', [UserBooking::class, 'sendRequest'])
+        ->middleware('role:customer');
+    // Đổi lịch tự động theo chính sách báo trước/báo sau (áp dụng cho từng buổi)
+    Route::post('/user/bookings/reschedule', [UserBooking::class, 'rescheduleSession'])
+        ->middleware('role:customer');
+    // Thống kê số buổi của tài khoản
+    Route::get('/user/booking-stats', [UserBooking::class, 'myBookingStats'])
         ->middleware('role:customer');
     Route::post('/reviews', [UserReviewController::class, 'store'])
         ->middleware('role:customer');
@@ -116,11 +124,16 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::apiResource('categories', CategoryController::class)->only(['index', 'show']);
         Route::apiResource('suppliers', SupplierController::class)->only(['index', 'show']);
         Route::apiResource('products', ProductController::class)->only(['index', 'show']);
+        Route::get('products-report', [ProductController::class, 'report']);
         Route::apiResource('promotions', PromotionController::class)->only(['index', 'show']);
         Route::post('court-pricing/calculate', [CourtPricingController::class, 'calculatePrice']);
 
         // Admin va staff duoc van hanh cac module nghiep vu; controller se chan vung tai khoan nhay cam.
         Route::get('/dashboard-report', [DashboardReportController::class, 'index']);
+        // Báo cáo hiệu suất & doanh thu từng sân theo khoảng thời gian
+        Route::get('/reports/court-performance', [DashboardReportController::class, 'courtPerformance']);
+        // Lịch sử sửa giá sân
+        Route::get('/court-pricing-history', [CourtPricingController::class, 'priceHistory']);
 
         Route::controller(AdminUserController::class)->group(function () {
             Route::get('/users', 'index');
@@ -137,6 +150,9 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::get('/payments/summary', 'summary');
             Route::get('/payments/booking/{bookingId}', 'paymentsByBooking');
             Route::get('/payments/{id}', 'show');
+            // Ghi nhận hoàn tiền (hệ thống chỉ lưu thông tin, hoàn tiền thực hiện thủ công)
+            Route::get('/refunds', 'refunds');
+            Route::post('/refunds', 'storeRefund');
         });
 
         Route::controller(NotificationController::class)->group(function () {
@@ -167,6 +183,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('images/{id}', [ImageController::class, 'destroy']);
 
         Route::apiResource('courts', CourtController::class)->except(['index', 'show']);
+        // Mốc giá dùng chung: 1 request áp/xóa cho tất cả sân trong 1 transaction
+        Route::post('court-pricing-bulk', [CourtPricingController::class, 'bulkUpsert']);
+        Route::delete('court-pricing-bulk', [CourtPricingController::class, 'bulkDestroy']);
         Route::apiResource('court-pricing', CourtPricingController::class)->except(['index', 'show']);
         Route::apiResource('services', AdditionalServiceController::class)->except(['index', 'show']);
         Route::apiResource('categories', CategoryController::class)->except(['index', 'show']);

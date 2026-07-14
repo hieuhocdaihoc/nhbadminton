@@ -23,6 +23,7 @@ class SystemSettingController extends Controller
         'facebook_url',
         'instagram_url',
         'youtube_url',
+        'deposit_percent',
     ];
 
     /** Chức năng: Lấy toàn bộ cấu hình hệ thống cho admin xem/sửa. */

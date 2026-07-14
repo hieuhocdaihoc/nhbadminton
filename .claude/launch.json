@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "badminton-frontend",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "badminton-frontend", "run", "dev", "--", "--host"],
+      "port": 5173,
+      "autoPort": false
+    }
+  ]
+}

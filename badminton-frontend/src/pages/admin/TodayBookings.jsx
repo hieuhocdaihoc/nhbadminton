@@ -11,6 +11,39 @@ const emptyItemRow = {
   note: "",
 };
 
+const HOURS = Array.from({ length: 16 }, (_, i) => i + 6); // 06:00 → 21:00
+
+const statusConfig = {
+  confirmed: {
+    dot: "bg-blue-500",
+    text: "text-blue-700",
+    bg: "bg-blue-50",
+    cell: "bg-blue-100 border-blue-300 text-blue-800",
+    label: "Đã xác nhận",
+  },
+  playing: {
+    dot: "bg-violet-500",
+    text: "text-violet-700",
+    bg: "bg-violet-50",
+    cell: "bg-violet-100 border-violet-300 text-violet-800",
+    label: "Đang chơi",
+  },
+  completed: {
+    dot: "bg-emerald-500",
+    text: "text-emerald-700",
+    bg: "bg-emerald-50",
+    cell: "bg-emerald-100 border-emerald-300 text-emerald-800",
+    label: "Hoàn thành",
+  },
+  cancelled: {
+    dot: "bg-zinc-400",
+    text: "text-zinc-500",
+    bg: "bg-zinc-100",
+    cell: "bg-zinc-200 border-zinc-300 text-zinc-500",
+    label: "Đã hủy",
+  },
+};
+
 const TodayBookings = () => {
   const [bookings, setBookings] = useState([]);
   const [products, setProducts] = useState([]);
@@ -22,6 +55,9 @@ const TodayBookings = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterCourt, setFilterCourt] = useState("all");
+
+  // Ca đang mở trong drawer thao tác (bấm vào 1 ô trên lưới)
+  const [selectedRow, setSelectedRow] = useState(null);
 
   const [isBillModalOpen, setIsBillModalOpen] = useState(false);
   const [selectedBill, setSelectedBill] = useState(null);
@@ -37,6 +73,7 @@ const TodayBookings = () => {
   const [checkInForm, setCheckInForm] = useState({ phone: "", booking_code: "" });
   const [checkInError, setCheckInError] = useState("");
   const [isCheckingIn, setIsCheckingIn] = useState(false);
+  const [isCheckingOut, setIsCheckingOut] = useState(false);
 
   const todayFormatted = new Date().toLocaleDateString("vi-VN", {
     weekday: "long",
@@ -71,16 +108,15 @@ const TodayBookings = () => {
       if (details.length === 0) {
         rows.push({
           ...booking,
-          _displayKey: booking.id,
+          _displayKey: `${booking.id}_nodetail`,
           _groupDetails: [],
           _groupStart: null,
           _groupEnd: null,
-          _groupCourtName: "—",
-          _groupPrice: Number(
-            booking.subtotal_court || booking.total_price || 0,
-          ),
+          _groupCourtId: null,
+          _groupCourtName: '—',
+          _groupPrice: 0,
+          _noDetails: true,
         });
-
         return;
       }
 
@@ -118,6 +154,7 @@ const TodayBookings = () => {
       _groupDetails: groupDetails,
       _groupStart: firstDetail?.start_time,
       _groupEnd: lastDetail?.end_time,
+      _groupCourtId: firstDetail?.court_id,
       _groupCourtName:
         firstDetail?.court?.name ||
         `Sân ${firstDetail?.court_id?.slice(-2) || "..."}`,
@@ -158,17 +195,20 @@ const TodayBookings = () => {
     fetchTodayData();
   }, []);
 
+  // Đồng bộ ca đang mở trong drawer với dữ liệu mới nhất sau mỗi lần fetch lại
+  useEffect(() => {
+    if (!selectedRow) return;
+    const fresh = buildDisplayRows(bookings).find((b) => b.id === selectedRow.id);
+    setSelectedRow(fresh || null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bookings]);
+
   // --- ACTIONS ---
   const handleUpdateStatus = async (id, status) => {
     try {
       setMessage({ type: "", text: "" });
-
       await adminBookingService.updateStatus(id, { status });
-
-      setMessage({
-        type: "success",
-        text: "✓ Cập nhật trạng thái đơn thành công!",
-      });
+      setMessage({ type: "success", text: "✓ Cập nhật trạng thái đơn thành công!" });
       fetchTodayData();
     } catch (error) {
       alert(error.response?.data?.message || "Thao tác thất bại!");
@@ -215,15 +255,20 @@ const TodayBookings = () => {
     }
   };
 
+  // Thu tiền cuối ca + hoàn thành trong 1 bước (backend tự tính phần còn thiếu)
   const handleCheckout = async (id) => {
-    if (!window.confirm("Xác nhận thu tiền và hoàn thành ca chơi này?")) return;
+    if (!window.confirm("Xác nhận thu tiền còn lại và hoàn thành ca chơi này?")) return;
+    setIsCheckingOut(true);
     try {
       setMessage({ type: "", text: "" });
       await adminBookingService.checkout(id);
-      setMessage({ type: "success", text: "✓ Thu tiền và hoàn thành thành công!" });
+      setMessage({ type: "success", text: "✓ Đã thu tiền và hoàn thành ca chơi!" });
+      setSelectedRow(null);
       fetchTodayData();
     } catch (error) {
       alert(error.response?.data?.message || "Thao tác thất bại!");
+    } finally {
+      setIsCheckingOut(false);
     }
   };
 
@@ -309,8 +354,9 @@ const TodayBookings = () => {
   const activeCourts = useMemo(() => {
     return courts
       .filter((court) => court.status !== "inactive")
+      .filter((court) => filterCourt === "all" || court.id === filterCourt)
       .sort((a, b) => String(a.name).localeCompare(String(b.name)));
-  }, [courts]);
+  }, [courts, filterCourt]);
 
   const filteredBookings = useMemo(() => {
     return displayBookings.filter((b) => {
@@ -329,45 +375,20 @@ const TodayBookings = () => {
           b.status !== "cancelled") ||
         (filterStatus === "paid" && b.payment_status === "paid");
 
-      const matchCourt =
-        filterCourt === "all" ||
-        b._groupDetails?.some((detail) => detail.court_id === filterCourt);
-
-      return matchSearch && matchFilter && matchCourt;
+      return matchSearch && matchFilter;
     });
-  }, [displayBookings, searchTerm, filterStatus, filterCourt]);
+  }, [displayBookings, searchTerm, filterStatus]);
 
-  const statusConfig = {
-    pending: {
-      dot: "bg-amber-400",
-      text: "text-amber-700",
-      bg: "bg-amber-50",
-      label: "Chờ duyệt",
-    },
-    confirmed: {
-      dot: "bg-blue-500",
-      text: "text-blue-700",
-      bg: "bg-blue-50",
-      label: "Đã chốt",
-    },
-    playing: {
-      dot: "bg-violet-500",
-      text: "text-violet-700",
-      bg: "bg-violet-50",
-      label: "Đang chơi",
-    },
-    completed: {
-      dot: "bg-emerald-500",
-      text: "text-emerald-700",
-      bg: "bg-emerald-50",
-      label: "Hoàn thành",
-    },
-    cancelled: {
-      dot: "bg-zinc-400",
-      text: "text-zinc-500",
-      bg: "bg-zinc-100",
-      label: "Đã hủy",
-    },
+  // Tìm ca đặt phủ lên 1 ô (sân × giờ) cụ thể trên lưới
+  const findCellBooking = (courtId, hour) => {
+    const hStart = `${String(hour).padStart(2, "0")}:00`;
+    const hEnd = `${String(hour + 1).padStart(2, "0")}:00`;
+    return filteredBookings.find((b) => {
+      if (b._groupCourtId !== courtId) return false;
+      const bStart = b._groupStart?.slice(0, 5);
+      const bEnd = b._groupEnd?.slice(0, 5);
+      return bStart < hEnd && bEnd > hStart;
+    });
   };
 
   const unpaidCount = filteredBookings.filter(
@@ -380,8 +401,7 @@ const TodayBookings = () => {
     (b) => b.payment_status === "paid",
   ).length;
 
-  const inputClass =
-    "admin-input";
+  const inputClass = "admin-input";
 
   const filterTabs = [
     { key: "all", label: "Tất cả", count: filteredBookings.length },
@@ -390,30 +410,38 @@ const TodayBookings = () => {
     { key: "paid", label: "Đã thu", count: paidCount },
   ];
 
+  // --- Số liệu chi tiết cho ca đang mở trong drawer ---
+  const rowFinance = (b) => {
+    const courtAmount = Number(b._groupPrice || b.subtotal_court || 0);
+    const serviceAmount = Number(b.subtotal_service || 0);
+    const totalAmount = Number(b.total_price || 0);
+    const remainingAmount = Number(b.remaining_amount || 0);
+    const paidAmount = totalAmount - remainingAmount;
+    const isOnlyProshopDebt =
+      serviceAmount > 0 &&
+      remainingAmount > 0 &&
+      paidAmount >= Number(b.subtotal_court || 0);
+    return { courtAmount, serviceAmount, totalAmount, remainingAmount, paidAmount, isOnlyProshopDebt };
+  };
+
   return (
     <div className="admin-page-container">
       {/* TIÊU ĐỀ */}
       <div className="admin-page-header">
         <div>
-          <h2 className="admin-page-title">
-            Ca đấu hôm nay
-          </h2>
-          <p className="admin-page-subtitle">{todayFormatted}</p>
+          <h2 className="admin-page-title">Ca đấu hôm nay</h2>
+          <p className="admin-page-subtitle">{todayFormatted} · Bấm vào 1 ô trên lưới để thao tác</p>
         </div>
 
         <div className="flex gap-2.5">
           <div className="admin-stat-badge badge-default">
-            <p className="admin-stat-value val-default">
-              {filteredBookings.length}
-            </p>
+            <p className="admin-stat-value val-default">{filteredBookings.length}</p>
             <p className="admin-stat-label lbl-default">Đang xem</p>
           </div>
 
           {(unpaidCount > 0 || partialCount > 0) && (
             <div className="bg-amber-50 border border-amber-200/60 px-4 py-2 rounded-lg text-center min-w-[70px]">
-              <p className="text-lg font-bold text-amber-600">
-                {unpaidCount + partialCount}
-              </p>
+              <p className="text-lg font-bold text-amber-600">{unpaidCount + partialCount}</p>
               <p className="text-[10px] text-amber-500 uppercase">Cần thu</p>
             </div>
           )}
@@ -469,12 +497,13 @@ const TodayBookings = () => {
               className="admin-input w-full sm:w-44 px-3 py-2.5 text-xs"
             >
               <option value="all">Tất cả sân</option>
-
-              {activeCourts.map((court) => (
-                <option key={court.id} value={court.id}>
-                  {court.name}
-                </option>
-              ))}
+              {courts
+                .filter((c) => c.status !== "inactive")
+                .map((court) => (
+                  <option key={court.id} value={court.id}>
+                    {court.name}
+                  </option>
+                ))}
             </select>
           </div>
 
@@ -490,7 +519,6 @@ const TodayBookings = () => {
                 }`}
               >
                 {tab.label}
-
                 {tab.count > 0 && (
                   <span
                     className={`ml-1.5 text-[9px] px-1.5 py-0.5 rounded-full ${
@@ -508,275 +536,228 @@ const TodayBookings = () => {
         </div>
       </div>
 
-      {/* TABLE */}
+      {/* CHÚ THÍCH MÀU */}
+      <div className="flex flex-wrap gap-3">
+        {Object.entries(statusConfig).map(([key, cfg]) => (
+          <span key={key} className="inline-flex items-center gap-1.5 text-[11px] text-zinc-500">
+            <span className={`w-2.5 h-2.5 rounded ${cfg.dot}`} /> {cfg.label}
+          </span>
+        ))}
+      </div>
+
+      {/* LƯỚI CA ĐẤU */}
       {isLoading ? (
         <div className="admin-card p-16 text-center">
           <div className="inline-block w-6 h-6 border-2 border-zinc-300 border-t-zinc-600 rounded-full animate-spin mb-3" />
           <p className="text-xs text-zinc-400">Đang tải...</p>
         </div>
-      ) : filteredBookings.length === 0 ? (
+      ) : activeCourts.length === 0 ? (
         <div className="admin-card p-16 text-center">
           <p className="text-3xl mb-2 opacity-30">📭</p>
-          <p className="text-sm text-zinc-400">Không tìm thấy ca đấu nào</p>
+          <p className="text-sm text-zinc-400">Chưa có sân nào đang hoạt động</p>
         </div>
       ) : (
-        <div className="admin-card overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[1100px]">
-              <thead>
-                <tr className="text-[10px] font-medium text-zinc-400 uppercase tracking-wider bg-zinc-50/60 border-b border-zinc-100">
-                  <th
-                    className="text-left py-3 px-5"
-                    style={{ width: "220px" }}
-                  >
-                    Khách hàng
-                  </th>
-                  <th
-                    className="text-left py-3 px-3"
-                    style={{ width: "130px" }}
-                  >
-                    Khung giờ
-                  </th>
-                  <th className="text-left py-3 px-3" style={{ width: "90px" }}>
-                    Sân
-                  </th>
-                  <th
-                    className="text-left py-3 px-3"
-                    style={{ width: "100px" }}
-                  >
-                    Pro-shop
-                  </th>
-                  <th
-                    className="text-right py-3 px-3"
-                    style={{ width: "160px" }}
-                  >
-                    Thanh toán
-                  </th>
-                  <th
-                    className="text-center py-3 px-3"
-                    style={{ width: "90px" }}
-                  >
-                    Trạng thái
-                  </th>
-                  <th
-                    className="text-right py-3 px-5"
-                    style={{ width: "210px" }}
-                  >
-                    Thao tác
-                  </th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {filteredBookings.map((b) => {
-                  const timeStr =
-                    b._groupStart && b._groupEnd
-                      ? `${b._groupStart.slice(0, 5)} – ${b._groupEnd.slice(0, 5)}`
-                      : "—";
-
-                  const sc = statusConfig[b.status] || statusConfig.pending;
-                  const isCancelled = b.status === "cancelled";
-
-                  const courtAmount = Number(
-                    b._groupPrice || b.subtotal_court || 0,
-                  );
-                  const serviceAmount = Number(b.subtotal_service || 0);
-                  const totalAmount = Number(b.total_price || 0);
-                  const paidAmount = totalAmount - Number(b.remaining_amount || 0);
-                  const remainingAmount = Number(b.remaining_amount || 0);
-
-                  const isOnlyProshopDebt =
-                    serviceAmount > 0 &&
-                    remainingAmount > 0 &&
-                    paidAmount >= Number(b.subtotal_court || 0);
-
-                  return (
-                    <tr
-                      key={b._displayKey}
-                      className={`border-b border-zinc-100 last:border-b-0 hover:bg-zinc-50/40 transition-colors group ${
-                        isCancelled ? "opacity-45" : ""
-                      }`}
-                    >
-                      <td className="py-3.5 px-5">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-lg bg-zinc-100 flex items-center justify-center text-zinc-500 font-medium text-xs shrink-0">
-                            {b.customer_name?.charAt(0)?.toUpperCase() || "?"}
-                          </div>
-
-                          <div className="min-w-0">
-                            <p className="text-[13px] font-medium text-zinc-800 truncate">
-                              {b.customer_name}
-                            </p>
-                            <p className="text-[11px] text-zinc-400 font-mono truncate">
-                              {b.customer_phone}
-                            </p>
-                          </div>
-                        </div>
-                      </td>
-
-                      <td className="py-3.5 px-3">
-                        <span className="text-xs font-mono text-zinc-600">
-                          {timeStr}
-                        </span>
-
-                        {b._groupDetails?.length > 1 && (
-                          <p className="text-[10px] text-emerald-600 font-semibold mt-0.5">
-                            Gộp {b._groupDetails.length} khung liền nhau
-                          </p>
-                        )}
-                      </td>
-
-                      <td className="py-3.5 px-3 text-xs text-zinc-600">
-                        {b._groupCourtName}
-                      </td>
-
-                      <td className="py-3.5 px-3">
-                        {!isCancelled && (
-                          <button
-                            onClick={() => openAddItemModal(b)}
-                            className="admin-btn-outline border-dashed px-2.5 py-1 text-[10px]"
-                          >
-                            + Thêm dịch vụ sử dụng
-                          </button>
-                        )}
-
-                        {serviceAmount > 0 && (
-                          <p className="mt-1 text-[10px] font-semibold text-violet-600">
-                            Pro-shop: {serviceAmount.toLocaleString()}₫
-                          </p>
-                        )}
-                      </td>
-
-                      <td className="py-3.5 px-3 text-right">
-                        <div className="space-y-0.5">
-                          <p className="text-[11px] text-zinc-500">
-                            Sân:{" "}
-                            <span className="font-semibold text-zinc-800">
-                              {courtAmount.toLocaleString()}₫
-                            </span>
-                          </p>
-
-                          <p className="text-[11px] text-zinc-500">
-                            Pro-shop:{" "}
-                            <span className="font-semibold text-violet-600">
-                              {serviceAmount.toLocaleString()}₫
-                            </span>
-                          </p>
-
-                          <p className="text-[11px] text-zinc-500">
-                            Đã thu:{" "}
-                            <span className="font-semibold text-emerald-600">
-                              {paidAmount.toLocaleString()}₫
-                            </span>
-                          </p>
-
-                          <p className="text-[11px] text-zinc-500">
-                            Còn thu:{" "}
-                            <span
-                              className={`font-bold ${
-                                remainingAmount > 0
-                                  ? "text-amber-600"
-                                  : "text-zinc-400"
-                              }`}
-                            >
-                              {remainingAmount.toLocaleString()}₫
-                            </span>
-                          </p>
-
-                          <p className="pt-0.5 text-xs font-bold text-zinc-900">
-                            Tổng: {totalAmount.toLocaleString()}₫
-                          </p>
-
-                          {b.payment_status === "paid" ? (
-                            <p className="text-[10px] text-emerald-600">
-                              ✓ Đã thu đủ
-                            </p>
-                          ) : isOnlyProshopDebt ? (
-                            <div className="admin-debt-alert">
-                              <span>⚠ Nợ Pro-shop</span>
-                            </div>
-                          ) : b.payment_status === "partially_paid" ? (
-                            <p className="text-[10px] font-bold text-amber-600">
-                              ⚠ Thanh toán một phần
-                            </p>
-                          ) : (
-                            <p className="text-[10px] text-amber-500">
-                              ○ Chưa thu
-                            </p>
-                          )}
-                        </div>
-                      </td>
-
-                      <td className="py-3.5 px-3 text-center">
-                        <span
-                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium ${sc.bg} ${sc.text}`}
+        <div className="admin-card p-4 overflow-x-auto">
+          <table className="min-w-[900px] w-full">
+            <thead>
+              <tr>
+                <th className="text-left w-28">Sân</th>
+                {HOURS.map((h) => (
+                  <th key={h} className="text-center !p-1 text-[10px]">{h}h</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {activeCourts.map((court) => (
+                <tr key={court.id}>
+                  <td className="font-semibold text-sm whitespace-nowrap">
+                    {court.name}
+                    {court.is_maintenance ? (
+                      <span className="block text-[10px] text-red-500 font-medium">Bảo trì</span>
+                    ) : null}
+                  </td>
+                  {HOURS.map((h) => {
+                    const b = findCellBooking(court.id, h);
+                    const cfg = b ? statusConfig[b.status] : null;
+                    return (
+                      <td key={h} className="!p-0.5">
+                        <button
+                          type="button"
+                          onClick={() => b && setSelectedRow(b)}
+                          className={`w-full h-11 rounded-md border text-[9px] font-bold transition-all ${
+                            cfg
+                              ? `${cfg.cell} hover:scale-105 cursor-pointer`
+                              : "bg-white border-zinc-100 cursor-default"
+                          }`}
+                          title={b ? `${b.customer_name} · ${b.booking_code}` : "Trống"}
                         >
-                          <span
-                            className={`w-1.5 h-1.5 rounded-full ${sc.dot}`}
-                          />
-                          {sc.label}
-                        </span>
+                          {b ? b.customer_name?.split(" ").slice(-1)[0] : ""}
+                        </button>
                       </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
-                      <td className="py-3.5 px-5 text-right">
-                        <div className="flex items-center justify-end gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
-                          <button
-                            onClick={() => handleOpenBill(b)}
-                            className="admin-btn-outline px-2.5 py-1 text-[10px]"
-                            title="Xem Bill"
-                          >
-                            🧾 Bill
-                          </button>
-
-                          {b.status === "pending" && (
-                            <button
-                              onClick={() => handleUpdateStatus(b.id, "confirmed")}
-                              className="admin-btn-secondary px-2.5 py-1 text-[10px] font-medium"
-                            >
-                              Duyệt
-                            </button>
-                          )}
-
-                          {b.status === "confirmed" && (
-                            <button
-                              onClick={() => openCheckInModal(b)}
-                              className="admin-btn-primary px-2.5 py-1 text-[10px] font-medium"
-                            >
-                              Check-in
-                            </button>
-                          )}
-
-                          {b.payment_status !== "paid" && !isCancelled && (
-                            <button
-                              onClick={() => handleUpdatePayment(b.id, "paid")}
-                              className="admin-btn-primary px-2.5 py-1 text-[10px] font-medium"
-                            >
-                              Thu tiền
-                            </button>
-                          )}
-
-                          {b.payment_status === "paid" && !isCancelled && b.status !== "completed" && (
-                            <button
-                              onClick={() => {
-                                if (window.confirm("Xác nhận hoàn thành ca chơi này?")) {
-                                  handleUpdateStatus(b.id, "completed");
-                                }
-                              }}
-                              className="admin-btn-primary px-2.5 py-1 text-[10px] font-medium"
-                            >
-                              Hoàn thành
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+      {/* ĐƠN THIẾU CHI TIẾT — không thể xếp vào lưới */}
+      {displayBookings.some((b) => b._noDetails) && (
+        <div className="admin-card p-4 mt-4">
+          <p className="text-xs font-bold uppercase tracking-widest text-amber-600 mb-3">
+            Đơn chưa có thông tin sân / giờ
+          </p>
+          <div className="space-y-2">
+            {displayBookings.filter((b) => b._noDetails).map((b) => (
+              <button
+                key={b.id}
+                type="button"
+                onClick={() => setSelectedRow(b)}
+                className="flex w-full items-center justify-between rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-left hover:bg-amber-100"
+              >
+                <div>
+                  <p className="text-sm font-bold text-slate-900">{b.customer_name || 'Khách vãng lai'}</p>
+                  <p className="text-xs text-slate-500">{b.booking_code} · {b.customer_phone}</p>
+                </div>
+                <span className={`text-xs font-bold px-2 py-1 rounded-lg ${statusConfig[b.status]?.cell || 'bg-slate-100 text-slate-500'}`}>
+                  {statusConfig[b.status]?.label || b.status}
+                </span>
+              </button>
+            ))}
           </div>
         </div>
       )}
+
+      {/* DRAWER THAO TÁC — MỞ KHI BẤM VÀO 1 Ô */}
+      <AnimatePresence>
+        {selectedRow && (() => {
+          const b = selectedRow;
+          const sc = statusConfig[b.status] || statusConfig.confirmed;
+          const isCancelled = b.status === "cancelled";
+          const isCompleted = b.status === "completed";
+          const { courtAmount, serviceAmount, totalAmount, remainingAmount, paidAmount, isOnlyProshopDebt } = rowFinance(b);
+          const timeStr =
+            b._groupStart && b._groupEnd
+              ? `${b._groupStart.slice(0, 5)} – ${b._groupEnd.slice(0, 5)}`
+              : "—";
+
+          return (
+            <div className="admin-modal-overlay" onClick={() => setSelectedRow(null)}>
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                onClick={(e) => e.stopPropagation()}
+                className="admin-modal-content max-w-lg"
+              >
+                <div className="admin-modal-header">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h4 className="text-sm font-semibold text-zinc-800">{b.customer_name}</h4>
+                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium ${sc.bg} ${sc.text}`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${sc.dot}`} /> {sc.label}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-zinc-400 mt-0.5 font-mono">
+                      {b.customer_phone} · {b._groupCourtName} · {timeStr}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setSelectedRow(null)}
+                    className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-zinc-100 text-zinc-400 hover:text-zinc-600 transition-colors text-sm"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <div className="p-6 space-y-5">
+                  {/* Tài chính */}
+                  <div className="bg-zinc-50 rounded-xl border border-zinc-100 p-4 space-y-1.5">
+                    <div className="flex justify-between text-xs">
+                      <span className="text-zinc-500">Tiền sân</span>
+                      <span className="font-semibold text-zinc-800">{courtAmount.toLocaleString()}₫</span>
+                    </div>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-zinc-500">Pro-shop</span>
+                      <span className="font-semibold text-violet-600">{serviceAmount.toLocaleString()}₫</span>
+                    </div>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-zinc-500">Đã thu</span>
+                      <span className="font-semibold text-emerald-600">{paidAmount.toLocaleString()}₫</span>
+                    </div>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-zinc-500">Còn thu</span>
+                      <span className={`font-bold ${remainingAmount > 0 ? "text-amber-600" : "text-zinc-400"}`}>
+                        {remainingAmount.toLocaleString()}₫
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-sm pt-1.5 border-t border-zinc-200 mt-1.5">
+                      <span className="font-bold text-zinc-900">Tổng bill</span>
+                      <span className="font-bold text-zinc-900">{totalAmount.toLocaleString()}₫</span>
+                    </div>
+                    {isOnlyProshopDebt && (
+                      <div className="admin-debt-alert mt-2"><span>⚠ Nợ Pro-shop</span></div>
+                    )}
+                  </div>
+
+                  {/* Hành động */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => handleOpenBill(b)}
+                      className="admin-btn-outline py-2.5 text-xs font-medium"
+                    >
+                      🧾 Xem Bill
+                    </button>
+
+                    {!isCancelled && !isCompleted && (
+                      <button
+                        onClick={() => openAddItemModal(b)}
+                        className="admin-btn-outline border-dashed py-2.5 text-xs font-medium"
+                      >
+                        + Thêm dịch vụ
+                      </button>
+                    )}
+
+                    {b.status === "confirmed" && (
+                      <button
+                        onClick={() => openCheckInModal(b)}
+                        className="admin-btn-primary py-2.5 text-xs font-medium col-span-2"
+                      >
+                        Check-in
+                      </button>
+                    )}
+
+                    {(b.status === "confirmed" || b.status === "playing") && remainingAmount > 0 && (
+                      <button
+                        onClick={() => handleUpdatePayment(b.id, "paid")}
+                        className="admin-btn-outline py-2.5 text-xs font-medium col-span-2"
+                      >
+                        Ghi nhận đã thu {remainingAmount.toLocaleString()}₫
+                      </button>
+                    )}
+
+                    {(b.status === "confirmed" || b.status === "playing") && (
+                      <button
+                        onClick={() => handleCheckout(b.id)}
+                        disabled={isCheckingOut}
+                        className="admin-btn-primary py-2.5 text-xs font-medium col-span-2 disabled:opacity-60"
+                      >
+                        {isCheckingOut
+                          ? "Đang xử lý..."
+                          : remainingAmount > 0
+                            ? `Thu ${remainingAmount.toLocaleString()}₫ & Hoàn thành`
+                            : "Hoàn thành ca chơi"}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </motion.div>
+            </div>
+          );
+        })()}
+      </AnimatePresence>
 
       {/* MODAL THÊM MÓN */}
       <AnimatePresence>
@@ -1173,7 +1154,7 @@ const TodayBookings = () => {
                 </div>
                 <div>
                   <h3 className="font-semibold text-zinc-800 text-sm">Xác nhận Check-in</h3>
-                  <p className="text-xs text-zinc-500">Sân {checkInModal.booking?.court_name} · {checkInModal.booking?.customer_name || "Khách vãng lai"}</p>
+                  <p className="text-xs text-zinc-500">Sân {checkInModal.booking?._groupCourtName} · {checkInModal.booking?.customer_name || "Khách vãng lai"}</p>
                 </div>
               </div>
 

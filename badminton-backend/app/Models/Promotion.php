@@ -20,6 +20,10 @@ class Promotion extends Model
         'discount_value',
         'per_user_limit',
         'min_points_required',
+        'valid_from',
+        'valid_to',
+        'auto_apply',
+        'description',
         'status',
     ];
 
@@ -27,7 +31,19 @@ class Promotion extends Model
         'discount_value'      => 'float',
         'per_user_limit'      => 'integer',
         'min_points_required' => 'integer',
+        'valid_from'          => 'date',
+        'valid_to'            => 'date',
+        'auto_apply'          => 'boolean',
     ];
+
+    /** Scope: chỉ lấy mã còn hiệu lực tại thời điểm hiện tại */
+    public function scopeCurrentlyValid($query)
+    {
+        $today = now()->toDateString();
+        return $query->where('status', 'active')
+            ->where(fn($q) => $q->whereNull('valid_from')->orWhere('valid_from', '<=', $today))
+            ->where(fn($q) => $q->whereNull('valid_to')->orWhere('valid_to', '>=', $today));
+    }
 
     // Relationships
 

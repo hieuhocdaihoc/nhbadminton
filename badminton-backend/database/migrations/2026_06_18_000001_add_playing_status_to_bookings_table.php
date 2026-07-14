@@ -7,7 +7,11 @@ return new class extends Migration
 {
     public function up(): void
     {
-        DB::statement("ALTER TABLE bookings MODIFY COLUMN status ENUM('pending','confirmed','completed','cancelled','playing') NOT NULL DEFAULT 'pending'");
+        // Already included in base migration — skip if enum already has 'playing'
+        $row = DB::select("SHOW COLUMNS FROM bookings LIKE 'status'");
+        if (!empty($row) && strpos($row[0]->Type ?? $row[0]->type ?? '', 'playing') === false) {
+            DB::statement("ALTER TABLE bookings MODIFY COLUMN status ENUM('confirmed','completed','cancelled','playing') NOT NULL DEFAULT 'confirmed'");
+        }
     }
 
     public function down(): void

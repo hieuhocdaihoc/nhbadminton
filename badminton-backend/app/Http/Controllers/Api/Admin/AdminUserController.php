@@ -13,7 +13,7 @@ use Illuminate\Validation\Rule;
 class AdminUserController extends Controller
 {
     // Các trạng thái đơn được coi là "chưa hoàn thành" khi kiểm tra trước khi khóa tài khoản
-    private const ACTIVE_BOOKING_STATUSES = ['pending', 'confirmed', 'playing'];
+    private const ACTIVE_BOOKING_STATUSES = ['confirmed', 'playing'];
 
     // Rule validate số điện thoại Việt Nam (10 số, bắt đầu 03/05/07/08/09)
     private const PHONE_REGEX = '/^0[35789][0-9]{8}$/';
@@ -71,9 +71,29 @@ class AdminUserController extends Controller
             );
         }
 
+        // Meta counts (ignore status filter — always reflect full scope)
+        $metaBase = User::query();
+        if ($this->isStaff($request)) {
+            $metaBase->where('role', 'customer');
+        } elseif ($request->filled('role')) {
+            $metaBase->where('role', $request->role);
+        }
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $metaBase->where(fn($q) => $q
+                ->where('full_name',     'like', "%{$search}%")
+                ->orWhere('email',       'like', "%{$search}%")
+                ->orWhere('phone',       'like', "%{$search}%")
+                ->orWhere('customer_code','like', "%{$search}%")
+            );
+        }
+        $metaTotal  = (clone $metaBase)->count();
+        $metaActive = (clone $metaBase)->where('status', 'active')->count();
+
         return response()->json([
             'message' => 'Lấy danh sách tài khoản thành công',
             'data'    => $query->orderByDesc('created_at')->paginate($request->integer('per_page', 10)),
+            'meta'    => ['total' => $metaTotal, 'active' => $metaActive],
         ]);
     }
 
@@ -264,7 +284,6 @@ class AdminUserController extends Controller
                 'user' => $user->only(['id', 'full_name', 'phone', 'email', 'role', 'status']),
                 'booking_stats' => [
                     'total_bookings'      => $totalBookings,
-                    'pending_bookings'    => $countByStatus['pending']   ?? 0,
                     'confirmed_bookings'  => $countByStatus['confirmed'] ?? 0,
                     'completed_bookings'  => $countByStatus['completed'] ?? 0,
                     'cancelled_bookings'  => $countByStatus['cancelled'] ?? 0,

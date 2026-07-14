@@ -1,7 +1,13 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { Fragment, useState, useEffect, useMemo, useCallback } from "react";
 import { useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { adminBookingService } from "../../services/admin/bookingService";
+import {
+  dayDiffFromToday,
+  groupByProximity,
+  relativeDayLabel,
+  relativeDayStyle,
+} from "../../utils/bookingDateGroups";
 
 const LongTermBookings = () => {
   const location = useLocation();
@@ -109,6 +115,37 @@ const LongTermBookings = () => {
     );
   }, [sessions, sessionSearchTerm]);
 
+  // Buổi chơi chia nhóm theo độ gần: Hôm nay → Ngày mai → 7 ngày tới → Sắp tới → Đã diễn ra
+  const groupedSessions = useMemo(
+    () =>
+      groupByProximity(
+        filteredSessions,
+        (s) => s.details?.[0]?.booking_date,
+        (s) => s.details?.[0]?.start_time || "",
+      ),
+    [filteredSessions],
+  );
+
+  // Trạng thái hiệu lực của hợp đồng để sắp xếp + hiển thị badge:
+  // rank 0 = đang chạy (sắp hết hạn trước), 1 = sắp bắt đầu (gần nhất trước), 2 = đã kết thúc (mới nhất trước)
+  const masterLifecycle = (m) => {
+    const startDiff = dayDiffFromToday(m.start_date);
+    const endDiff = dayDiffFromToday(m.end_date);
+    if (endDiff !== null && endDiff < 0)
+      return { rank: 2, sort: -endDiff, label: "Đã kết thúc", cls: "bg-zinc-100 text-zinc-400" };
+    if (startDiff !== null && startDiff > 0)
+      return { rank: 1, sort: startDiff, label: startDiff === 1 ? "Bắt đầu ngày mai" : `Bắt đầu sau ${startDiff} ngày`, cls: "bg-blue-50 text-blue-700" };
+    return { rank: 0, sort: endDiff ?? 0, label: "Đang chạy", cls: "bg-emerald-50 text-emerald-700" };
+  };
+
+  const sortedMasters = useMemo(() => {
+    return [...filteredMasters].sort((a, b) => {
+      const la = masterLifecycle(a);
+      const lb = masterLifecycle(b);
+      return la.rank !== lb.rank ? la.rank - lb.rank : la.sort - lb.sort;
+    });
+  }, [filteredMasters]);
+
   // --- ACTIONS ---
   const requestAction = (sessionBooking, type) => {
     let title = "";
@@ -116,12 +153,7 @@ const LongTermBookings = () => {
     let payload = {};
     let actionType = "status";
 
-    if (type === "confirm") {
-      title = "Xác nhận duyệt ca";
-      msg = "Xác nhận giữ sân cho ca đá này?";
-      payload = { status: "confirmed" };
-      actionType = "status";
-    } else if (type === "complete") {
+    if (type === "complete") {
       title = "Hoàn thành ca chơi";
       msg = "Xác nhận kết thúc ca chơi này?";
       payload = { status: "completed" };
@@ -198,7 +230,6 @@ const LongTermBookings = () => {
 
   // --- UTILS ---
   const statusConfig = {
-    pending: { dot: "bg-amber-400", text: "text-amber-700", bg: "bg-amber-50", label: "Chờ" },
     confirmed: { dot: "bg-blue-500", text: "text-blue-700", bg: "bg-blue-50", label: "Đã chốt" },
     playing: { dot: "bg-violet-500", text: "text-violet-700", bg: "bg-violet-50", label: "Đang chơi" },
     completed: { dot: "bg-emerald-500", text: "text-emerald-700", bg: "bg-emerald-50", label: "Hoàn thành" },
@@ -270,11 +301,11 @@ const LongTermBookings = () => {
                 <p className="text-xs">Chưa có hợp đồng dài hạn</p>
               </div>
             ) : (
-              filteredMasters.map((m) => {
+              sortedMasters.map((m) => {
                 const isSelected = selectedMaster?.id === m.id;
                 const isNotificationTarget =
                   location.state?.notificationBookingCode === m.recurring_code;
-                const sessionCount = m.bookings_count ?? "?";
+                const lifecycle = masterLifecycle(m);
                 return (
                   <button
                     key={m.id}
@@ -293,8 +324,8 @@ const LongTermBookings = () => {
                       <span className={`text-[10px] font-mono ${isSelected ? "text-amber-100" : "text-zinc-400"}`}>
                         {m.recurring_code}
                       </span>
-                      <span className={`text-[10px] ${isSelected ? "text-amber-100" : "text-zinc-400"}`}>
-                        {m.court?.name}
+                      <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${isSelected ? "bg-amber-700 text-amber-100" : lifecycle.cls}`}>
+                        {lifecycle.label}
                       </span>
                     </div>
                     <p className={`text-xs font-medium truncate ${isSelected ? "text-white" : "text-zinc-800"}`}>
@@ -304,7 +335,7 @@ const LongTermBookings = () => {
                       {m.user?.phone || "N/A"}
                     </p>
                     <div className={`mt-2 pt-2 border-t border-dashed flex justify-between items-center text-[10px] ${isSelected ? "border-amber-500 text-amber-100" : "border-zinc-100 text-zinc-400"}`}>
-                      <span>Tự chọn ngày</span>
+                      <span>{m.court?.name || "Tự chọn ngày"}</span>
                       <span className="font-mono">
                         {formatVN(m.start_date)} → {formatVN(m.end_date)}
                       </span>
@@ -390,8 +421,21 @@ const LongTermBookings = () => {
                     </td>
                   </tr>
                 ) : (
-                  filteredSessions.map((s) => {
-                    const sc = statusConfig[s.status] || statusConfig.pending;
+                  groupedSessions.map((group) => (
+                    <Fragment key={group.key}>
+                      {/* Header nhóm theo độ gần của ngày chơi */}
+                      <tr className="bg-zinc-50/90 border-y border-zinc-100">
+                        <td colSpan="6" className="py-2 px-5">
+                          <span className={`text-[10px] font-bold uppercase tracking-widest ${group.key === "today" ? "text-emerald-600" : group.key === "past" ? "text-zinc-400" : "text-zinc-500"}`}>
+                            {group.label}
+                          </span>
+                          <span className="ml-2 text-[10px] text-zinc-400">
+                            {group.items.length} buổi
+                          </span>
+                        </td>
+                      </tr>
+                      {group.items.map((s) => {
+                    const sc = statusConfig[s.status] || statusConfig.confirmed;
                     const isCancelled = s.status === "cancelled";
                     return (
                       <tr
@@ -401,8 +445,15 @@ const LongTermBookings = () => {
                         <td className="py-3 px-5 font-mono text-[11px] text-zinc-700">
                           {s.booking_code}
                         </td>
-                        <td className="py-3 px-3 text-xs text-zinc-600">
-                          {s.details?.[0]?.booking_date ? formatVN(s.details[0].booking_date) : "—"}
+                        <td className="py-3 px-3">
+                          <p className="text-xs text-zinc-600">
+                            {s.details?.[0]?.booking_date ? formatVN(s.details[0].booking_date) : "—"}
+                          </p>
+                          {s.details?.[0]?.booking_date && (
+                            <span className={`inline-block mt-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium ${relativeDayStyle(s.details[0].booking_date)}`}>
+                              {relativeDayLabel(s.details[0].booking_date)}
+                            </span>
+                          )}
                         </td>
                         <td className="py-3 px-3">
                           <span className="text-xs font-mono text-zinc-600">
@@ -425,14 +476,6 @@ const LongTermBookings = () => {
                         </td>
                         <td className="py-3 px-5 text-right">
                           <div className="flex items-center justify-end gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
-                            {s.status === "pending" && (
-                              <button
-                                onClick={() => requestAction(s, "confirm")}
-                                className="admin-btn-secondary px-2.5 py-1 text-[10px] font-medium"
-                              >
-                                Duyệt
-                              </button>
-                            )}
                             {s.payment_status !== "paid" && !isCancelled && (
                               <button
                                 onClick={() => requestAction(s, "pay")}
@@ -469,7 +512,9 @@ const LongTermBookings = () => {
                         </td>
                       </tr>
                     );
-                  })
+                      })}
+                    </Fragment>
+                  ))
                 )}
               </tbody>
             </table>

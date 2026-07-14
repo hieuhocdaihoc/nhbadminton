@@ -4,11 +4,52 @@ namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Payment;
+use App\Models\Refund;
 use Illuminate\Http\Request;
 
 class PaymentManagementController extends Controller
 {
     private const BANK_METHODS = ['bank_transfer', 'sepay', 'online'];
+
+    /**
+     * Chức năng: Ghi nhận thông tin hoàn tiền. Hệ thống CHỈ lưu lại thông tin —
+     * việc chuyển tiền thực tế do cá nhân thực hiện (tiền mặt hoặc banking cá nhân).
+     */
+    public function storeRefund(Request $request)
+    {
+        $validated = $request->validate([
+            'payment_id'    => ['required', 'exists:payments,id'],
+            'amount'        => ['required', 'numeric', 'min:1'],
+            'reason'        => ['required', 'string', 'max:500'],
+            'refund_method' => ['required', 'in:cash,bank_transfer'],
+            'refund_info'   => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $refund = Refund::create($validated + [
+            'processed_by' => $request->user()->id,
+            'status'       => 'recorded',
+        ]);
+
+        return response()->json([
+            'status'  => 'success',
+            'message' => 'Đã ghi nhận thông tin hoàn tiền. Việc chuyển tiền thực hiện thủ công ngoài hệ thống.',
+            'data'    => $refund,
+        ], 201);
+    }
+
+    /** Chức năng: Danh sách các lần hoàn tiền đã ghi nhận. */
+    public function refunds(Request $request)
+    {
+        $refunds = Refund::with([
+                'payment:id,payment_code,booking_id',
+                'processedBy:id,full_name',
+            ])
+            ->orderByDesc('created_at')
+            ->limit(200)
+            ->get();
+
+        return response()->json(['status' => 'success', 'data' => $refunds]);
+    }
 
     /** Chức năng: Lấy danh sách giao dịch thanh toán để quản trị đối soát doanh thu. */
     public function index(Request $request)

@@ -1,12 +1,14 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { adminSupplierService } from "../../services/admin/supplierService";
 
 const SupplierManager = () => {
+  const [activeTab, setActiveTab] = useState("list");
   const [suppliers, setSuppliers] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [message, setMessage] = useState({ type: "", text: "" });
   const [searchKeyword, setSearchKeyword] = useState("");
+  const [stats, setStats] = useState({ total: 0, total_orders: 0, total_import_amount: 0 });
 
   const [form, setForm] = useState({
     id: null,
@@ -24,6 +26,7 @@ const SupplierManager = () => {
     try {
       const res = await adminSupplierService.getSuppliers(searchKeyword);
       setSuppliers(res.data?.data || []);
+      setStats(res.data?.stats || { total: 0, total_orders: 0, total_import_amount: 0 });
     } catch (error) {
       setMessage({
         type: "error",
@@ -37,6 +40,21 @@ const SupplierManager = () => {
   useEffect(() => {
     fetchSuppliers();
   }, []);
+
+  // Top nhà cung cấp theo tổng tiền đã nhập — tính từ dữ liệu đã tải (không phân trang)
+  const topSuppliers = useMemo(() => {
+    return [...suppliers]
+      .map((s) => ({
+        id: s.id,
+        name: s.name,
+        orderCount: s.purchase_orders_count || 0,
+        totalAmount: Number(s.total_import_amount || 0),
+      }))
+      .filter((s) => s.orderCount > 0)
+      .sort((a, b) => b.totalAmount - a.totalAmount);
+  }, [suppliers]);
+
+  const maxSupplierAmount = Math.max(1, ...topSuppliers.map((s) => s.totalAmount));
 
   const handleSearchSubmit = (e) => {
     e.preventDefault();
@@ -135,8 +153,76 @@ const SupplierManager = () => {
             Quản lý đối tác phân phối hàng hóa và dịch vụ
           </p>
         </div>
+        <div className="admin-stat-group">
+          <div className="admin-stat-badge badge-default">
+            <p className="admin-stat-value val-default">{stats.total}</p>
+            <p className="admin-stat-label lbl-default">Nhà cung cấp</p>
+          </div>
+          <div className="admin-stat-badge badge-default">
+            <p className="admin-stat-value val-default">{stats.total_orders}</p>
+            <p className="admin-stat-label lbl-default">Phiếu nhập</p>
+          </div>
+          <div className="admin-stat-badge badge-success">
+            <p className="admin-stat-value val-success">{Number(stats.total_import_amount || 0).toLocaleString()}đ</p>
+            <p className="admin-stat-label lbl-success">Tổng tiền nhập</p>
+          </div>
+        </div>
       </div>
 
+      {/* TAB CHUYỂN GIỮA DANH SÁCH VÀ BÁO CÁO */}
+      <div className="flex gap-1 border-b border-zinc-200">
+        {[
+          { key: "list", label: "Danh sách" },
+          { key: "report", label: "Báo cáo nhập hàng" },
+        ].map((t) => (
+          <button
+            key={t.key}
+            onClick={() => setActiveTab(t.key)}
+            className={`px-4 py-2.5 text-xs font-semibold border-b-2 -mb-px transition-colors ${
+              activeTab === t.key
+                ? "border-emerald-500 text-emerald-600"
+                : "border-transparent text-zinc-400 hover:text-zinc-600"
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === "report" && (
+        <div className="admin-card overflow-hidden">
+          <div className="px-5 py-3.5 border-b border-zinc-100">
+            <h3 className="text-sm font-medium text-zinc-800">Top nhà cung cấp theo tổng tiền nhập</h3>
+          </div>
+          {topSuppliers.length === 0 ? (
+            <p className="p-16 text-center text-sm text-zinc-400">Chưa có phiếu nhập hàng nào.</p>
+          ) : (
+            <div className="divide-y divide-zinc-100">
+              {topSuppliers.map((s, i) => (
+                <div key={s.id} className="flex items-center gap-4 px-5 py-3.5">
+                  <span className="text-xs font-bold text-zinc-300 w-4">{i + 1}</span>
+                  <div className="min-w-0 w-40 shrink-0">
+                    <p className="text-xs font-medium text-zinc-800 truncate">{s.name}</p>
+                    <p className="text-[10px] text-zinc-400">{s.orderCount} phiếu nhập</p>
+                  </div>
+                  <div className="flex-1 h-2 bg-zinc-100 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-emerald-500 rounded-full"
+                      style={{ width: `${(s.totalAmount / maxSupplierAmount) * 100}%` }}
+                    />
+                  </div>
+                  <span className="text-xs font-bold text-zinc-800 w-28 text-right shrink-0">
+                    {s.totalAmount.toLocaleString()}đ
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeTab === "list" && (
+        <>
       {/* THÔNG BÁO (TOAST) */}
       <AnimatePresence>
         {message.text && (
@@ -388,6 +474,8 @@ const SupplierManager = () => {
           </form>
         </div>
       </div>
+        </>
+      )}
     </div>
   );
 };

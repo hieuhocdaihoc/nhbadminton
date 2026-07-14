@@ -17,6 +17,8 @@ class Refund extends Model
         'payment_id',
         'amount',
         'reason',
+        'refund_method',
+        'refund_info',
         'processed_by',
         'status',
     ];

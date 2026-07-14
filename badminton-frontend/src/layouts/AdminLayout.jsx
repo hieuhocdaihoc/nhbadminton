@@ -4,7 +4,6 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
   BadgeDollarSign,
   Bell,
-  Boxes,
   CalendarCheck2,
   CalendarClock,
   CalendarDays,
@@ -91,7 +90,7 @@ const menuGroups = [
         name: "Lịch đặt hôm nay",
         path: "/admin/bookings/today",
         icon: CalendarCheck2,
-        desc: "Ca chơi, thu tiền và in bill",
+        desc: "Lưới ca theo giờ, bấm để duyệt/check-in/thu tiền",
         roles: ["admin", "staff"],
       },
       {
@@ -131,7 +130,7 @@ const menuGroups = [
         name: "Cấu hình giá sân",
         path: "/admin/pricings",
         icon: BadgeDollarSign,
-        desc: "Bảng giá theo khung giờ",
+        desc: "Bảng giá theo khung giờ và lịch sử sửa giá",
         roles: ["admin", "staff"],
       },
     ],
@@ -139,13 +138,6 @@ const menuGroups = [
   {
     label: "Kho & sản phẩm",
     items: [
-      {
-        name: "Danh mục sản phẩm",
-        path: "/admin/categories",
-        icon: Boxes,
-        desc: "Nhóm hàng hóa và dịch vụ",
-        roles: ["admin", "staff"],
-      },
       {
         name: "Quản lý sản phẩm",
         path: "/admin/products",

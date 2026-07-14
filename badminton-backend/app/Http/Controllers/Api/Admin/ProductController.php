@@ -32,9 +32,55 @@ class ProductController extends Controller
             $query->where('category_id', $request->category_id);
         }
 
+        // Thống kê tổng quan tính trên toàn bộ kết quả khớp bộ lọc (không bị giới hạn bởi phân trang)
+        $statsQuery = clone $query;
+        $stats = [
+            'total'        => (clone $statsQuery)->count(),
+            'in_stock'     => (clone $statsQuery)->whereColumn('stock_quantity', '>', 'low_stock_threshold')->count(),
+            'low_stock'    => (clone $statsQuery)->whereColumn('stock_quantity', '<=', 'low_stock_threshold')->where('stock_quantity', '>', 0)->count(),
+            'out_of_stock' => (clone $statsQuery)->where('stock_quantity', '<=', 0)->count(),
+        ];
+
         $products = $query->orderBy('created_at', 'desc')->paginate(15);
 
-        return response()->json(['status' => 'success', 'data' => $products]);
+        return response()->json(['status' => 'success', 'data' => $products, 'stats' => $stats]);
+    }
+
+    /**
+     * Chức năng: Báo cáo tồn kho — top bán chạy, sản phẩm cần nhập thêm,
+     * giá trị tồn kho theo từng danh mục.
+     */
+    public function report()
+    {
+        $topSelling = Product::with('category:id,name')
+            ->orderByDesc('sold_count')
+            ->limit(10)
+            ->get(['id', 'name', 'sku', 'category_id', 'sold_count', 'selling_price']);
+
+        $needsRestock = Product::with('category:id,name')
+            ->whereColumn('stock_quantity', '<=', 'low_stock_threshold')
+            ->orderBy('stock_quantity')
+            ->get(['id', 'name', 'sku', 'category_id', 'stock_quantity', 'low_stock_threshold']);
+
+        $byCategory = Product::selectRaw('category_id, COUNT(*) as product_count, SUM(stock_quantity * selling_price) as inventory_value')
+            ->groupBy('category_id')
+            ->with('category:id,name')
+            ->get()
+            ->map(fn($row) => [
+                'category_name'    => $row->category?->name ?? 'Chưa phân loại',
+                'product_count'    => (int) $row->product_count,
+                'inventory_value'  => (float) $row->inventory_value,
+            ]);
+
+        return response()->json([
+            'status' => 'success',
+            'data'   => [
+                'top_selling'    => $topSelling,
+                'needs_restock'  => $needsRestock,
+                'by_category'    => $byCategory,
+                'total_inventory_value' => (float) $byCategory->sum('inventory_value'),
+            ],
+        ]);
     }
 
     /** Chức năng: Tạo mới sản phẩm với tồn kho ban đầu bằng 0. */

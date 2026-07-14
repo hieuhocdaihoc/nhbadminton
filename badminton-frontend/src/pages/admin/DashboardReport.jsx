@@ -1,5 +1,5 @@
 // src/pages/admin/DashboardReport.jsx
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   AreaChart,
   Area,
@@ -49,7 +49,6 @@ const getPaymentStatusLabel = (status) => {
 
 const getBookingStatusLabel = (status) => {
   const labels = {
-    pending: "Chờ xác nhận",
     confirmed: "Đã xác nhận",
     completed: "Hoàn thành",
     cancelled: "Đã hủy",
@@ -58,21 +57,7 @@ const getBookingStatusLabel = (status) => {
   return labels[status] || status || "—";
 };
 
-const getStatusClass = (status) => {
-  if (status === "paid" || status === "confirmed" || status === "completed") {
-    return "badge-success";
-  }
 
-  if (status === "pending" || status === "partially_paid") {
-    return "badge-warning";
-  }
-
-  if (status === "cancelled") {
-    return "badge-error";
-  }
-
-  return "badge-neutral";
-};
 
   const StatCard = ({ item }) => {
     return (
@@ -143,7 +128,26 @@ const DashboardReport = () => {
   };
 
   useEffect(() => {
-    fetchDashboardReport();
+    let active = true;
+    adminDashboardService.getDashboardReport(filters)
+      .then((res) => {
+        if (!active) return;
+        setReport(res.data?.data || null);
+        setIsLoading(false);
+      })
+      .catch((error) => {
+        console.error("Lỗi tải dashboard:", error);
+        if (active) {
+          setMessage(
+            error.response?.data?.message ||
+              "Không thể tải dữ liệu báo cáo thống kê.",
+          );
+          setIsLoading(false);
+        }
+      });
+    return () => {
+      active = false;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -151,8 +155,8 @@ const DashboardReport = () => {
   const charts = report?.charts || {};
   const revenueChart = charts?.revenue_chart || [];
   const timeSlotStats = charts?.time_slot_stats || [];
-  const courtPerformance = report?.court_performance || [];
-  const recentBookings = report?.recent_bookings || [];
+  const courtPerformance = useMemo(() => report?.court_performance || [], [report]);
+  const recentBookings = useMemo(() => report?.recent_bookings || [], [report]);
 
   const bestCourt = useMemo(() => {
     if (!courtPerformance.length) return "Chưa có dữ liệu";
@@ -475,8 +479,8 @@ const DashboardReport = () => {
         ))}
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
-        <div className="xl:col-span-2 admin-card p-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <div className="admin-card p-6">
           <div className="flex items-center justify-between mb-5">
             <div>
               <h3 className="font-bold text-zinc-800 text-base">
@@ -545,54 +549,10 @@ const DashboardReport = () => {
 
         <div className="admin-card p-6">
           <h3 className="font-bold text-zinc-800 text-base mb-5">
-            Hiệu suất khai thác sân
-          </h3>
-
-          {courtPerformance.length === 0 ? (
-            <div className="py-12 text-center text-sm text-zinc-400">
-              Chưa có dữ liệu sân.
-            </div>
-          ) : (
-            <div className="space-y-5">
-              {courtPerformance.map((court) => (
-                <div key={court.court_id}>
-                  <div className="flex justify-between text-xs font-semibold mb-2">
-                    <span className="text-zinc-600">{court.court_name}</span>
-                    <span className="text-zinc-900">
-                      {court.booked_hours} giờ · {court.occupancy_rate}%
-                    </span>
-                  </div>
-
-                  <div className="w-full bg-zinc-100 h-2 rounded-full overflow-hidden">
-                    <div
-                      className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-teal-500"
-                      style={{
-                        width: `${Math.min(Number(court.occupancy_rate || 0), 100)}%`,
-                      }}
-                    />
-                  </div>
-
-                  <p className="text-[10px] text-zinc-400 mt-1">
-                    {court.booking_count} lượt đặt
-                  </p>
-                </div>
-              ))}
-            </div>
-          )}
-
-          <div className="mt-6 pt-4 border-t border-zinc-100 text-xs text-zinc-400">
-            Tỷ lệ dựa trên tổng số giờ đặt / giờ khai thác dự kiến.
-          </div>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
-        <div className="admin-card p-6">
-          <h3 className="font-bold text-zinc-800 text-base mb-5">
             Lượt đặt theo khung giờ
           </h3>
 
-          <div className="h-64">
+          <div className="h-72">
             {timeSlotStats.length === 0 ? (
               <div className="h-full flex items-center justify-center text-sm text-zinc-400 bg-zinc-50 rounded-2xl">
                 Chưa có dữ liệu khung giờ.
@@ -612,100 +572,6 @@ const DashboardReport = () => {
                 </BarChart>
               </ResponsiveContainer>
             )}
-          </div>
-        </div>
-
-        <div className="xl:col-span-2 admin-card p-6">
-          <div className="flex items-center justify-between mb-5">
-            <h3 className="font-bold text-zinc-800 text-base">
-              Đơn đặt sân gần đây
-            </h3>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[800px]">
-              <thead>
-                <tr className="text-left text-xs text-zinc-400 border-b">
-                  <th className="pb-3 font-bold">Mã đơn</th>
-                  <th className="pb-3 font-bold">Khách hàng</th>
-                  <th className="pb-3 font-bold">Sân</th>
-                  <th className="pb-3 font-bold">Ngày chơi</th>
-                  <th className="pb-3 font-bold">Thời gian</th>
-                  <th className="pb-3 font-bold">Giá</th>
-                  <th className="pb-3 font-bold">Thanh toán</th>
-                  <th className="pb-3 font-bold">Trạng thái</th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {recentBookings.length === 0 ? (
-                  <tr>
-                    <td
-                      colSpan="8"
-                      className="py-12 text-center text-sm text-zinc-400"
-                    >
-                      Chưa có đơn đặt sân gần đây.
-                    </td>
-                  </tr>
-                ) : (
-                  recentBookings.map((booking) => (
-                    <tr
-                      key={booking.booking_id}
-                      className="border-b last:border-none"
-                    >
-                      <td className="py-4 font-semibold text-zinc-800">
-                        {booking.booking_code}
-                      </td>
-
-                      <td className="py-4">
-                        <p className="font-semibold text-zinc-800">
-                          {booking.customer_name || "Khách vãng lai"}
-                        </p>
-                        <p className="text-[11px] text-zinc-400">
-                          {booking.customer_phone || "—"}
-                        </p>
-                      </td>
-
-                      <td className="py-4 text-zinc-500">
-                        {booking.court_name || "—"}
-                      </td>
-
-                      <td className="py-4 text-zinc-500">
-                        {formatDate(booking.play_date)}
-                      </td>
-
-                      <td className="py-4 text-zinc-500">
-                        {booking.time_slot || "—"}
-                      </td>
-
-                      <td className="py-4 font-semibold text-zinc-800">
-                        {formatMoney(booking.total_price)}
-                      </td>
-
-                      <td className="py-4">
-                        <span
-                          className={`admin-badge px-3 py-1 text-[11px] ${getStatusClass(
-                            booking.payment_status,
-                          )}`}
-                        >
-                          {getPaymentStatusLabel(booking.payment_status)}
-                        </span>
-                      </td>
-
-                      <td className="py-4">
-                        <span
-                          className={`admin-badge px-3 py-1 text-[11px] ${getStatusClass(
-                            booking.status,
-                          )}`}
-                        >
-                          {getBookingStatusLabel(booking.status)}
-                        </span>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
           </div>
         </div>
       </div>

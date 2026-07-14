@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { adminUserService } from "../../services/admin/adminUserService";
+import { staffShiftService } from "../../services/admin/staffShiftService";
 
 const StaffManager = () => {
   const [staffs, setStaffs] = useState([]);
@@ -9,12 +10,15 @@ const StaffManager = () => {
     last_page: 1,
   });
 
+  const [meta, setMeta] = useState({ total: 0, active: 0 });
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState({ type: "", text: "" });
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+
+  const [shiftStats, setShiftStats] = useState(null);
 
   const [form, setForm] = useState({
     id: null,
@@ -66,6 +70,7 @@ const StaffManager = () => {
         current_page: response.data?.data?.current_page || 1,
         last_page: response.data?.data?.last_page || 1,
       });
+      setMeta(response.data?.meta || { total: 0, active: 0 });
     } catch (error) {
       setMessage({ type: "error", text: "Không thể tải danh sách nhân viên." });
     } finally {
@@ -145,8 +150,18 @@ const StaffManager = () => {
 
   const handleViewDetail = async (id) => {
     try {
-      const response = await adminUserService.getUserDetail(id);
-      setDetailUser(response.data?.data);
+      const [userRes, shiftsRes] = await Promise.all([
+        adminUserService.getUserDetail(id),
+        staffShiftService.getShifts({ staff_id: id, per_page: 500 }),
+      ]);
+      setDetailUser(userRes.data?.data);
+      const allShifts = shiftsRes.data?.data?.data || shiftsRes.data?.data || [];
+      setShiftStats({
+        total:     allShifts.length,
+        completed: allShifts.filter((s) => s.status === "completed").length,
+        cancelled: allShifts.filter((s) => s.status === "cancelled").length,
+        scheduled: allShifts.filter((s) => s.status === "scheduled").length,
+      });
       setIsDetailOpen(true);
     } catch (error) {
       alert("Không thể lấy chi tiết tài khoản.");
@@ -195,8 +210,6 @@ const StaffManager = () => {
     }
   };
 
-  const totalStaffs = staffs.length;
-  const activeStaffs = staffs.filter((user) => user.status === "active").length;
 
   const inputClass =
     "w-full bg-[#f8f8fa] border border-zinc-200 rounded-lg px-3.5 py-2 text-sm text-zinc-800 outline-none focus:border-zinc-400 focus:ring-1 focus:ring-zinc-200 transition-all";
@@ -215,11 +228,11 @@ const StaffManager = () => {
         </div>
         <div className="flex gap-2.5">
           <div className="admin-stat-badge badge-default">
-            <p className="admin-stat-value val-default">{totalStaffs}</p>
+            <p className="admin-stat-value val-default">{meta.total}</p>
             <p className="admin-stat-label lbl-default">Tổng</p>
           </div>
           <div className="admin-stat-badge badge-success">
-            <p className="admin-stat-value val-success">{activeStaffs}</p>
+            <p className="admin-stat-value val-success">{meta.active}</p>
             <p className="admin-stat-label lbl-success">Hoạt động</p>
           </div>
         </div>
@@ -649,6 +662,24 @@ const StaffManager = () => {
                     </span>
                   </div>
                 </div>
+                {shiftStats && (
+                  <div className="mt-5 pt-4 border-t border-zinc-100">
+                    <p className="text-[10px] font-bold uppercase tracking-wide text-zinc-400 mb-3">Thống kê ca làm</p>
+                    <div className="grid grid-cols-4 gap-2 text-center">
+                      {[
+                        { label: "Tổng ca",    value: shiftStats.total,     cls: "text-zinc-800"    },
+                        { label: "Hoàn thành", value: shiftStats.completed, cls: "text-emerald-600" },
+                        { label: "Chờ làm",    value: shiftStats.scheduled, cls: "text-sky-600"     },
+                        { label: "Đã hủy",     value: shiftStats.cancelled, cls: "text-zinc-400"    },
+                      ].map(({ label, value, cls }) => (
+                        <div key={label} className="rounded-lg bg-zinc-50 py-2 px-1">
+                          <p className={`text-lg font-black ${cls}`}>{value}</p>
+                          <p className="text-[9px] text-zinc-400 leading-tight mt-0.5">{label}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </motion.div>
           </div>

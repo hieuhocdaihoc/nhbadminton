@@ -8,9 +8,11 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('recurring_bookings', function (Blueprint $table) {
-            $table->enum('type', ['recurring', 'long_term'])->default('recurring')->after('status');
-        });
+        if (!Schema::hasColumn('recurring_bookings', 'type')) {
+            Schema::table('recurring_bookings', function (Blueprint $table) {
+                $table->enum('type', ['recurring', 'long_term'])->default('recurring')->after('status');
+            });
+        }
     }
 
     public function down(): void

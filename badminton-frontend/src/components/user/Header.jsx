@@ -20,7 +20,6 @@ const Header = () => {
     const [userDropdownOpen, setUserDropdownOpen] = useState(false);
     const [authModalOpen, setAuthModalOpen] = useState(false);
     const [authMode, setAuthMode] = useState('login');
-    const [hoveredLink, setHoveredLink] = useState(null);
 
     // PERSIST SESSION
     useEffect(() => {
@@ -61,8 +60,8 @@ const Header = () => {
         { name: 'Bảng Giá', href: '/#pricing', sectionId: 'pricing' },
         { name: 'Tiện Ích', href: '/#utilities', sectionId: 'utilities' },
         { name: 'Hướng Dẫn', href: '/#steps', sectionId: 'steps' },
-        { name: 'Tra Cứu Đơn', href: '/guest-booking-lookup' },
         { name: 'Mặt Bằng', href: '/#floorplan', sectionId: 'floorplan' },
+        { name: 'Tra Cứu Đơn', href: '/guest-booking-lookup' },
     ];
 
     // SCROLL-SPY: tự động chuyển pill active theo section đang hiển thị trên trang chủ
@@ -112,7 +111,7 @@ const Header = () => {
             initial={{ y: -80 }}
             animate={{ y: 0 }}
             transition={{ duration: 0.5, type: 'spring', stiffness: 100 }}
-            className="sticky top-0 z-50 bg-zinc-950/80 backdrop-blur-xl border-b border-zinc-800/50"
+            className="sticky top-0 z-50 bg-zinc-950/85 backdrop-blur-xl border-b border-zinc-700"
         >
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
 
@@ -127,18 +126,16 @@ const Header = () => {
                 </a>
 
                 {/* ═══ DESKTOP NAV ═══ */}
-                <nav className="hidden md:flex items-center gap-1 font-semibold text-sm bg-zinc-900/60 border border-zinc-800/80 rounded-full px-1.5 py-1.5">
+                <nav className="hidden md:flex items-center gap-1 font-semibold text-sm bg-zinc-900/80 border border-zinc-700 rounded-full px-1.5 py-1.5">
                     {navLinks.map((link) => {
                         const isActive = activeLink === link.name;
                         return (
                             <a key={link.name} href={link.href}
                                 onClick={() => setActiveLink(link.name)}
-                                onMouseEnter={() => setHoveredLink(link.name)}
-                                onMouseLeave={() => setHoveredLink(null)}
                                 className={`relative px-4 py-2 rounded-full transition-colors duration-200 ${isActive ? 'text-zinc-950' : 'text-zinc-400 hover:text-white'}`}>
                                 {(isActive) && (
                                     <motion.div layoutId="navPill"
-                                        className="absolute inset-0 bg-lime-400 rounded-full shadow-[0_0_12px_rgba(163,230,53,0.5)]"
+                                        className="absolute inset-0 bg-lime-400 rounded-full shadow-[0_0_12px_rgba(163,230,53,0.35)]"
                                         transition={{ type: 'spring', stiffness: 350, damping: 30 }} />
                                 )}
                                 <span className="relative z-10">{link.name}</span>
@@ -153,28 +150,28 @@ const Header = () => {
                         <>
                             <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
                                 onClick={() => { setAuthMode('login'); setAuthModalOpen(true); }}
-                                className="px-5 py-2.5 border border-zinc-700 hover:border-lime-500/50 text-zinc-300 hover:text-lime-400 text-sm font-semibold rounded-xl transition-all duration-300">
+                                className="px-5 py-2.5 border border-zinc-600 hover:border-lime-400/60 text-zinc-300 hover:text-lime-300 text-sm font-semibold rounded-xl transition-all duration-300">
                                 Đăng nhập
                             </motion.button>
                             <motion.a href="/#courts"
-                                whileHover={{ scale: 1.03, boxShadow: '0 0 20px rgba(163,230,53,0.4)' }}
+                                whileHover={{ scale: 1.03 }}
                                 whileTap={{ scale: 0.97 }}
-                                className="px-6 py-2.5 bg-lime-500 hover:bg-lime-400 text-zinc-950 text-sm font-extrabold rounded-xl shadow-lg shadow-lime-500/20 transition-all duration-300 uppercase tracking-wide">
+                                className="px-6 py-2.5 bg-lime-500 hover:bg-lime-400 text-zinc-950 text-sm font-extrabold rounded-xl border border-lime-300/40 shadow-[0_0_16px_rgba(163,230,53,0.3)] transition-all duration-300 uppercase tracking-wide">
                                 Đặt Sân Ngay
                             </motion.a>
                         </>
                     ) : (
                         <div className="flex items-center gap-3">
                             <motion.a href="/#courts"
-                                whileHover={{ scale: 1.03, boxShadow: '0 0 20px rgba(163,230,53,0.4)' }}
+                                whileHover={{ scale: 1.03 }}
                                 whileTap={{ scale: 0.97 }}
-                                className="px-5 py-2 bg-lime-500 hover:bg-lime-400 text-zinc-950 text-sm font-extrabold rounded-xl shadow-lg shadow-lime-500/20 uppercase tracking-wide">
+                                className="px-5 py-2 bg-lime-500 hover:bg-lime-400 text-zinc-950 text-sm font-extrabold rounded-xl border border-lime-300/40 shadow-[0_0_16px_rgba(163,230,53,0.3)] uppercase tracking-wide">
                                 🏸 Đặt Sân
                             </motion.a>
                             <div className="relative">
                                 <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                                     onClick={() => setUserDropdownOpen(!userDropdownOpen)}
-                                    className="flex items-center gap-2 p-1 pl-3 bg-zinc-900/80 border border-zinc-700/80 rounded-full focus:outline-none hover:border-lime-500/40 transition-colors">
+                                    className="flex items-center gap-2 p-1 pl-3 bg-zinc-900 border border-zinc-700 rounded-full focus:outline-none hover:border-lime-400/50 transition-colors">
                                     <span className="text-sm font-bold text-zinc-300 max-w-[120px] truncate">{currentUser.full_name || 'Vợt thủ'}</span>
                                     {currentUser.avatar_url ? (
                                         <img src={currentUser.avatar_url} alt={currentUser.full_name} className="w-8 h-8 rounded-full object-cover" />
@@ -188,35 +185,35 @@ const Header = () => {
                                 <AnimatePresence>
                                     {userDropdownOpen && (
                                         <motion.div variants={dropdownVariant} initial="hidden" animate="visible" exit="exit"
-                                            className="absolute right-0 mt-2 w-64 bg-zinc-900 rounded-2xl shadow-2xl shadow-black/50 border border-zinc-800 py-2 z-50">
-                                            <div className="px-4 py-2.5 border-b border-zinc-800 mb-1">
+                                            className="absolute right-0 mt-2 w-64 bg-zinc-900 rounded-2xl shadow-2xl shadow-black/50 border border-zinc-700 py-2 z-50">
+                                            <div className="px-4 py-2.5 border-b border-zinc-700 mb-1">
                                                 <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">Tài khoản của bạn</p>
                                                 <p className="text-sm font-bold text-white truncate">{currentUser.phone}</p>
-                                                {currentUser.email && <p className="text-xs text-zinc-400 truncate">{currentUser.email}</p>}
+                                                {currentUser.email && <p className="text-xs text-zinc-500 truncate">{currentUser.email}</p>}
                                                 <div className="mt-2 grid grid-cols-2 gap-2">
-                                                    <div className="rounded-lg bg-lime-500/10 px-2.5 py-2">
-                                                        <p className="text-[10px] font-bold uppercase text-lime-400">Điểm</p>
-                                                        <p className="text-sm font-black text-white">{currentUser.points || 0}</p>
+                                                    <div className="rounded-lg bg-lime-400/10 border border-lime-400/20 px-2.5 py-2">
+                                                        <p className="text-[10px] font-bold uppercase text-lime-300">Điểm</p>
+                                                        <p className="text-sm font-black text-lime-200">{currentUser.points || 0}</p>
                                                     </div>
-                                                    <div className="rounded-lg bg-zinc-800/80 px-2.5 py-2">
-                                                        <p className="text-[10px] font-bold uppercase text-zinc-500">Hạng</p>
+                                                    <div className="rounded-lg bg-zinc-800 border border-zinc-600 px-2.5 py-2">
+                                                        <p className="text-[10px] font-bold uppercase text-zinc-400">Hạng</p>
                                                         <p className="text-sm font-black text-white">{currentUser.membership_level || 'Đồng'}</p>
                                                     </div>
                                                 </div>
                                                 {(currentUser.points || 0) >= 1000 && (
-                                                    <p className="mt-2 rounded-lg border border-lime-500/20 bg-lime-500/10 px-2.5 py-2 text-[11px] font-semibold text-lime-300">
+                                                    <p className="mt-2 rounded-lg border border-lime-400/30 bg-lime-400/10 px-2.5 py-2 text-[11px] font-semibold text-lime-300">
                                                         Ưu đãi: giảm 5.000đ mỗi giờ chơi
                                                     </p>
                                                 )}
                                             </div>
-                                            <a href="/profile" className="flex items-center gap-2 px-4 py-2 text-sm text-zinc-400 hover:bg-lime-500/10 hover:text-lime-400 font-medium transition-colors">
+                                            <a href="/profile" className="flex items-center gap-2 px-4 py-2 text-sm text-zinc-300 hover:bg-lime-400/10 hover:text-lime-300 font-medium transition-colors">
                                                 <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M12 12C14.21 12 16 10.21 16 8C16 5.79 14.21 4 12 4C9.79 4 8 5.79 8 8C8 10.21 9.79 12 12 12ZM12 14C9.33 14 4 15.34 4 18V20H20V18C20 15.34 14.67 14 12 14Z" /></svg> Thông tin cá nhân
                                             </a>
-                                            <a href="booking-history" className="flex items-center gap-2 px-4 py-2 text-sm text-zinc-400 hover:bg-lime-500/10 hover:text-lime-400 font-medium transition-colors">
+                                            <a href="booking-history" className="flex items-center gap-2 px-4 py-2 text-sm text-zinc-300 hover:bg-lime-400/10 hover:text-lime-300 font-medium transition-colors">
                                                 <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M19 3H5C3.9 3 3 3.9 3 5V19C3 20.1 3.9 21 5 21H19C20.1 21 21 20.1 21 19V5C21 3.9 20.1 3 19 3ZM10 17L5 12L6.41 10.59L10 14.17L17.59 6.58L19 8L10 17Z" /></svg> Lịch sử đặt sân
                                             </a>
-                                            <div className="border-t border-zinc-800 mt-1 pt-1">
-                                                <button onClick={handleLogout} className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-400 hover:bg-red-500/10 font-semibold transition-colors text-left">
+                                            <div className="border-t border-zinc-700 mt-1 pt-1">
+                                                <button onClick={handleLogout} className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-400 hover:bg-red-400/10 font-semibold transition-colors text-left">
                                                     <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M17 7L15.59 8.41L18.17 11H8V13H18.17L15.59 15.59L17 17L22 12L17 7ZM4 5H12V3H4C2.9 3 2 3.9 2 5V19C2 20.1 2.9 21 4 21H12V19H4V5Z" /></svg> Đăng xuất
                                                 </button>
                                             </div>
@@ -230,7 +227,7 @@ const Header = () => {
 
                 {/* ═══ HAMBURGER MOBILE ═══ */}
                 <motion.button whileTap={{ scale: 0.9 }} onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                    className="p-2 text-zinc-400 hover:text-lime-400 hover:bg-lime-500/10 rounded-xl md:hidden focus:outline-none transition-colors">
+                    className="p-2 text-zinc-400 hover:text-lime-300 hover:bg-lime-400/10 rounded-xl md:hidden focus:outline-none transition-colors">
                     <motion.div animate={{ rotate: mobileMenuOpen ? 90 : 0 }} transition={{ duration: 0.2 }}>
                         {mobileMenuOpen
                             ? <svg className="w-6 h-6 fill-current" viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" /></svg>
@@ -243,28 +240,28 @@ const Header = () => {
             <AnimatePresence>
                 {mobileMenuOpen && (
                     <motion.div variants={mobileMenuVariant} initial="hidden" animate="visible" exit="exit"
-                        className="md:hidden bg-zinc-950/95 backdrop-blur-xl border-b border-zinc-800/50 px-6 py-6 space-y-4 overflow-hidden">
+                        className="md:hidden bg-zinc-950/95 backdrop-blur-xl border-b border-zinc-700 px-6 py-6 space-y-4 overflow-hidden">
                         {navLinks.map((link) => (
                             <motion.a key={link.name} variants={itemVariant} href={link.href}
                                 onClick={() => { setActiveLink(link.name); setMobileMenuOpen(false); }}
-                                className={`block text-lg py-1.5 transition-colors ${activeLink === link.name ? 'text-lime-400 font-bold' : 'text-zinc-400 font-medium hover:text-lime-400'}`}>
+                                className={`block text-lg py-1.5 transition-colors ${activeLink === link.name ? 'text-lime-300 font-bold' : 'text-zinc-400 font-medium hover:text-lime-300'}`}>
                                 {link.name}
                             </motion.a>
                         ))}
-                        <motion.div variants={itemVariant} className="pt-6 border-t border-zinc-800 flex flex-col gap-3">
+                        <motion.div variants={itemVariant} className="pt-6 border-t border-zinc-700 flex flex-col gap-3">
                             {!currentUser ? (
                                 <>
                                     <div className="grid grid-cols-2 gap-2">
                                         <button onClick={() => { setAuthMode('login'); setAuthModalOpen(true); setMobileMenuOpen(false); }}
-                                            className="py-2.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-bold rounded-xl text-sm border border-zinc-700">Đăng nhập</button>
+                                            className="py-2.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-bold rounded-xl text-sm border border-zinc-600">Đăng nhập</button>
                                         <button onClick={() => { setAuthMode('register'); setAuthModalOpen(true); setMobileMenuOpen(false); }}
-                                            className="py-2.5 bg-zinc-800 text-lime-400 font-bold rounded-xl text-sm border border-lime-500/30">Đăng ký</button>
+                                            className="py-2.5 bg-zinc-800 text-lime-300 font-bold rounded-xl text-sm border border-lime-400/40">Đăng ký</button>
                                     </div>
                                     <a href="/#courts" onClick={() => setMobileMenuOpen(false)}
-                                        className="block w-full text-center py-3 bg-lime-500 text-zinc-950 font-extrabold rounded-xl shadow-lg shadow-lime-500/20 uppercase tracking-wide">Đặt Sân Ngay</a>
+                                        className="block w-full text-center py-3 bg-lime-500 text-zinc-950 font-extrabold rounded-xl border border-lime-300/40 shadow-[0_0_16px_rgba(163,230,53,0.3)] uppercase tracking-wide">Đặt Sân Ngay</a>
                                 </>
                             ) : (
-                                <div className="bg-zinc-900/80 p-4 rounded-2xl border border-zinc-800">
+                                <div className="bg-zinc-900 p-4 rounded-2xl border border-zinc-700 shadow-lg shadow-black/40">
                                     <div className="flex items-center gap-3 mb-4">
                                         {currentUser.avatar_url ? (
                                             <img src={currentUser.avatar_url} alt={currentUser.full_name} className="w-10 h-10 rounded-full object-cover" />
@@ -278,9 +275,9 @@ const Header = () => {
                                     </div>
                                     <a href="/#courts" onClick={() => setMobileMenuOpen(false)}
                                         className="block w-full text-center py-2.5 bg-lime-500 text-zinc-950 font-extrabold rounded-xl shadow-sm mb-2 text-sm uppercase">🏸 Đặt Sân</a>
-                                    <div className="grid grid-cols-2 gap-2 border-t border-zinc-800 pt-2">
-                                        <a href="/profile" className="text-center py-2 text-xs font-semibold text-lime-400 bg-lime-500/10 rounded-lg">Hồ sơ</a>
-                                        <button onClick={handleLogout} className="text-center py-2 text-xs font-semibold text-red-400 bg-red-500/10 rounded-lg">Đăng xuất</button>
+                                    <div className="grid grid-cols-2 gap-2 border-t border-zinc-700 pt-2">
+                                        <a href="/profile" className="text-center py-2 text-xs font-semibold text-lime-300 bg-lime-400/10 border border-lime-400/20 rounded-lg">Hồ sơ</a>
+                                        <button onClick={handleLogout} className="text-center py-2 text-xs font-semibold text-red-400 bg-red-400/10 border border-red-400/20 rounded-lg">Đăng xuất</button>
                                     </div>
                                 </div>
                             )}

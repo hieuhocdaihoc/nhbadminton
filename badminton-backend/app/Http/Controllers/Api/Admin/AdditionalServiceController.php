@@ -28,7 +28,7 @@ class AdditionalServiceController extends Controller
 
         return response()->json([
             'status' => 'success',
-            'data'   => $query->orderBy('name')->get(),
+            'data' => $query->orderBy('name')->get(),
         ]);
     }
 
@@ -38,12 +38,12 @@ class AdditionalServiceController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'name'         => ['required', 'string', 'max:100'],
+            'name' => ['required', 'string', 'max:100'],
             'service_type' => ['required', 'in:' . implode(',', self::SERVICE_TYPES)],
-            'description'  => ['nullable', 'string'],
-            'price'        => ['required', 'numeric', 'min:0'],
-            'unit'         => ['nullable', 'string', 'max:50'],
-            'status'       => ['nullable', 'in:active,inactive'],
+            'description' => ['nullable', 'string'],
+            'price' => ['required', 'numeric', 'min:0'],
+            'unit' => ['nullable', 'string', 'max:50'],
+            'status' => ['nullable', 'in:active,inactive'],
         ]);
 
         $service = AdditionalService::create([
@@ -52,9 +52,9 @@ class AdditionalServiceController extends Controller
         ]);
 
         return response()->json([
-            'status'  => 'success',
+            'status' => 'success',
             'message' => 'Thêm dịch vụ thành công!',
-            'data'    => $service,
+            'data' => $service,
         ], 201);
     }
 
@@ -67,7 +67,7 @@ class AdditionalServiceController extends Controller
 
         return response()->json([
             'status' => 'success',
-            'data'   => $service,
+            'data' => $service,
         ]);
     }
 
@@ -79,20 +79,20 @@ class AdditionalServiceController extends Controller
         $service = AdditionalService::findOrFail($id);
 
         $validated = $request->validate([
-            'name'         => ['sometimes', 'required', 'string', 'max:100'],
+            'name' => ['sometimes', 'required', 'string', 'max:100'],
             'service_type' => ['sometimes', 'required', 'in:' . implode(',', self::SERVICE_TYPES)],
-            'description'  => ['nullable', 'string'],
-            'price'        => ['sometimes', 'required', 'numeric', 'min:0'],
-            'unit'         => ['nullable', 'string', 'max:50'],
-            'status'       => ['sometimes', 'required', 'in:active,inactive'],
+            'description' => ['nullable', 'string'],
+            'price' => ['sometimes', 'required', 'numeric', 'min:0'],
+            'unit' => ['nullable', 'string', 'max:50'],
+            'status' => ['sometimes', 'required', 'in:active,inactive'],
         ]);
 
         $service->update($validated);
 
         return response()->json([
-            'status'  => 'success',
+            'status' => 'success',
             'message' => 'Cập nhật dịch vụ thành công!',
-            'data'    => $service,
+            'data' => $service,
         ]);
     }
 
@@ -105,7 +105,7 @@ class AdditionalServiceController extends Controller
 
         if ($service->status === 'inactive') {
             return response()->json([
-                'status'  => 'error',
+                'status' => 'error',
                 'message' => 'Dịch vụ này đã được tạm ngưng từ trước!',
             ], 400);
         }
@@ -113,7 +113,7 @@ class AdditionalServiceController extends Controller
         $service->update(['status' => 'inactive']);
 
         return response()->json([
-            'status'  => 'success',
+            'status' => 'success',
             'message' => 'Đã tạm ngưng dịch vụ! (Dữ liệu hóa đơn cũ vẫn được bảo toàn)',
         ]);
     }

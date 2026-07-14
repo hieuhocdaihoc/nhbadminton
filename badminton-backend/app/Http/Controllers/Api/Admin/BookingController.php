@@ -21,9 +21,7 @@ use Illuminate\Support\Str;
 
 class BookingController extends Controller
 {
-    // Các trạng thái được phép chuyển sang từ trạng thái hiện tại
     private const ALLOWED_TRANSITIONS = [
-        'pending' => ['confirmed', 'cancelled'],
         'confirmed' => ['cancelled'],
         'playing' => ['completed'],
         'completed' => [],
@@ -465,6 +463,14 @@ class BookingController extends Controller
 
         return DB::transaction(function () use ($validated, $bookingId, $request) {
             $booking = Booking::findOrFail($bookingId);
+
+            if (in_array($booking->status, ['cancelled', 'completed'], true)) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'Không thể thêm dịch vụ/sản phẩm cho đơn đã hoàn thành hoặc đã hủy.',
+                ], 422);
+            }
+
             $quantity = $validated['quantity'];
             $productId = null;
             $serviceId = null;
@@ -544,6 +550,14 @@ class BookingController extends Controller
 
         return DB::transaction(function () use ($validated, $bookingId, $request) {
             $booking = Booking::lockForUpdate()->findOrFail($bookingId);
+
+            if (in_array($booking->status, ['cancelled', 'completed'], true)) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'Không thể thêm dịch vụ/sản phẩm cho đơn đã hoàn thành hoặc đã hủy.',
+                ], 422);
+            }
+
             $createdDetails = [];
             $totalAddedAmount = 0;
 

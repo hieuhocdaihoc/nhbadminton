@@ -10,6 +10,7 @@ use App\Models\RecurringBooking;
 use App\Models\User;
 use App\Services\PaymentService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -51,8 +52,11 @@ class SePayController extends Controller
                     return response()->json(['success' => false, 'message' => 'Số tiền không hợp lệ'], 422);
                 }
 
+                // Đánh dấu "đang xử lý" trước khi xóa intent, để intentStatus biết chờ
+                // thay vì trả paid=true với booking_codes rỗng (race condition)
+                Cache::put('intent_processing_' . $intent->intent_code, true, now()->addMinutes(2));
+
                 // Lock: xóa intent ngay lập tức để tránh xử lý 2 lần
-                // (frontend poll thấy intent gone → trả paid=true ngay, không còn bị "expired" nhầm)
                 $locked = BookingIntent::where('intent_code', $intent->intent_code)
                     ->where('expires_at', '>', now())
                     ->delete();
@@ -68,6 +72,9 @@ class SePayController extends Controller
                     $userId = $intent->payload['user_id'] ?? null;
                     return $userId ? User::find($userId) : null;
                 });
+                // Đánh dấu request này đã qua xác nhận thanh toán thật (chỉ set được từ server,
+                // không nằm trong payload nên client không thể tự thêm để giả mạo).
+                $fakeRequest->attributes->set('is_verified_payment', true);
 
                 try {
                     $response = $bookingController->store($fakeRequest);
@@ -131,6 +138,17 @@ class SePayController extends Controller
                         }
                     }
                 });
+
+                // Cache booking codes, xóa marker processing
+                $codes = [];
+                if ($bookingId) {
+                    $b = Booking::find($bookingId);
+                    if ($b) {
+                        $codes[] = $b->booking_code;
+                    }
+                }
+                Cache::put('intent_paid_' . $intent->intent_code, $codes, now()->addHour());
+                Cache::forget('intent_processing_' . $intent->intent_code);
 
                 return response()->json([
                     'success' => true,
@@ -422,8 +440,17 @@ class SePayController extends Controller
         $intent = BookingIntent::where('intent_code', strtoupper($code))->first();
 
         if (!$intent) {
-            // Intent không còn → đã được webhook xử lý (paid) hoặc hết hạn
-            return response()->json(['status' => 'success', 'data' => ['paid' => true]]);
+            // Webhook đang xử lý (chưa có codes) → chờ thêm
+            if (Cache::has('intent_processing_' . strtoupper($code))) {
+                return response()->json(['status' => 'success', 'data' => ['paid' => false]]);
+            }
+
+            // Webhook xong → trả paid=true kèm mã đơn
+            $codes = Cache::get('intent_paid_' . strtoupper($code), []);
+            return response()->json(['status' => 'success', 'data' => [
+                'paid'          => true,
+                'booking_codes' => $codes,
+            ]]);
         }
 
         if ($intent->expires_at->isPast()) {

@@ -9,6 +9,7 @@ const CustomerManager = () => {
     last_page: 1,
   });
 
+  const [meta, setMeta] = useState({ total: 0, active: 0 });
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState({ type: "", text: "" });
@@ -59,6 +60,7 @@ const CustomerManager = () => {
         current_page: response.data?.data?.current_page || 1,
         last_page: response.data?.data?.last_page || 1,
       });
+      setMeta(response.data?.meta || { total: 0, active: 0 });
     } catch (error) {
       setMessage({
         type: "error",
@@ -211,10 +213,6 @@ const CustomerManager = () => {
     }
   };
 
-  const totalCustomers = customers.length;
-  const activeCustomers = customers.filter(
-    (user) => user.status === "active",
-  ).length;
 
   const inputClass =
     "w-full bg-[#f8f8fa] border border-zinc-200 rounded-lg px-3.5 py-2 text-sm text-zinc-800 outline-none focus:border-zinc-400 focus:ring-1 focus:ring-zinc-200 transition-all";
@@ -233,11 +231,11 @@ const CustomerManager = () => {
         </div>
         <div className="flex gap-2.5">
           <div className="admin-stat-badge badge-default">
-            <p className="admin-stat-value val-default">{totalCustomers}</p>
+            <p className="admin-stat-value val-default">{meta.total}</p>
             <p className="admin-stat-label lbl-default">Tổng</p>
           </div>
           <div className="bg-blue-50 border border-blue-200/60 px-4 py-2 rounded-lg text-center min-w-[70px]">
-            <p className="text-lg font-bold text-blue-600">{activeCustomers}</p>
+            <p className="text-lg font-bold text-blue-600">{meta.active}</p>
             <p className="text-[10px] text-blue-500 uppercase">Hoạt động</p>
           </div>
         </div>
@@ -738,15 +736,6 @@ const CustomerManager = () => {
                         </p>
                         <p className="text-lg font-bold text-emerald-700">
                           {bookingStats.completed_bookings}
-                        </p>
-                      </div>
-
-                      <div className="bg-amber-50 border border-amber-100 rounded-xl p-3">
-                        <p className="text-[10px] text-amber-500 uppercase">
-                          Chờ xử lý
-                        </p>
-                        <p className="text-lg font-bold text-amber-700">
-                          {bookingStats.pending_bookings}
                         </p>
                       </div>
 

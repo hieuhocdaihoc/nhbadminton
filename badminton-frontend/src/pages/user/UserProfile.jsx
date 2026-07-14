@@ -49,84 +49,82 @@ const UserProfile = () => {
             setProfileMessage({ type: 'success', text: '✓ Cập nhật thông tin thành công!' });
             setTimeout(() => { window.location.reload(); }, 1000);
         } catch (error) {
-            console.error('Lỗi cập nhật:', error);
-            if (error.response?.data?.errors) {
-                setProfileMessage({ type: 'error', text: Object.values(error.response.data.errors)[0][0] });
-            } else {
-                setProfileMessage({ type: 'error', text: 'Cập nhật thất bại. Vui lòng thử lại.' });
-            }
-        } finally { setProfileLoading(false); }
+            console.error('Loi cap nhat profile:', error);
+            setProfileMessage({ type: 'error', text: error.response?.data?.message || 'Có lỗi xảy ra, vui lòng thử lại.' });
+        } finally {
+            setProfileLoading(false);
+        }
     };
 
     const handleChangePassword = async (e) => {
         e.preventDefault();
-        setPasswordLoading(true);
-        setPasswordMessage({ type: '', text: '' });
         if (newPassword !== confirmPassword) {
-            setPasswordMessage({ type: 'error', text: 'Mật khẩu xác nhận không khớp!' });
-            setPasswordLoading(false);
+            setPasswordMessage({ type: 'error', text: 'Mật khẩu mới và xác nhận mật khẩu không trùng khớp.' });
             return;
         }
+        setPasswordLoading(true);
+        setPasswordMessage({ type: '', text: '' });
         try {
-            await authService.changePassword(oldPassword, newPassword, confirmPassword);
+            await authService.changePassword({ oldPassword, newPassword });
             setPasswordMessage({ type: 'success', text: '✓ Đổi mật khẩu thành công!' });
-            setOldPassword(''); setNewPassword(''); setConfirmPassword('');
+            setOldPassword('');
+            setNewPassword('');
+            setConfirmPassword('');
         } catch (error) {
-            setPasswordMessage({ type: 'error', text: error.response?.data?.message || 'Đổi mật khẩu thất bại.' });
-        } finally { setPasswordLoading(false); }
+            console.error('Loi doi mat khau:', error);
+            setPasswordMessage({ type: 'error', text: error.response?.data?.message || 'Có lỗi xảy ra, vui lòng thử lại.' });
+        } finally {
+            setPasswordLoading(false);
+        }
     };
 
     const handleAvatarClick = () => {
-        avatarInputRef.current?.click();
+        if (avatarInputRef.current) {
+            avatarInputRef.current.click();
+        }
     };
 
     const handleAvatarChange = async (e) => {
         const file = e.target.files?.[0];
         if (!file) return;
-        if (!file.type.startsWith('image/')) {
-            setProfileMessage({ type: 'error', text: 'Vui lòng chọn một tệp hình ảnh.' });
-            return;
-        }
-        if (file.size > 2 * 1024 * 1024) {
-            setProfileMessage({ type: 'error', text: 'Ảnh không được vượt quá 2MB.' });
-            return;
-        }
+
         setAvatarUploading(true);
+        setProfileMessage({ type: '', text: '' });
+
         try {
             const response = await authService.uploadAvatar(file);
-            const newAvatarUrl = response.data?.avatar_url;
-            const updatedUser = { ...user, avatar_url: newAvatarUrl };
+            const avatarUrl = response.data.avatar_url;
+            const updatedUser = { ...user, avatar_url: avatarUrl };
             localStorage.setItem('current_user', JSON.stringify(updatedUser));
             setUser(updatedUser);
             setProfileMessage({ type: 'success', text: '✓ Cập nhật ảnh đại diện thành công!' });
-            // Reload để Header và các nơi khác đồng bộ avatar mới
-            setTimeout(() => { window.location.reload(); }, 800);
         } catch (error) {
-            setProfileMessage({ type: 'error', text: error.response?.data?.message || 'Tải ảnh thất bại. Vui lòng thử lại.' });
+            console.error('Loi upload avatar:', error);
+            setProfileMessage({ type: 'error', text: error.response?.data?.message || 'Không thể upload ảnh đại diện.' });
         } finally {
             setAvatarUploading(false);
-            e.target.value = '';
         }
     };
 
+    const handleLogoutClick = () => {
+        authService.logout();
+        localStorage.removeItem('current_user');
+        localStorage.removeItem('access_token');
+        window.location.href = '/';
+    };
+
     const getInitials = (name) => {
-        if (!name) return 'VT';
-        const w = name.trim().split(' ');
-        return w.length >= 2 ? (w[0][0] + w[w.length - 1][0]).toUpperCase() : name.substring(0, 2).toUpperCase();
+        if (!name) return 'U';
+        return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
     };
-
-    const handleLogoutClick = async () => {
-        try { await authService.logout(); } catch (err) { console.error(err); }
-        finally { localStorage.removeItem('access_token'); localStorage.removeItem('current_user'); window.location.href = '/'; }
-    };
-
-    const inputClass = "user-input";
-    const labelClass = "user-form-label";
 
     const tabs = [
-        { id: 'profile', label: 'Thông tin', icon: 'person' },
-        { id: 'security', label: 'Bảo mật', icon: 'lock' },
+        { id: 'profile', label: 'Thông tin', icon: 'contact_mail' },
+        { id: 'security', label: 'Mật khẩu', icon: 'lock' }
     ];
+
+    const labelClass = "block text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2";
+    const inputClass = "user-input";
 
     const points = user.points || 0;
     const nextTierTarget = 1000;
@@ -135,17 +133,17 @@ const UserProfile = () => {
     return (
         <div className="bg-zinc-950 min-h-[calc(100vh-160px)] relative overflow-hidden">
             {/* Nền trang trí */}
-            <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-lime-500/[0.03] rounded-full blur-3xl pointer-events-none" />
-            <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-emerald-500/[0.03] rounded-full blur-3xl pointer-events-none" />
+            <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-lime-400/[0.02] rounded-full blur-3xl pointer-events-none" />
+            <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-teal-400/[0.02] rounded-full blur-3xl pointer-events-none" />
 
             <div className="user-page-container max-w-5xl py-16 relative z-10">
 
                 {/* ═══ THẺ THÔNG TIN CHÍNH (HERO) ═══ */}
                 <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-                    className="relative user-card-glass mb-8 p-5 sm:p-6">
+                    className="relative user-card-glass mb-8 p-5 sm:p-6 bg-zinc-900 border border-zinc-700 shadow-sm rounded-3xl">
 
                     {/* Role badge - góc trên phải */}
-                    <span className="absolute top-5 right-5 text-[10px] font-extrabold text-lime-400 bg-lime-500/10 px-3 py-1 rounded-lg border border-lime-500/20 uppercase tracking-widest">
+                    <span className="absolute top-5 right-5 text-[10px] font-extrabold text-lime-500 bg-lime-400/10 px-3 py-1 rounded-lg border border-lime-400/30 uppercase tracking-widest">
                         {user.role === 'customer' ? 'Vợt thủ' : user.role}
                     </span>
 
@@ -154,12 +152,12 @@ const UserProfile = () => {
                         <div className="relative w-20 h-20 sm:w-24 sm:h-24 shrink-0 mx-auto sm:mx-0">
                             <motion.div whileHover={{ scale: 1.04 }} transition={{ type: 'spring', stiffness: 300 }}
                                 onClick={handleAvatarClick}
-                                className="relative w-full h-full rounded-xl overflow-hidden flex items-center justify-center shadow-xl shadow-lime-500/10 border-2 border-zinc-800 cursor-pointer group/avatar"
+                                className="relative w-full h-full rounded-xl overflow-hidden flex items-center justify-center border-2 border-zinc-700 cursor-pointer shadow-sm group/avatar"
                             >
                                 {user.avatar_url ? (
                                     <img src={user.avatar_url} alt={user.full_name} className="w-full h-full object-cover" />
                                 ) : (
-                                    <div className="w-full h-full bg-gradient-to-br from-lime-400 via-lime-500 to-emerald-500 flex items-center justify-center text-zinc-950 font-black text-3xl">
+                                    <div className="w-full h-full bg-gradient-to-br from-lime-400 to-teal-500 flex items-center justify-center text-white font-black text-3xl">
                                         {getInitials(user.full_name)}
                                     </div>
                                 )}
@@ -172,8 +170,8 @@ const UserProfile = () => {
                             </motion.div>
                             {/* Badge bút chì sửa ảnh */}
                             <button onClick={handleAvatarClick}
-                                className="absolute -bottom-1.5 -right-1.5 w-7 h-7 bg-lime-500 hover:bg-lime-400 rounded-full flex items-center justify-center border-2 border-zinc-900 transition-colors">
-                                <span className="material-symbols-outlined text-zinc-950 text-[14px]">edit</span>
+                                className="absolute -bottom-1.5 -right-1.5 w-7 h-7 bg-lime-500 hover:bg-lime-400 rounded-full flex items-center justify-center border-2 border-white transition-colors">
+                                <span className="material-symbols-outlined text-white text-[14px]">edit</span>
                             </button>
                         </div>
 
@@ -184,11 +182,11 @@ const UserProfile = () => {
 
                             <div className="flex items-center gap-2 mt-3 justify-center sm:justify-start">
                                 <a href="/booking-history"
-                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white text-[11px] font-bold rounded-lg transition-all border border-zinc-700/50">
+                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-200 text-zinc-300 text-[11px] font-bold rounded-lg transition-all border border-zinc-700">
                                     <span className="material-symbols-outlined text-[14px]">history</span> Lịch sử
                                 </a>
                                 <button onClick={handleLogoutClick}
-                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/10 hover:bg-red-500 text-red-400 hover:text-white text-[11px] font-bold rounded-lg transition-all border border-red-500/20">
+                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-red-400/10 hover:bg-red-100 text-red-300 text-[11px] font-bold rounded-lg transition-all border border-red-400/30">
                                     <span className="material-symbols-outlined text-[14px]">logout</span> Đăng xuất
                                 </button>
                             </div>
@@ -196,43 +194,43 @@ const UserProfile = () => {
 
                         {/* Hạng + điểm */}
                         <div className="shrink-0 flex flex-col items-center sm:items-end gap-1">
-                            <span className="inline-flex items-center gap-1.5 text-xs font-extrabold text-amber-300 bg-amber-500/10 border border-amber-500/20 px-3 py-1.5 rounded-lg">
+                            <span className="inline-flex items-center gap-1.5 text-xs font-extrabold text-amber-300 bg-amber-400/10 border border-amber-400/30 px-3 py-1.5 rounded-lg">
                                 <span className="material-symbols-outlined text-[16px]">emoji_events</span>
                                 Hạng {user.membership_level || 'Đồng'}
                             </span>
                             <div className="text-right">
-                                <p className="text-2xl font-black text-lime-400 leading-none">{points}</p>
+                                <p className="text-2xl font-black text-lime-500 leading-none">{points}</p>
                                 <p className="text-[9px] font-bold uppercase tracking-widest text-zinc-500 mt-0.5">Điểm tích lũy</p>
                             </div>
                         </div>
                     </div>
 
                     {/* Thanh tiến trình lên hạng */}
-                    <div className="mt-5 pt-4 border-t border-zinc-800">
+                    <div className="mt-5 pt-4 border-t border-zinc-700">
                         <div className="flex items-center justify-between mb-1.5 text-[10px] font-semibold">
                             <span className="text-zinc-500">
                                 {points >= nextTierTarget
                                     ? 'Đã mở ưu đãi giảm 5.000đ/giờ chơi'
                                     : `Còn ${nextTierTarget - points} điểm để lên hạng tiếp theo`}
                             </span>
-                            <span className="text-lime-400 font-bold">{tierProgress}%</span>
+                            <span className="text-lime-500 font-bold">{tierProgress}%</span>
                         </div>
                         <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
                             <motion.div initial={{ width: 0 }} animate={{ width: `${tierProgress}%` }} transition={{ duration: 0.8, ease: 'easeOut' }}
-                                className="h-full bg-gradient-to-r from-lime-500 to-emerald-400 rounded-full" />
+                                className="h-full bg-gradient-to-r from-lime-400 to-teal-500 rounded-full" />
                         </div>
                     </div>
                 </motion.div>
 
                 {/* ═══ ĐIỀU HƯỚNG TAB ═══ */}
-                <div className="flex items-center gap-2 mb-8 bg-zinc-900/60 border border-zinc-800 rounded-2xl p-1.5 max-w-xs">
+                <div className="flex items-center gap-2 mb-8 bg-zinc-800 border border-zinc-700 rounded-2xl p-1.5 max-w-xs shadow-inner">
                     {tabs.map((tab) => (
                         <button key={tab.id} onClick={() => setActiveTab(tab.id)}
                             className={`relative flex-1 px-5 py-2.5 rounded-xl text-xs font-bold transition-all duration-300 flex items-center justify-center gap-1.5
-                                ${activeTab === tab.id ? 'text-zinc-950' : 'text-zinc-500 hover:text-zinc-300'}`}>
+                                ${activeTab === tab.id ? 'text-white font-extrabold' : 'text-zinc-400 hover:text-white'}`}>
                             {activeTab === tab.id && (
                                 <motion.div layoutId="activeProfileTab"
-                                    className="absolute inset-0 bg-lime-500 rounded-xl shadow-lg shadow-lime-500/20"
+                                    className="absolute inset-0 bg-lime-500 rounded-xl shadow-sm"
                                     transition={{ type: 'spring', stiffness: 350, damping: 30 }} />
                             )}
                             <span className="material-symbols-outlined relative z-10 text-[16px]">{tab.icon}</span>
@@ -245,10 +243,10 @@ const UserProfile = () => {
                 <AnimatePresence mode="wait">
                     {activeTab === 'profile' && (
                         <motion.div key="profile" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} transition={{ duration: 0.25 }}
-                            className="user-card-glass">
-                            <div className="flex items-center gap-3 mb-8 pb-5 border-b border-zinc-800">
-                                <div className="w-10 h-10 bg-lime-500/10 rounded-xl flex items-center justify-center">
-                                    <span className="material-symbols-outlined text-lime-400 text-xl">contact_mail</span>
+                            className="user-card-glass bg-zinc-900 border border-zinc-700 shadow-sm p-6 sm:p-8 rounded-3xl">
+                            <div className="flex items-center gap-3 mb-8 pb-5 border-b border-zinc-700">
+                                <div className="w-10 h-10 bg-lime-400/10 rounded-xl flex items-center justify-center">
+                                    <span className="material-symbols-outlined text-lime-500 text-xl">contact_mail</span>
                                 </div>
                                 <div>
                                     <h2 className="text-base font-extrabold text-white uppercase tracking-wide">Thông tin liên hệ</h2>
@@ -258,7 +256,7 @@ const UserProfile = () => {
 
                             {profileMessage.text && (
                                 <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
-                                    className={`mb-6 p-4 rounded-2xl text-sm font-bold flex items-center gap-2 ${profileMessage.type === 'success' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'}`}>
+                                    className={`mb-6 p-4 rounded-2xl text-sm font-bold flex items-center gap-2 ${profileMessage.type === 'success' ? 'bg-lime-400/10 border border-lime-400/30 text-lime-300' : 'bg-red-400/10 text-red-300 border border-red-400/30'}`}>
                                     {profileMessage.text}
                                 </motion.div>
                             )}
@@ -271,12 +269,12 @@ const UserProfile = () => {
                                     </div>
                                     <div>
                                         <label className={labelClass}>Số điện thoại
-                                            <span className="ml-2 text-[9px] text-amber-400/70 normal-case tracking-normal inline-flex items-center gap-0.5">
+                                            <span className="ml-2 text-[9px] text-amber-300 normal-case tracking-normal inline-flex items-center gap-0.5 font-bold">
                                                 <span className="material-symbols-outlined text-[11px]">lock</span> Không thể thay đổi
                                             </span>
                                         </label>
                                         <input type="text" disabled value={user.phone}
-                                            className="w-full px-4 py-3.5 bg-zinc-800/30 border border-zinc-800 rounded-2xl text-sm font-semibold text-zinc-600 cursor-not-allowed" />
+                                            className="w-full px-4 py-3.5 bg-zinc-800 border border-zinc-700 rounded-2xl text-sm font-semibold text-zinc-500 cursor-not-allowed" />
                                     </div>
                                     <div className="sm:col-span-2">
                                         <label className={labelClass}>Địa chỉ email *</label>
@@ -286,10 +284,10 @@ const UserProfile = () => {
 
                                 <div className="flex items-center gap-4 pt-2">
                                     <motion.button type="submit" disabled={profileLoading}
-                                        whileHover={!profileLoading ? { scale: 1.02, boxShadow: '0 0 25px rgba(163,230,53,0.3)' } : {}}
+                                        whileHover={!profileLoading ? { scale: 1.02 } : {}}
                                         whileTap={!profileLoading ? { scale: 0.98 } : {}}
                                         className={`user-btn-primary ${profileLoading ? 'opacity-50 cursor-not-allowed' : ''}`}>
-                                        {profileLoading && <span className="w-4 h-4 border-2 border-zinc-950 border-t-transparent rounded-full animate-spin" />}
+                                        {profileLoading && <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
                                         {profileLoading ? 'Đang lưu...' : 'Lưu thay đổi'}
                                     </motion.button>
                                     <a href="/" className="text-xs text-zinc-500 hover:text-zinc-300 font-semibold transition-colors inline-flex items-center gap-1">
@@ -302,10 +300,10 @@ const UserProfile = () => {
 
                     {activeTab === 'security' && (
                         <motion.div key="security" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.25 }}
-                            className="user-card-glass">
-                            <div className="flex items-center gap-3 mb-8 pb-5 border-b border-zinc-800">
-                                <div className="w-10 h-10 bg-amber-500/10 rounded-xl flex items-center justify-center">
-                                    <span className="material-symbols-outlined text-amber-400 text-xl">lock</span>
+                            className="user-card-glass bg-zinc-900 border border-zinc-700 shadow-sm p-6 sm:p-8 rounded-3xl">
+                            <div className="flex items-center gap-3 mb-8 pb-5 border-b border-zinc-700">
+                                <div className="w-10 h-10 bg-amber-400/10 rounded-xl flex items-center justify-center">
+                                    <span className="material-symbols-outlined text-amber-300 text-xl">lock</span>
                                 </div>
                                 <div>
                                     <h2 className="text-base font-extrabold text-white uppercase tracking-wide">Đổi mật khẩu</h2>
@@ -315,7 +313,7 @@ const UserProfile = () => {
 
                             {passwordMessage.text && (
                                 <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
-                                    className={`mb-6 p-4 rounded-2xl text-sm font-bold flex items-center gap-2 ${passwordMessage.type === 'success' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'}`}>
+                                    className={`mb-6 p-4 rounded-2xl text-sm font-bold flex items-center gap-2 ${passwordMessage.type === 'success' ? 'bg-lime-400/10 border border-lime-400/30 text-lime-300' : 'bg-red-400/10 text-red-300 border border-red-400/30'}`}>
                                     {passwordMessage.text}
                                 </motion.div>
                             )}
@@ -336,13 +334,13 @@ const UserProfile = () => {
                                     </div>
                                 </div>
                                 {/* Gợi ý độ mạnh mật khẩu */}
-                                <div className="bg-zinc-800/40 rounded-2xl p-4 border border-zinc-800/60">
+                                <div className="bg-zinc-900/60 rounded-2xl p-4 border border-zinc-700">
                                     <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2">Yêu cầu mật khẩu</p>
                                     <div className="grid grid-cols-2 gap-2 text-[11px] text-zinc-500">
-                                        <span className={newPassword.length >= 6 ? 'text-lime-400' : ''}>✓ Ít nhất 6 ký tự</span>
-                                        <span className={/[A-Z]/.test(newPassword) ? 'text-lime-400' : ''}>✓ Có chữ hoa</span>
-                                        <span className={/[0-9]/.test(newPassword) ? 'text-lime-400' : ''}>✓ Có chữ số</span>
-                                        <span className={newPassword && newPassword === confirmPassword ? 'text-lime-400' : ''}>✓ Khớp xác nhận</span>
+                                        <span className={newPassword.length >= 6 ? 'text-lime-500 font-bold' : 'text-zinc-500'}>✓ Ít nhất 6 ký tự</span>
+                                        <span className={/[A-Z]/.test(newPassword) ? 'text-lime-500 font-bold' : 'text-zinc-500'}>✓ Có chữ hoa</span>
+                                        <span className={/[0-9]/.test(newPassword) ? 'text-lime-500 font-bold' : 'text-zinc-500'}>✓ Có chữ số</span>
+                                        <span className={newPassword && newPassword === confirmPassword ? 'text-lime-500 font-bold' : 'text-zinc-500'}>✓ Khớp xác nhận</span>
                                     </div>
                                 </div>
 
@@ -350,7 +348,7 @@ const UserProfile = () => {
                                     whileHover={!passwordLoading ? { scale: 1.02 } : {}}
                                     whileTap={!passwordLoading ? { scale: 0.98 } : {}}
                                     className={`user-btn-secondary ${passwordLoading ? 'opacity-50 cursor-not-allowed' : ''}`}>
-                                    {passwordLoading && <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+                                    {passwordLoading && <span className="w-4 h-4 border-2 border-zinc-500 border-t-transparent rounded-full animate-spin" />}
                                     {passwordLoading ? 'Đang xác thực...' : 'Cập nhật mật khẩu'}
                                 </motion.button>
                             </form>

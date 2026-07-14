@@ -37,13 +37,6 @@ const Footer = () => {
         { name: 'Sơ đồ mặt bằng', href: '/#floorplan' },
     ];
 
-    const supportLinks = [
-        { name: 'Câu hỏi thường gặp', href: '#' },
-        { name: 'Chính sách bảo mật', href: '#' },
-        { name: 'Điều khoản dịch vụ', href: '#' },
-        { name: 'Quy chế hoạt động', href: '#' },
-    ];
-
     const openHours = [
         { day: 'Thứ 2 - Thứ 6', time: settings.weekday_hours },
         { day: 'Thứ 7 - Chủ nhật', time: settings.weekend_hours },
@@ -57,20 +50,20 @@ const Footer = () => {
     ];
 
     return (
-        <footer id="footer" className="bg-zinc-950 text-zinc-500 pt-20 pb-10 border-t border-zinc-800/50 relative overflow-hidden">
+        <footer id="footer" className="bg-zinc-950 text-zinc-400 pt-20 pb-10 border-t border-zinc-700 relative overflow-hidden">
             {/* Decorative top glow line */}
-            <div className="absolute top-0 left-1/4 right-1/4 h-px bg-gradient-to-r from-transparent via-lime-500/30 to-transparent" />
+            <div className="absolute top-0 left-1/4 right-1/4 h-px bg-gradient-to-r from-transparent via-lime-400/40 to-transparent" />
 
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-12 pb-16 border-b border-zinc-800/60">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-12 pb-16 border-b border-zinc-700">
 
                     {/* ═══ CỘT 1: GIỚI THIỆU & SOCIAL ═══ */}
                     <div className="lg:col-span-4">
                         <div className="flex items-center gap-2.5 mb-5">
-                            <div className="w-10 h-10 bg-lime-500 rounded-xl flex items-center justify-center text-zinc-950 font-black text-xl tracking-tighter shadow-lg shadow-lime-500/20">NH</div>
+                            <div className="w-10 h-10 bg-lime-500 rounded-xl flex items-center justify-center text-zinc-950 font-black text-xl tracking-tighter shadow-[0_0_16px_rgba(163,230,53,0.25)]">NH</div>
                             <span className="font-extrabold text-xl tracking-tight text-white">{settings.club_name || 'NH Badminton'}<span className="text-lime-400">.</span></span>
                         </div>
-                        <p className="text-zinc-500 text-sm leading-relaxed mb-6 max-w-xs">
+                        <p className="text-zinc-400 text-sm leading-relaxed mb-6 max-w-xs">
                             {settings.description}
                         </p>
                         <div className="flex items-center gap-3">
@@ -78,7 +71,7 @@ const Footer = () => {
                                 <motion.a key={s.label} href={s.href} target="_blank" rel="noopener noreferrer" aria-label={s.label}
                                     whileHover={{ y: -3, scale: 1.1 }}
                                     transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-                                    className="w-10 h-10 rounded-xl bg-zinc-800/80 hover:bg-lime-500 text-zinc-500 hover:text-zinc-950 flex items-center justify-center transition-colors duration-300 border border-zinc-700/50 hover:border-lime-400 hover:shadow-[0_0_15px_rgba(163,230,53,0.3)]">
+                                    className="w-10 h-10 rounded-xl bg-zinc-900 hover:bg-lime-500 text-zinc-400 hover:text-zinc-950 flex items-center justify-center transition-colors duration-300 border border-zinc-700 hover:border-lime-400 hover:shadow-[0_0_15px_rgba(163,230,53,0.3)]">
                                     <svg className="w-[18px] h-[18px] fill-current" viewBox="0 0 24 24"><path d={s.path} /></svg>
                                 </motion.a>
                             ))}
@@ -91,7 +84,7 @@ const Footer = () => {
                         <ul className="space-y-3 text-sm font-medium">
                             {quickLinks.map((l) => (
                                 <li key={l.name}>
-                                    <a href={l.href} className="group inline-flex items-center gap-1.5 hover:text-lime-400 transition-all duration-300">
+                                    <a href={l.href} className="group inline-flex items-center gap-1.5 hover:text-lime-300 transition-all duration-300">
                                         <span className="w-0 group-hover:w-2 h-[2px] bg-lime-400 rounded transition-all duration-300" />
                                         {l.name}
                                     </a>
@@ -105,7 +98,7 @@ const Footer = () => {
                         <h4 className="text-white font-extrabold text-xs uppercase tracking-widest mb-6">Giờ hoạt động</h4>
                         <div className="space-y-3">
                             {openHours.map((h, i) => (
-                                <div key={i} className="flex items-center justify-between text-sm bg-zinc-900/50 rounded-xl px-4 py-2.5 border border-zinc-800/60">
+                                <div key={i} className="flex items-center justify-between text-sm bg-zinc-900 rounded-xl px-4 py-2.5 border border-zinc-700">
                                     <span className="text-zinc-400 font-medium">{h.day}</span>
                                     <span className="text-lime-400 font-bold font-mono text-xs">{h.time}</span>
                                 </div>
@@ -119,31 +112,31 @@ const Footer = () => {
                         <div className="space-y-4 text-sm">
                             <div className="flex items-start gap-3 group">
                                 <svg className="w-5 h-5 text-lime-400 shrink-0 mt-0.5 fill-current" viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 010-5 2.5 2.5 0 010 5z" /></svg>
-                                <span className="group-hover:text-zinc-300 transition-colors">{settings.address}</span>
+                                <span className="group-hover:text-white transition-colors">{settings.address}</span>
                             </div>
                             <div className="flex items-center gap-3 group">
                                 <svg className="w-5 h-5 text-lime-400 shrink-0 fill-current" viewBox="0 0 24 24"><path d="M6.62 10.79C8.06 13.62 10.38 15.94 13.21 17.38l2.2-2.2c.28-.28.67-.36 1.02-.25 1.12.37 2.32.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z" /></svg>
-                                <span className="text-lime-400 font-semibold group-hover:text-lime-300 transition-colors">{settings.hotline}</span>
+                                <span className="text-lime-300 font-semibold group-hover:text-lime-200 transition-colors">{settings.hotline}</span>
                             </div>
                             <div className="flex items-center gap-3 group">
                                 <svg className="w-5 h-5 text-lime-400 shrink-0 fill-current" viewBox="0 0 24 24"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 14H4V8l8 5 8-5v10zm-8-7L4 6h16l-8 5z" /></svg>
-                                <span className="group-hover:text-zinc-300 transition-colors">{settings.email}</span>
+                                <span className="group-hover:text-white transition-colors">{settings.email}</span>
                             </div>
                         </div>
 
-                        {/* Bản đồ: ưu tiên tọa độ ghim chính xác, fallback theo địa chỉ chữ */}
-                        <div className="mt-5 rounded-xl overflow-hidden border border-zinc-800/60 h-[140px] bg-zinc-900/50 relative group">
+                        {/* Bản đồ */}
+                        <div className="mt-5 rounded-xl overflow-hidden border border-zinc-700 h-[140px] bg-zinc-900 relative group">
                             {(settings.map_lat && settings.map_lng) || settings.address ? (
                                 <iframe
                                     title="Bản đồ địa chỉ"
                                     src={
                                         settings.map_lat && settings.map_lng
                                             ? `https://www.google.com/maps?q=${settings.map_lat},${settings.map_lng}&z=16&output=embed`
-                                            : `https://www.google.com/maps?q=${encodeURIComponent(settings.address)}&output=embed`
+                                             : `https://www.google.com/maps?q=${encodeURIComponent(settings.address)}&output=embed`
                                     }
                                     width="100%"
                                     height="100%"
-                                    style={{ border: 0, filter: 'grayscale(1) invert(0.92) contrast(0.9)' }}
+                                    style={{ border: 0, filter: 'invert(90%) hue-rotate(180deg) contrast(90%)' }}
                                     loading="lazy"
                                     referrerPolicy="no-referrer-when-downgrade"
                                 />
@@ -159,7 +152,7 @@ const Footer = () => {
                                         : settings.map_url || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(settings.address || '')}`
                                 }
                                 target="_blank" rel="noopener noreferrer"
-                                className="absolute bottom-2 right-2 text-[10px] bg-zinc-950/80 backdrop-blur px-2.5 py-1.5 rounded-lg text-zinc-300 hover:text-lime-400 transition-colors font-semibold flex items-center gap-1 opacity-0 group-hover:opacity-100"
+                                className="absolute bottom-2 right-2 text-[10px] bg-zinc-950/90 backdrop-blur px-2.5 py-1.5 rounded-lg text-zinc-200 hover:text-lime-300 transition-colors font-semibold flex items-center gap-1 opacity-0 group-hover:opacity-100 shadow-md border border-zinc-700"
                             >
                                 <svg className="w-3 h-3 fill-current" viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 010-5 2.5 2.5 0 010 5z" /></svg>
                                 Mở Google Maps →
@@ -169,10 +162,10 @@ const Footer = () => {
                 </div>
 
                 {/* ═══ COPYRIGHT BAR ═══ */}
-                <div className="pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-zinc-600 font-medium">
+                <div className="pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-zinc-500 font-medium">
                     <p>© 2026 NH Badminton. Nền tảng phục vụ Khóa luận Tốt nghiệp.</p>
                     <div className="flex items-center gap-1.5">
-                        <span className="w-2 h-2 rounded-full bg-lime-500 animate-pulse" />
+                        <span className="w-2 h-2 rounded-full bg-lime-400 animate-pulse" />
                         <span className="text-zinc-500">Hệ thống đang hoạt động</span>
                     </div>
                 </div>

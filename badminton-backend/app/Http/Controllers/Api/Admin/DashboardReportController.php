@@ -15,8 +15,8 @@ use Illuminate\Support\Facades\DB;
 class DashboardReportController extends Controller
 {
     private const HOURS_PER_DAY = 16;
-    private const BANK_METHODS  = ['bank_transfer', 'sepay', 'online'];
-    private const TIME_SLOTS    = [
+    private const BANK_METHODS = ['bank_transfer', 'sepay', 'online'];
+    private const TIME_SLOTS = [
         ['label' => '06-09h', 'start' => '06:00:00', 'end' => '09:00:00'],
         ['label' => '09-12h', 'start' => '09:00:00', 'end' => '12:00:00'],
         ['label' => '12-15h', 'start' => '12:00:00', 'end' => '15:00:00'],
@@ -36,21 +36,21 @@ class DashboardReportController extends Controller
             : now()->endOfDay();
 
         $fromDateOnly = $fromDate->toDateString();
-        $toDateOnly   = $toDate->toDateString();
+        $toDateOnly = $toDate->toDateString();
 
         $paymentQuery = Payment::where('status', 'success')
             ->whereBetween('paid_at', [$fromDate, $toDate]);
 
         $totalRevenue = (clone $paymentQuery)->sum('amount');
-        $cashRevenue  = (clone $paymentQuery)->where('payment_method', 'cash')->sum('amount');
-        $bankRevenue  = (clone $paymentQuery)->whereIn('payment_method', self::BANK_METHODS)->sum('amount');
+        $cashRevenue = (clone $paymentQuery)->where('payment_method', 'cash')->sum('amount');
+        $bankRevenue = (clone $paymentQuery)->whereIn('payment_method', self::BANK_METHODS)->sum('amount');
 
         $bookingRevenueQuery = Booking::where('status', '!=', 'cancelled')
             ->whereHas('details', fn($q) => $q->whereBetween('booking_date', [$fromDateOnly, $toDateOnly]));
 
-        $courtRevenue   = (clone $bookingRevenueQuery)->sum('subtotal_court');
+        $courtRevenue = (clone $bookingRevenueQuery)->sum('subtotal_court');
         $serviceRevenue = (clone $bookingRevenueQuery)->sum('subtotal_service');
-        $totalBookings  = (clone $bookingRevenueQuery)->count();
+        $totalBookings = (clone $bookingRevenueQuery)->count();
 
         $purchaseAmount = PurchaseOrder::whereBetween('created_at', [$fromDate, $toDate])->sum('total_amount');
 
@@ -62,14 +62,14 @@ class DashboardReportController extends Controller
             ->distinct('b.customer_phone')
             ->count('b.customer_phone');
 
-        $activeCourtCount   = Court::where('status', 'active')->count();
+        $activeCourtCount = Court::where('status', 'active')->count();
         $totalBookedMinutes = BookingDetail::whereBetween('booking_date', [$fromDateOnly, $toDateOnly])
             ->whereHas('booking', fn($q) => $q->where('status', '!=', 'cancelled'))
             ->sum('duration_minutes');
 
-        $days             = max($fromDate->diffInDays($toDate) + 1, 1);
+        $days = max($fromDate->diffInDays($toDate) + 1, 1);
         $availableMinutes = $activeCourtCount * $days * self::HOURS_PER_DAY * 60;
-        $occupancyRate    = $availableMinutes > 0
+        $occupancyRate = $availableMinutes > 0
             ? round(($totalBookedMinutes / $availableMinutes) * 100, 1)
             : 0;
 
@@ -80,7 +80,7 @@ class DashboardReportController extends Controller
             ->orderByRaw('DATE(paid_at)')
             ->get()
             ->map(fn($item) => [
-                'date'    => Carbon::parse($item->date)->format('d/m'),
+                'date' => Carbon::parse($item->date)->format('d/m'),
                 'revenue' => (float) $item->revenue,
             ]);
 
@@ -97,14 +97,14 @@ class DashboardReportController extends Controller
             ])
             ->get()
             ->map(function ($court) use ($days) {
-                $bookedMinutes    = (int) ($court->booked_minutes ?? 0);
+                $bookedMinutes = (int) ($court->booked_minutes ?? 0);
                 $availableMinutes = $days * self::HOURS_PER_DAY * 60;
 
                 return [
-                    'court_id'      => $court->id,
-                    'court_name'    => $court->name,
+                    'court_id' => $court->id,
+                    'court_name' => $court->name,
                     'booking_count' => (int) $court->booking_count,
-                    'booked_hours'  => round($bookedMinutes / 60, 1),
+                    'booked_hours' => round($bookedMinutes / 60, 1),
                     'occupancy_rate' => $availableMinutes > 0
                         ? round(($bookedMinutes / $availableMinutes) * 100, 1)
                         : 0,
@@ -114,7 +114,7 @@ class DashboardReportController extends Controller
             ->values();
 
         $timeSlotStats = array_map(fn($slot) => [
-            'label'         => $slot['label'],
+            'label' => $slot['label'],
             'booking_count' => $this->countBookingsByTimeRange($fromDateOnly, $toDateOnly, $slot['start'], $slot['end']),
         ], self::TIME_SLOTS);
 
@@ -128,51 +128,107 @@ class DashboardReportController extends Controller
             ->get()
             ->map(function ($booking) {
                 $firstDetail = $booking->details->first();
-                $lastDetail  = $booking->details->last();
+                $lastDetail = $booking->details->last();
 
                 return [
-                    'booking_id'     => $booking->id,
-                    'booking_code'   => $booking->booking_code,
-                    'customer_name'  => $booking->customer_name,
+                    'booking_id' => $booking->id,
+                    'booking_code' => $booking->booking_code,
+                    'customer_name' => $booking->customer_name,
                     'customer_phone' => $booking->customer_phone,
-                    'court_name'     => $firstDetail?->court?->name,
-                    'play_date'      => $firstDetail?->booking_date,
-                    'time_slot'      => $firstDetail
+                    'court_name' => $firstDetail?->court?->name,
+                    'play_date' => $firstDetail?->booking_date,
+                    'time_slot' => $firstDetail
                         ? substr($firstDetail->start_time, 0, 5) . ' - ' . substr($lastDetail->end_time, 0, 5)
                         : null,
-                    'total_price'    => (float) $booking->total_price,
+                    'total_price' => (float) $booking->total_price,
                     'payment_status' => $booking->payment_status,
-                    'status'         => $booking->status,
-                    'created_at'     => $booking->created_at,
+                    'status' => $booking->status,
+                    'created_at' => $booking->created_at,
                 ];
             });
 
         return response()->json([
-            'status'  => 'success',
+            'status' => 'success',
             'message' => 'Lấy báo cáo dashboard thành công!',
-            'data'    => [
+            'data' => [
                 'filters' => [
                     'from_date' => $fromDateOnly,
-                    'to_date'   => $toDateOnly,
+                    'to_date' => $toDateOnly,
                 ],
                 'summary' => [
-                    'total_revenue'   => (float) $totalRevenue,
-                    'court_revenue'   => (float) $courtRevenue,
+                    'total_revenue' => (float) $totalRevenue,
+                    'court_revenue' => (float) $courtRevenue,
                     'service_revenue' => (float) $serviceRevenue,
-                    'cash_revenue'    => (float) $cashRevenue,
-                    'bank_revenue'    => (float) $bankRevenue,
+                    'cash_revenue' => (float) $cashRevenue,
+                    'bank_revenue' => (float) $bankRevenue,
                     'purchase_amount' => (float) $purchaseAmount,
-                    'total_bookings'  => (int) $totalBookings,
-                    'new_customers'   => (int) $newCustomers,
-                    'occupancy_rate'  => (float) $occupancyRate,
+                    'total_bookings' => (int) $totalBookings,
+                    'new_customers' => (int) $newCustomers,
+                    'occupancy_rate' => (float) $occupancyRate,
                 ],
                 'charts' => [
-                    'revenue_chart'   => $revenueChart,
+                    'revenue_chart' => $revenueChart,
                     'time_slot_stats' => $timeSlotStats,
                 ],
                 'court_performance' => $courtPerformance,
-                'recent_bookings'   => $recentBookings,
+                'recent_bookings' => $recentBookings,
             ],
+        ]);
+    }
+
+    /** Chức năng: Trả về hiệu suất từng sân trong khoảng thời gian — dùng cho trang báo cáo hiệu suất sân. */
+    public function courtPerformance(Request $request)
+    {
+        $fromDate = $request->filled('from_date')
+            ? Carbon::parse($request->from_date)->startOfDay()
+            : now()->startOfMonth();
+
+        $toDate = $request->filled('to_date')
+            ? Carbon::parse($request->to_date)->endOfDay()
+            : now()->endOfDay();
+
+        $fromDateOnly = $fromDate->toDateString();
+        $toDateOnly   = $toDate->toDateString();
+        $days = max($fromDate->diffInDays($toDate) + 1, 1);
+
+        $courtPerformance = Court::where('status', 'active')
+            ->withSum([
+                'bookingDetails as booked_minutes' => fn($q) => $q
+                    ->whereBetween('booking_date', [$fromDateOnly, $toDateOnly])
+                    ->whereHas('booking', fn($bq) => $bq->where('status', '!=', 'cancelled')),
+            ], 'duration_minutes')
+            ->withSum([
+                'bookingDetails as revenue' => fn($q) => $q
+                    ->whereBetween('booking_date', [$fromDateOnly, $toDateOnly])
+                    ->whereHas('booking', fn($bq) => $bq->where('status', '!=', 'cancelled')),
+            ], 'price')
+            ->withCount([
+                'bookingDetails as bookings' => fn($q) => $q
+                    ->whereBetween('booking_date', [$fromDateOnly, $toDateOnly])
+                    ->whereHas('booking', fn($bq) => $bq->where('status', '!=', 'cancelled')),
+            ])
+            ->get()
+            ->map(function ($court) use ($days) {
+                $bookedMinutes    = (int) ($court->booked_minutes ?? 0);
+                $availableMinutes = $days * self::HOURS_PER_DAY * 60;
+
+                return [
+                    'court_id'    => $court->id,
+                    'court_name'  => $court->name,
+                    'bookings'    => (int) $court->bookings,
+                    'booked_hours' => round($bookedMinutes / 60, 1),
+                    'utilization' => $availableMinutes > 0
+                        ? round(($bookedMinutes / $availableMinutes) * 100, 1)
+                        : 0,
+                    'revenue'     => (float) ($court->revenue ?? 0),
+                ];
+            })
+            ->sortByDesc('utilization')
+            ->values();
+
+        return response()->json([
+            'status' => 'success',
+            'data'   => $courtPerformance,
         ]);
     }
 

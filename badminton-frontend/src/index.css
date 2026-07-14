@@ -20,14 +20,20 @@
 
   body {
     margin: 0;
-    background: #f8fafc;
-    color: #0f172a;
+    background: #0a0a0a;
+    color: #e4e4e7;
     font-family:
-      Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+      "Outfit", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
       "Segoe UI", sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 99px; }
+  ::-webkit-scrollbar-thumb:hover { background: #3f3f46; }
 
   button,
   input,
@@ -248,64 +254,87 @@
   @media (max-width: 768px) {
     .admin-content {
       padding-left: 14px;
-      padding-right: 14px;
-    }
-
-    .admin-content .sticky {
-      position: static;
     }
   }
 
   /* --- COMPONENT BEM CHO USER --- */
-  
+
   .user-page-container {
     @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
   }
-  
+
+  /*
+   * Chống "chìm" dưới ánh sáng ngoài: viền dùng độ mờ cao hơn (zinc-700 thay vì zinc-800/50)
+   * + một quầng sáng viền trong (inset highlight) để mép panel luôn phân biệt được với nền,
+   * kể cả khi màn hình bị chói/phản chiếu ánh sáng phòng.
+   */
   .user-card-glass {
-    @apply bg-zinc-900/60 border border-zinc-800 rounded-3xl p-6 sm:p-8 backdrop-blur-md shadow-lg;
+    @apply bg-zinc-900/70 border border-zinc-700 rounded-3xl p-6 sm:p-8 backdrop-blur-md;
+    box-shadow:
+      inset 0 1px 0 0 rgba(255, 255, 255, 0.04),
+      0 0 0 1px rgba(0, 0, 0, 0.6),
+      0 8px 24px rgba(0, 0, 0, 0.35);
+    transition: box-shadow 0.3s ease, border-color 0.3s ease;
   }
-  
+  .user-card-glass:hover {
+    @apply border-lime-400/50;
+    box-shadow:
+      inset 0 1px 0 0 rgba(255, 255, 255, 0.06),
+      0 0 0 1px rgba(0, 0, 0, 0.6),
+      0 0 24px rgba(163, 230, 53, 0.12),
+      0 8px 24px rgba(0, 0, 0, 0.4);
+  }
+
   .user-card-glass-hover {
-    @apply hover:border-lime-500/30 transition-all duration-300;
+    @apply hover:border-lime-400/40 transition-all duration-300;
   }
-  
+
   .user-input {
-    @apply w-full px-4 py-3 bg-zinc-800/60 border border-zinc-700/60 rounded-2xl text-sm font-medium text-white placeholder-zinc-500 focus:outline-none focus:border-lime-400 focus:shadow-[0_0_15px_rgba(163,230,53,0.15)] focus:bg-zinc-800/90 transition-all;
+    @apply w-full px-4 py-3 bg-zinc-800/80 border border-zinc-600 rounded-2xl text-sm font-medium text-white placeholder-zinc-400 focus:outline-none focus:border-lime-400 focus:bg-zinc-800 transition-all duration-200;
   }
-  
+  .user-input:focus {
+    box-shadow: 0 0 0 3px rgba(163, 230, 53, 0.15), 0 0 16px rgba(163, 230, 53, 0.1);
+  }
+
   .user-form-label {
-    @apply block text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2;
+    @apply block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-2;
   }
-  
+
   .user-btn-primary {
-    @apply px-6 py-3.5 bg-lime-500 hover:bg-lime-400 text-zinc-950 font-extrabold rounded-2xl text-sm uppercase tracking-wider transition-all shadow-[0_0_15px_rgba(163,230,53,0.2)] disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-[0_0_25px_rgba(163,230,53,0.3)] hover:-translate-y-0.5 active:translate-y-0 inline-flex justify-center items-center gap-2;
+    @apply px-6 py-3.5 bg-lime-500 hover:bg-lime-400 text-zinc-950 font-extrabold rounded-2xl text-sm uppercase tracking-wider transition-all disabled:opacity-40 disabled:cursor-not-allowed hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] inline-flex justify-center items-center gap-2 border border-lime-300/40;
+    box-shadow: 0 0 0 1px rgba(163, 230, 53, 0.25), 0 4px 16px rgba(163, 230, 53, 0.2);
   }
-  
+  .user-btn-primary:hover:not(:disabled) {
+    box-shadow: 0 0 0 1px rgba(163, 230, 53, 0.4), 0 6px 24px rgba(163, 230, 53, 0.35);
+  }
+
   .user-btn-outline {
-    @apply px-6 py-3.5 bg-transparent border border-lime-500/40 hover:border-lime-400 hover:bg-lime-500/10 text-lime-400 font-extrabold rounded-2xl text-sm uppercase tracking-wider transition-all disabled:opacity-50 disabled:cursor-not-allowed inline-flex justify-center items-center gap-2;
+    @apply px-6 py-3.5 bg-zinc-900/60 border border-lime-400/50 hover:border-lime-300 hover:bg-lime-400/10 text-lime-300 hover:text-lime-200 font-extrabold rounded-2xl text-sm uppercase tracking-wider transition-all disabled:opacity-40 disabled:cursor-not-allowed inline-flex justify-center items-center gap-2;
   }
-  
+  .user-btn-outline:hover:not(:disabled) {
+    box-shadow: 0 0 16px rgba(163, 230, 53, 0.15);
+  }
+
   .user-btn-secondary {
-    @apply px-6 py-3.5 bg-zinc-800 hover:bg-zinc-700 text-white font-extrabold rounded-2xl text-sm uppercase tracking-wider transition-all border border-zinc-700 hover:border-lime-500/30 hover:shadow-[0_0_15px_rgba(163,230,53,0.1)] disabled:opacity-50 disabled:cursor-not-allowed inline-flex justify-center items-center gap-2;
+    @apply px-6 py-3.5 bg-zinc-800 hover:bg-zinc-700 text-white font-extrabold rounded-2xl text-sm uppercase tracking-wider transition-all border border-zinc-600 hover:border-zinc-500 disabled:opacity-40 disabled:cursor-not-allowed inline-flex justify-center items-center gap-2;
   }
 
   .user-badge {
     @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border;
   }
   .user-badge-success {
-    @apply bg-lime-500/10 text-lime-400 border-lime-500/20;
+    @apply bg-lime-400/10 text-lime-300 border-lime-400/30;
   }
   .user-badge-warning {
-    @apply bg-amber-500/10 text-amber-400 border-amber-500/20;
+    @apply bg-amber-400/10 text-amber-300 border-amber-400/30;
   }
   .user-badge-danger {
-    @apply bg-red-500/10 text-red-400 border-red-500/20;
+    @apply bg-red-400/10 text-red-300 border-red-400/30;
   }
   .user-badge-info {
-    @apply bg-sky-500/10 text-sky-400 border-sky-500/20;
+    @apply bg-sky-400/10 text-sky-300 border-sky-400/30;
   }
   .user-badge-neutral {
-    @apply bg-zinc-800 text-zinc-400 border-zinc-700;
+    @apply bg-zinc-800 text-zinc-300 border-zinc-600;
   }
 }

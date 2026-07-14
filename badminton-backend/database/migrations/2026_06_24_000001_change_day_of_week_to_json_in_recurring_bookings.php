@@ -9,18 +9,23 @@ return new class extends Migration
 {
     public function up(): void
     {
-        // 1. Thêm cột json mới
-        Schema::table('recurring_bookings', function (Blueprint $table) {
-            $table->json('days_of_week')->nullable()->after('recurring_code');
-        });
+        // Base migration already has days_of_week as json — skip if it exists
+        if (!Schema::hasColumn('recurring_bookings', 'days_of_week')) {
+            // 1. Thêm cột json mới
+            Schema::table('recurring_bookings', function (Blueprint $table) {
+                $table->json('days_of_week')->nullable()->after('recurring_code');
+            });
 
-        // 2. Chuyển dữ liệu cũ sang dạng mảng JSON
-        DB::statement('UPDATE recurring_bookings SET days_of_week = JSON_ARRAY(day_of_week) WHERE day_of_week IS NOT NULL');
+            // 2. Chuyển dữ liệu cũ sang dạng mảng JSON
+            if (Schema::hasColumn('recurring_bookings', 'day_of_week')) {
+                DB::statement('UPDATE recurring_bookings SET days_of_week = JSON_ARRAY(day_of_week) WHERE day_of_week IS NOT NULL');
 
-        // 3. Xoá cột cũ
-        Schema::table('recurring_bookings', function (Blueprint $table) {
-            $table->dropColumn('day_of_week');
-        });
+                // 3. Xoá cột cũ
+                Schema::table('recurring_bookings', function (Blueprint $table) {
+                    $table->dropColumn('day_of_week');
+                });
+            }
+        }
     }
 
     public function down(): void

@@ -5,15 +5,98 @@ import { adminCategoryService } from "../../services/admin/categoryService";
 import { imageService } from "../../services/admin/imageService";
 
 const ProductManager = () => {
+  const [activeTab, setActiveTab] = useState("list");
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [message, setMessage] = useState({ type: "", text: "" });
 
+  // --- DANH MỤC ---
+  const [catForm, setCatForm] = useState({ id: null, name: "", description: "", status: "active" });
+  const [isCatEditing, setIsCatEditing] = useState(false);
+  const [isCatProcessing, setIsCatProcessing] = useState(false);
+  const [catMessage, setCatMessage] = useState({ type: "", text: "" });
+
+  const fetchCategories = async () => {
+    try {
+      const res = await adminCategoryService.getCategories();
+      setCategories(res.data?.data || []);
+    } catch (e) {
+      console.error("Lỗi tải danh mục:", e);
+    }
+  };
+
+  const handleCatSubmit = async (e) => {
+    e.preventDefault();
+    if (!catForm.name.trim()) return;
+    setIsCatProcessing(true);
+    setCatMessage({ type: "", text: "" });
+    try {
+      if (isCatEditing) {
+        await adminCategoryService.updateCategory(catForm.id, { name: catForm.name, description: catForm.description, status: catForm.status });
+        setCatMessage({ type: "success", text: "Cập nhật thành công!" });
+      } else {
+        await adminCategoryService.createCategory({ name: catForm.name, description: catForm.description, status: catForm.status });
+        setCatMessage({ type: "success", text: "Thêm mới thành công!" });
+      }
+      resetCatForm();
+      fetchCategories();
+    } catch (err) {
+      setCatMessage({ type: "error", text: err.response?.data?.message || "Có lỗi xảy ra!" });
+    } finally {
+      setIsCatProcessing(false);
+      setTimeout(() => setCatMessage({ type: "", text: "" }), 2500);
+    }
+  };
+
+  const handleCatEdit = (c) => {
+    setIsCatEditing(true);
+    setCatForm({ id: c.id, name: c.name, description: c.description || "", status: c.status });
+  };
+
+  const handleCatDelete = async (c) => {
+    if (!window.confirm(`Tạm ẩn danh mục [${c.name}]?`)) return;
+    try {
+      await adminCategoryService.deleteCategory(c.id);
+      setCatMessage({ type: "success", text: "Đã tạm ẩn danh mục!" });
+      fetchCategories();
+    } catch {
+      setCatMessage({ type: "error", text: "Thao tác thất bại!" });
+    } finally {
+      setTimeout(() => setCatMessage({ type: "", text: "" }), 2500);
+    }
+  };
+
+  const resetCatForm = () => {
+    setCatForm({ id: null, name: "", description: "", status: "active" });
+    setIsCatEditing(false);
+  };
+
+  const [report, setReport] = useState(null);
+  const [isLoadingReport, setIsLoadingReport] = useState(false);
+
+  const fetchReport = async () => {
+    setIsLoadingReport(true);
+    try {
+      const res = await adminProductService.getReport();
+      setReport(res.data?.data || null);
+    } catch (error) {
+      console.error("Không thể tải báo cáo tồn kho:", error);
+    } finally {
+      setIsLoadingReport(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === "report" && !report) fetchReport();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
+
   const [pagination, setPagination] = useState({
     current_page: 1,
     last_page: 1,
   });
+  const [stats, setStats] = useState({ total: 0, in_stock: 0, low_stock: 0, out_of_stock: 0 });
   const [searchKeyword, setSearchKeyword] = useState("");
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState("");
 
@@ -36,15 +119,7 @@ const ProductManager = () => {
   const imageInputRef = useRef(null);
 
   const loadInitData = async () => {
-    try {
-      const catRes = await adminCategoryService.getCategories();
-      const activeCats = (catRes.data?.data || []).filter(
-        (c) => c.status === "active",
-      );
-      setCategories(activeCats);
-    } catch (e) {
-      console.error("Lỗi đồng bộ danh mục hệ thống:", e);
-    }
+    await fetchCategories();
   };
 
   const fetchProducts = async (page = 1) => {
@@ -61,6 +136,7 @@ const ProductManager = () => {
         current_page: serverData?.current_page || 1,
         last_page: serverData?.last_page || 1,
       });
+      setStats(res.data?.stats || { total: 0, in_stock: 0, low_stock: 0, out_of_stock: 0 });
     } catch (error) {
       setMessage({ type: "error", text: "Không thể tải danh sách sản phẩm." });
     } finally {
@@ -302,8 +378,159 @@ const ProductManager = () => {
             Thiết lập giá bán lẻ và theo dõi tồn kho
           </p>
         </div>
+        <div className="admin-stat-group">
+          <div className="admin-stat-badge badge-default">
+            <p className="admin-stat-value val-default">{stats.total}</p>
+            <p className="admin-stat-label lbl-default">Tổng sản phẩm</p>
+          </div>
+          <div className="admin-stat-badge badge-success">
+            <p className="admin-stat-value val-success">{stats.in_stock}</p>
+            <p className="admin-stat-label lbl-success">Còn hàng</p>
+          </div>
+          {stats.low_stock > 0 && (
+            <div className="admin-stat-badge badge-warning">
+              <p className="admin-stat-value text-amber-600">{stats.low_stock}</p>
+              <p className="admin-stat-label text-amber-500">Sắp hết</p>
+            </div>
+          )}
+          {stats.out_of_stock > 0 && (
+            <div className="admin-stat-badge badge-danger">
+              <p className="admin-stat-value val-danger">{stats.out_of_stock}</p>
+              <p className="admin-stat-label lbl-danger">Hết hàng</p>
+            </div>
+          )}
+        </div>
       </div>
 
+      {/* TAB */}
+      <div className="flex gap-1 border-b border-zinc-200">
+        {[
+          { key: "list", label: "Sản phẩm" },
+          { key: "categories", label: "Danh mục" },
+          { key: "report", label: "Báo cáo tồn kho" },
+        ].map((t) => (
+          <button
+            key={t.key}
+            onClick={() => setActiveTab(t.key)}
+            className={`px-4 py-2.5 text-xs font-semibold border-b-2 -mb-px transition-colors ${
+              activeTab === t.key
+                ? "border-emerald-500 text-emerald-600"
+                : "border-transparent text-zinc-400 hover:text-zinc-600"
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === "report" && (
+        <div className="space-y-4">
+          {isLoadingReport ? (
+            <div className="admin-card p-16 text-center">
+              <div className="inline-block w-6 h-6 border-2 border-zinc-300 border-t-zinc-600 rounded-full animate-spin mb-3" />
+              <p className="text-xs text-zinc-400">Đang tải báo cáo...</p>
+            </div>
+          ) : !report ? (
+            <div className="admin-card p-16 text-center text-sm text-zinc-400">Không có dữ liệu báo cáo.</div>
+          ) : (
+            <>
+              <div className="admin-stat-group">
+                <div className="admin-stat-badge badge-success">
+                  <p className="admin-stat-value val-success">
+                    {Number(report.total_inventory_value || 0).toLocaleString()}đ
+                  </p>
+                  <p className="admin-stat-label lbl-success">Tổng giá trị tồn kho</p>
+                </div>
+                <div className="admin-stat-badge badge-danger">
+                  <p className="admin-stat-value val-danger">{report.needs_restock?.length || 0}</p>
+                  <p className="admin-stat-label lbl-danger">Cần nhập thêm</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {/* Top bán chạy */}
+                <div className="admin-card overflow-hidden">
+                  <div className="px-5 py-3.5 border-b border-zinc-100">
+                    <h3 className="text-sm font-medium text-zinc-800">Top bán chạy</h3>
+                  </div>
+                  <div className="divide-y divide-zinc-100 max-h-96 overflow-y-auto">
+                    {(report.top_selling || []).length === 0 ? (
+                      <p className="p-5 text-xs text-zinc-400 text-center">Chưa có dữ liệu bán hàng.</p>
+                    ) : (
+                      report.top_selling.map((p, i) => (
+                        <div key={p.id} className="flex items-center justify-between px-5 py-3">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <span className="text-xs font-bold text-zinc-300 w-4">{i + 1}</span>
+                            <div className="min-w-0">
+                              <p className="text-xs font-medium text-zinc-800 truncate">{p.name}</p>
+                              <p className="text-[10px] text-zinc-400">{p.category?.name || "—"}</p>
+                            </div>
+                          </div>
+                          <span className="text-xs font-bold text-emerald-600 shrink-0">{p.sold_count || 0} đã bán</span>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+
+                {/* Cần nhập thêm */}
+                <div className="admin-card overflow-hidden">
+                  <div className="px-5 py-3.5 border-b border-zinc-100">
+                    <h3 className="text-sm font-medium text-zinc-800">Sắp hết / cần nhập thêm</h3>
+                  </div>
+                  <div className="divide-y divide-zinc-100 max-h-96 overflow-y-auto">
+                    {(report.needs_restock || []).length === 0 ? (
+                      <p className="p-5 text-xs text-zinc-400 text-center">Không có sản phẩm nào cần nhập thêm.</p>
+                    ) : (
+                      report.needs_restock.map((p) => (
+                        <div key={p.id} className="flex items-center justify-between px-5 py-3">
+                          <div className="min-w-0">
+                            <p className="text-xs font-medium text-zinc-800 truncate">{p.name}</p>
+                            <p className="text-[10px] text-zinc-400">{p.category?.name || "—"}</p>
+                          </div>
+                          <span className={`text-xs font-bold shrink-0 ${p.stock_quantity <= 0 ? "text-red-500" : "text-amber-600"}`}>
+                            Còn {p.stock_quantity} / ngưỡng {p.low_stock_threshold}
+                          </span>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Giá trị tồn kho theo danh mục */}
+              <div className="admin-card overflow-hidden">
+                <div className="px-5 py-3.5 border-b border-zinc-100">
+                  <h3 className="text-sm font-medium text-zinc-800">Giá trị tồn kho theo danh mục</h3>
+                </div>
+                <table className="w-full">
+                  <thead>
+                    <tr className="text-[10px] font-medium text-zinc-400 uppercase tracking-wider bg-zinc-50/60 border-b border-zinc-100">
+                      <th className="text-left py-3 px-5">Danh mục</th>
+                      <th className="text-right py-3 px-3">Số sản phẩm</th>
+                      <th className="text-right py-3 px-5">Giá trị tồn kho</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(report.by_category || []).map((c) => (
+                      <tr key={c.category_name} className="border-b border-zinc-100 last:border-b-0">
+                        <td className="py-3 px-5 text-sm font-medium text-zinc-800">{c.category_name}</td>
+                        <td className="py-3 px-3 text-right text-sm text-zinc-600">{c.product_count}</td>
+                        <td className="py-3 px-5 text-right text-sm font-semibold text-zinc-800">
+                          {Number(c.inventory_value || 0).toLocaleString()}đ
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {activeTab === "list" && (
+        <>
       {/* THÔNG BÁO (TOAST) */}
       <AnimatePresence>
         {message.text && (
@@ -352,7 +579,7 @@ const ProductManager = () => {
               className="bg-[#f8f8fa] border border-zinc-200 rounded-lg px-3 py-2 text-xs text-zinc-700 outline-none focus:border-zinc-400 transition-colors cursor-pointer"
             >
               <option value="">Tất cả</option>
-              {categories.map((c) => (
+              {categories.filter(c => c.status === "active").map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
                 </option>
@@ -649,7 +876,7 @@ const ProductManager = () => {
                   <option value="" disabled>
                     Chọn danh mục
                   </option>
-                  {categories.map((c) => (
+                  {categories.filter(c => c.status === "active").map((c) => (
                     <option key={c.id} value={c.id}>
                       {c.name}
                     </option>
@@ -769,6 +996,129 @@ const ProductManager = () => {
           </form>
         </div>
       </div>
+        </>
+      )}
+
+      {activeTab === "categories" && (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+          {/* BẢNG DANH MỤC */}
+          <div className="lg:col-span-8 admin-card overflow-hidden">
+            <AnimatePresence>
+              {catMessage.text && (
+                <motion.div
+                  initial={{ opacity: 0, y: -8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  className={`mx-5 mt-4 p-3 rounded-lg text-xs font-medium ${catMessage.type === "success" ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-red-50 text-red-600 border border-red-200"}`}
+                >
+                  {catMessage.text}
+                </motion.div>
+              )}
+            </AnimatePresence>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead className="bg-zinc-50/60 border-b border-zinc-100 text-[10px] font-medium text-zinc-400 uppercase tracking-wider">
+                  <tr>
+                    <th className="py-3 px-5">Tên danh mục</th>
+                    <th className="py-3 px-3">Mô tả</th>
+                    <th className="py-3 px-3 text-center">Trạng thái</th>
+                    <th className="py-3 px-5 text-right">Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {categories.length === 0 ? (
+                    <tr>
+                      <td colSpan="4" className="py-16 text-center text-xs text-zinc-400">Chưa có danh mục nào</td>
+                    </tr>
+                  ) : (
+                    categories.map((c) => (
+                      <tr key={c.id} className="border-b border-zinc-100 last:border-b-0 hover:bg-zinc-50/40 transition-colors group">
+                        <td className="py-3.5 px-5 text-sm font-semibold text-zinc-800">{c.name}</td>
+                        <td className="py-3.5 px-3">
+                          <p className="text-xs text-zinc-500 truncate max-w-[280px]">
+                            {c.description || <span className="text-zinc-300 italic">Không có mô tả</span>}
+                          </p>
+                        </td>
+                        <td className="py-3.5 px-3 text-center">
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium ${c.status === "active" ? "text-emerald-700 bg-emerald-50" : "text-zinc-500 bg-zinc-100"}`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${c.status === "active" ? "bg-emerald-500" : "bg-zinc-400"}`} />
+                            {c.status === "active" ? "Hoạt động" : "Tạm ẩn"}
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-5 text-right">
+                          <div className="flex items-center justify-end gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                            <button onClick={() => handleCatEdit(c)} className="admin-btn-outline px-2.5 py-1 text-[10px]">Sửa</button>
+                            {c.status === "active" && (
+                              <button onClick={() => handleCatDelete(c)} className="admin-btn-outline px-2 py-1 text-[10px] hover:text-red-500 hover:border-red-200">Ẩn</button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* FORM DANH MỤC */}
+          <div className="lg:col-span-4 admin-card p-5 sticky top-5">
+            <div className="flex items-center justify-between mb-4 pb-3 border-b border-zinc-100">
+              <h3 className="text-sm font-semibold text-zinc-800">
+                {isCatEditing ? "Sửa danh mục" : "Thêm danh mục mới"}
+              </h3>
+              {isCatEditing && (
+                <button onClick={resetCatForm} className="text-[10px] font-medium text-zinc-400 hover:text-zinc-600 transition-colors">Hủy sửa</button>
+              )}
+            </div>
+            <form onSubmit={handleCatSubmit} className="space-y-4">
+              <div>
+                <label className="admin-form-label">Tên danh mục *</label>
+                <input
+                  type="text"
+                  required
+                  value={catForm.name}
+                  onChange={(e) => setCatForm({ ...catForm, name: e.target.value })}
+                  className={inputClass}
+                  placeholder="Ví dụ: Nước giải khát"
+                />
+              </div>
+              <div>
+                <label className="admin-form-label">Mô tả chi tiết</label>
+                <textarea
+                  rows="3"
+                  value={catForm.description}
+                  onChange={(e) => setCatForm({ ...catForm, description: e.target.value })}
+                  className={`${inputClass} resize-none`}
+                  placeholder="Ghi chú thêm (không bắt buộc)..."
+                />
+              </div>
+              <div>
+                <label className="admin-form-label">Trạng thái</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button type="button" onClick={() => setCatForm({ ...catForm, status: "active" })}
+                    className={`py-2 rounded-lg text-xs font-medium transition-colors border ${catForm.status === "active" ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-zinc-50 text-zinc-400 border-transparent hover:bg-zinc-100"}`}>
+                    Hoạt động
+                  </button>
+                  <button type="button" onClick={() => setCatForm({ ...catForm, status: "inactive" })}
+                    className={`py-2 rounded-lg text-xs font-medium transition-colors border ${catForm.status === "inactive" ? "bg-zinc-100 text-zinc-600 border-zinc-300" : "bg-zinc-50 text-zinc-400 border-transparent hover:bg-zinc-100"}`}>
+                    Tạm ẩn
+                  </button>
+                </div>
+              </div>
+              <div className="pt-2">
+                <button
+                  type="submit"
+                  disabled={isCatProcessing || !catForm.name.trim()}
+                  className={`w-full py-2.5 ${isCatEditing ? "admin-btn-secondary" : "admin-btn-primary"} ${isCatProcessing || !catForm.name.trim() ? "opacity-60 cursor-not-allowed shadow-none hover:translate-y-0" : ""}`}
+                >
+                  {isCatProcessing ? "Đang lưu..." : isCatEditing ? "Lưu thay đổi" : "Tạo danh mục"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

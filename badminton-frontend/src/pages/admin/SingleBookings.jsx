@@ -1,10 +1,15 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { Fragment, useState, useEffect, useMemo, useCallback } from "react";
 import { useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { adminBookingService } from "../../services/admin/bookingService";
 import { ClipboardList } from "lucide-react";
 import EmptyState from "../../components/admin/EmptyState";
 import LoadingSpinner from "../../components/admin/LoadingSpinner";
+import {
+  groupByProximity,
+  relativeDayLabel,
+  relativeDayStyle,
+} from "../../utils/bookingDateGroups";
 
 const SingleBookings = () => {
   const location = useLocation();
@@ -97,6 +102,18 @@ const SingleBookings = () => {
     });
   }, [bookings, searchTerm, filterStatus]);
 
+  // Sắp xếp & chia nhóm theo độ gần của ngày chơi: Hôm nay → Ngày mai → 7 ngày tới
+  // → Sắp tới → Đã diễn ra (mới nhất trước). Cùng ngày thì theo giờ bắt đầu.
+  const groupedBookings = useMemo(
+    () =>
+      groupByProximity(
+        filteredBookings,
+        (b) => b.details?.[0]?.booking_date,
+        (b) => b.details?.[0]?.start_time || "",
+      ),
+    [filteredBookings],
+  );
+
   // --- LOGIC XÁC NHẬN ---
   const requestAction = (booking, type) => {
     let title = "";
@@ -104,12 +121,7 @@ const SingleBookings = () => {
     let payload = {};
     let actionType = "status";
 
-    if (type === "confirm") {
-      title = "Xác nhận duyệt đơn";
-      msg = `Xác nhận giữ sân cho khách hàng ${booking.customer_name}?`;
-      payload = { status: "confirmed" };
-      actionType = "status";
-    } else if (type === "pay") {
+    if (type === "pay") {
       title = "Xác nhận đã thu tiền";
       msg = `Xác nhận ${booking.customer_name} đã thanh toán đủ tiền sân?`;
       payload = { payment_status: "paid" };
@@ -211,12 +223,6 @@ const SingleBookings = () => {
 
   // --- TIỆN ÍCH ---
   const statusConfig = {
-    pending: {
-      dot: "bg-amber-400",
-      text: "text-amber-700",
-      bg: "bg-amber-50",
-      label: "Chờ duyệt",
-    },
     confirmed: {
       dot: "bg-blue-500",
       text: "text-blue-700",
@@ -245,11 +251,6 @@ const SingleBookings = () => {
 
   const filterTabs = [
     { key: "all", label: "Tất cả", count: bookings.length },
-    {
-      key: "pending",
-      label: "Chờ duyệt",
-      count: bookings.filter((b) => b.status === "pending").length,
-    },
     {
       key: "confirmed",
       label: "Đã xác nhận",
@@ -347,181 +348,135 @@ const SingleBookings = () => {
           <EmptyState icon={ClipboardList} title="Không tìm thấy đơn đặt sân nào" />
         </div>
       ) : (
-        <div className="admin-card overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[900px]">
-              <thead>
-                <tr className="text-[10px] font-medium text-zinc-400 uppercase tracking-wider bg-zinc-50/60 border-b border-zinc-100">
-                  <th
-                    className="text-left py-3 px-5"
-                    style={{ width: "260px" }}
-                  >
-                    Khách hàng
-                  </th>
-                  <th
-                    className="text-left py-3 px-3"
-                    style={{ width: "110px" }}
-                  >
-                    Ngày
-                  </th>
-                  <th
-                    className="text-left py-3 px-3"
-                    style={{ width: "110px" }}
-                  >
-                    Giờ
-                  </th>
-                  <th className="text-left py-3 px-3" style={{ width: "70px" }}>
-                    Sân
-                  </th>
-                  <th
-                    className="text-right py-3 px-3"
-                    style={{ width: "100px" }}
-                  >
-                    Số tiền
-                  </th>
-                  <th
-                    className="text-center py-3 px-3"
-                    style={{ width: "90px" }}
-                  >
-                    Trạng thái
-                  </th>
-                  <th
-                    className="text-right py-3 px-5"
-                    style={{ width: "200px" }}
-                  >
-                    Thao tác
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredBookings.map((b) => {
+        <div className="space-y-6">
+          {groupedBookings.map((group) => (
+            <div key={group.key}>
+              {/* Group header */}
+              <div className="flex items-center gap-2 mb-3 px-1">
+                <span className={`text-[10px] font-bold uppercase tracking-widest ${group.key === "today" ? "text-emerald-600" : group.key === "past" ? "text-zinc-400" : "text-zinc-500"}`}>
+                  {group.label}
+                </span>
+                <span className="text-[10px] text-zinc-400 bg-zinc-100 px-1.5 py-0.5 rounded-full">
+                  {group.items.length} đơn
+                </span>
+                <div className="flex-1 h-px bg-zinc-100" />
+              </div>
+
+              {/* Cards grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                {group.items.map((b) => {
                   const detail = b.details?.[0];
-                  const courtName =
-                    detail?.court?.name ||
-                    `Sân ${detail?.court_id?.slice(-2) || "..."}`;
+                  const courtName = detail?.court?.name || `Sân ${detail?.court_id?.slice(-2) || "..."}`;
                   const dateStr = detail?.booking_date
-                    ? new Date(detail.booking_date).toLocaleDateString(
-                        "vi-VN",
-                        { day: "2-digit", month: "2-digit", year: "numeric" },
-                      )
+                    ? new Date(detail.booking_date).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" })
                     : "—";
                   const timeStr = detail
                     ? `${detail.start_time.slice(0, 5)} – ${detail.end_time.slice(0, 5)}`
                     : "—";
-                  const sc = statusConfig[b.status] || statusConfig.pending;
+                  const sc = statusConfig[b.status] || statusConfig.confirmed;
                   const isCancelled = b.status === "cancelled";
-                  const isNotificationTarget =
-                    location.state?.notificationBookingCode === b.booking_code;
+                  const isNotificationTarget = location.state?.notificationBookingCode === b.booking_code;
+
+                  // border-left color per status
+                  const borderAccent = {
+                    confirmed: "border-l-blue-400",
+                    playing: "border-l-violet-500",
+                    completed: "border-l-emerald-500",
+                    cancelled: "border-l-zinc-300",
+                  }[b.status] || "border-l-blue-400";
 
                   return (
-                    <tr
+                    <div
                       key={b.id}
-                      className={`border-b border-zinc-100 last:border-b-0 hover:bg-zinc-50/40 transition-colors group ${
-                        isCancelled ? "opacity-45" : ""
-                      } ${
-                        isNotificationTarget
-                          ? "bg-emerald-50 ring-1 ring-inset ring-emerald-300"
-                          : ""
-                      }`}
+                      className={`bg-white rounded-xl border border-zinc-200 border-l-4 ${borderAccent} shadow-sm hover:shadow-md transition-shadow group ${isCancelled ? "opacity-50" : ""} ${isNotificationTarget ? "ring-2 ring-emerald-300" : ""}`}
                     >
-                      <td className="py-3.5 px-5">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-lg bg-zinc-100 flex items-center justify-center text-zinc-500 font-medium text-xs shrink-0">
+                      {/* Card header */}
+                      <div className="flex items-start justify-between px-4 pt-4 pb-3">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className={`w-9 h-9 rounded-lg flex items-center justify-center text-white text-xs font-bold shrink-0 ${sc.dot.replace("bg-", "bg-")}`}
+                            style={{ background: b.status === "confirmed" ? "#3b82f6" : b.status === "playing" ? "#8b5cf6" : b.status === "completed" ? "#10b981" : "#a1a1aa" }}
+                          >
                             {b.customer_name?.charAt(0)?.toUpperCase() || "?"}
                           </div>
                           <div className="min-w-0">
-                            <p className="text-[13px] font-medium text-zinc-800 truncate">
+                            <p className="text-[13px] font-semibold text-zinc-800 truncate leading-tight">
                               {b.customer_name}
                             </p>
-                            <p className="text-[11px] text-zinc-400 font-mono truncate">
-                              {b.booking_code} · {b.customer_phone}
+                            <p className="text-[10px] text-zinc-400 font-mono truncate">
+                              {b.booking_code}
                             </p>
                           </div>
                         </div>
-                      </td>
-                      <td className="py-3.5 px-3 text-xs text-zinc-600">
-                        {dateStr}
-                      </td>
-                      <td className="py-3.5 px-3">
-                        <span className="text-xs font-mono text-zinc-600">
-                          {timeStr}
-                        </span>
-                      </td>
-                      <td className="py-3.5 px-3 text-xs text-zinc-600">
-                        {courtName}
-                      </td>
-                      <td className="py-3.5 px-3 text-right">
-                        <p className="text-sm font-semibold text-zinc-800">
-                          {Number(b.total_price).toLocaleString()}₫
-                        </p>
-                        <p
-                          className={`text-[10px] ${b.payment_status === "paid" ? "text-emerald-600" : "text-amber-500"}`}
-                        >
-                          {b.payment_status === "paid"
-                            ? "✓ Đã thu"
-                            : "○ Chưa thu"}
-                        </p>
-                      </td>
-                      <td className="py-3.5 px-3 text-center">
-                        <span
-                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium ${sc.bg} ${sc.text}`}
-                        >
-                          <span
-                            className={`w-1.5 h-1.5 rounded-full ${sc.dot}`}
-                          />
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium shrink-0 ${sc.bg} ${sc.text}`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${sc.dot}`} />
                           {sc.label}
                         </span>
-                      </td>
-                      <td className="py-3.5 px-5 text-right">
-                        <div className="flex items-center justify-end gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
-                          {b.status === "pending" && (
-                            <button
-                              onClick={() => requestAction(b, "confirm")}
-                              className="admin-btn-secondary px-2.5 py-1 text-[10px] font-medium"
-                            >
-                              Duyệt
-                            </button>
+                      </div>
+
+                      {/* Card body */}
+                      <div className="px-4 pb-3 grid grid-cols-2 gap-y-2 gap-x-3 border-t border-zinc-100 pt-3">
+                        <div>
+                          <p className="text-[9px] text-zinc-400 uppercase tracking-wider mb-0.5">Ngày</p>
+                          <p className="text-xs text-zinc-700 font-medium">{dateStr}</p>
+                          {detail?.booking_date && (
+                            <span className={`inline-block mt-0.5 px-1.5 py-0.5 rounded text-[9px] font-medium ${relativeDayStyle(detail.booking_date)}`}>
+                              {relativeDayLabel(detail.booking_date)}
+                            </span>
                           )}
+                        </div>
+                        <div>
+                          <p className="text-[9px] text-zinc-400 uppercase tracking-wider mb-0.5">Giờ</p>
+                          <p className="text-xs text-zinc-700 font-mono font-medium">{timeStr}</p>
+                        </div>
+                        <div>
+                          <p className="text-[9px] text-zinc-400 uppercase tracking-wider mb-0.5">Sân</p>
+                          <p className="text-xs text-zinc-700 font-medium">{courtName}</p>
+                        </div>
+                        <div>
+                          <p className="text-[9px] text-zinc-400 uppercase tracking-wider mb-0.5">SĐT</p>
+                          <p className="text-xs text-zinc-700">{b.customer_phone || "—"}</p>
+                        </div>
+                      </div>
+
+                      {/* Card footer: price + actions */}
+                      <div className="flex items-center justify-between px-4 py-2.5 border-t border-zinc-100 bg-zinc-50/50 rounded-b-xl">
+                        <div>
+                          <p className="text-sm font-bold text-zinc-800">
+                            {Number(b.total_price).toLocaleString()}₫
+                          </p>
+                          <p className={`text-[10px] ${b.payment_status === "paid" ? "text-emerald-600" : "text-amber-500"}`}>
+                            {b.payment_status === "paid" ? "✓ Đã thu" : "○ Chưa thu"}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-1">
                           {b.payment_status !== "paid" && !isCancelled && (
-                            <button
-                              onClick={() => requestAction(b, "pay")}
-                              className="admin-btn-primary px-2.5 py-1 text-[10px] font-medium"
-                            >
+                            <button onClick={() => requestAction(b, "pay")} className="admin-btn-primary px-2.5 py-1 text-[10px] font-medium">
                               Thu tiền
                             </button>
                           )}
                           {["playing", "confirmed"].includes(b.status) && b.payment_status === "paid" && (
-                            <button
-                              onClick={() => requestAction(b, "complete")}
-                              className="admin-btn-primary px-2.5 py-1 text-[10px] font-medium"
-                            >
+                            <button onClick={() => requestAction(b, "complete")} className="admin-btn-primary px-2.5 py-1 text-[10px] font-medium">
                               Hoàn thành
                             </button>
                           )}
                           {!isCancelled && !["playing", "completed"].includes(b.status) && (
-                            <button
-                              onClick={() => openRescheduleModal(b)}
-                              className="admin-btn-outline px-2.5 py-1 text-[10px]"
-                            >
+                            <button onClick={() => openRescheduleModal(b)} className="admin-btn-outline px-2.5 py-1 text-[10px]">
                               Đổi lịch
                             </button>
                           )}
                           {!["playing", "cancelled", "completed"].includes(b.status) && (
-                            <button
-                              onClick={() => requestAction(b, "cancel")}
-                              className="admin-btn-outline px-2.5 py-1 text-[10px] hover:text-red-500 hover:border-red-200"
-                            >
+                            <button onClick={() => requestAction(b, "cancel")} className="admin-btn-outline px-2.5 py-1 text-[10px] hover:text-red-500 hover:border-red-200">
                               Hủy
                             </button>
                           )}
                         </div>
-                      </td>
-                    </tr>
+                      </div>
+                    </div>
                   );
                 })}
-              </tbody>
-            </table>
-          </div>
+              </div>
+            </div>
+          ))}
         </div>
       )}
 

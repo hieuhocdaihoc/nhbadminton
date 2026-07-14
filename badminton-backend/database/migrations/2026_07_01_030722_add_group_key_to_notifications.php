@@ -11,9 +11,11 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('notifications', function (Blueprint $table) {
-            $table->string('group_key', 64)->nullable()->after('created_at')->index();
-        });
+        if (!Schema::hasColumn('notifications', 'group_key')) {
+            Schema::table('notifications', function (Blueprint $table) {
+                $table->string('group_key', 64)->nullable()->after('created_at')->index();
+            });
+        }
     }
 
     public function down(): void

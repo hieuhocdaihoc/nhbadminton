@@ -40,10 +40,6 @@ class PaymentService
         $booking->remaining_amount = $newRemainingAmount;
         $booking->payment_status = $newRemainingAmount <= 0 ? 'paid' : 'partially_paid';
 
-        if ($booking->status === 'pending') {
-            $booking->status = 'confirmed';
-        }
-
         $booking->save();
 
         return $payment;

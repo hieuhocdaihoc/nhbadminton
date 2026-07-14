@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { courtService } from "../../services/user/courtService";
 import { bookingService } from "../../services/user/bookingService";
+import { settingService } from "../../services/settingService";
 
 const BookingPage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -20,12 +21,25 @@ const BookingPage = () => {
 
   const [court, setCourt] = useState(null);
   const [slots, setSlots] = useState([]);
+  const [courts, setCourts] = useState([]);
+  const [isMapOpen, setIsMapOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedSlots, setSelectedSlots] = useState([]);
 
   const [bookingType, setBookingType] = useState("single");
-  const [payLater, setPayLater] = useState(false);
+  // Đặt lẻ: "full" (chuyển khoản đủ) hoặc "deposit" (cọc giữ chỗ, trả nốt tại sân)
+  const [paymentOption, setPaymentOption] = useState("full");
+  const [depositPercent, setDepositPercent] = useState(20);
+
+  useEffect(() => {
+    settingService.getPublicSettings()
+      .then((res) => {
+        const pct = Number(res.data?.data?.deposit_percent);
+        if (pct > 0) setDepositPercent(pct);
+      })
+      .catch(() => {});
+  }, []);
 
   const [recurringRange, setRecurringRange] = useState({
     startDate: dateParam,
@@ -114,6 +128,23 @@ const BookingPage = () => {
   const [promotionPreview, setPromotionPreview] = useState(null);
   const [promotionMessage, setPromotionMessage] = useState("");
   const [isCheckingPromotion, setIsCheckingPromotion] = useState(false);
+  const [autoPromo, setAutoPromo] = useState(null);
+  const [isAutoPromoFilled, setIsAutoPromoFilled] = useState(false);
+
+  // Mã giảm giá ngày đặc biệt (kỷ niệm sân...) — tự động áp, hiển thị banner
+  useEffect(() => {
+    bookingService.getAutoPromotion()
+      .then((res) => setAutoPromo(res.data?.data ?? null))
+      .catch(() => {});
+  }, []);
+
+  // Điền sẵn mã tự động vào ô mã giảm giá để khách biết mình đang được giảm
+  useEffect(() => {
+    if (autoPromo?.code && !promotionCode) {
+      setPromotionCode(autoPromo.code);
+      setIsAutoPromoFilled(true);
+    }
+  }, [autoPromo]);
 
   const [errorMessage, setErrorMessage] = useState("");
   const [paymentInfo, setPaymentInfo] = useState(null);
@@ -144,13 +175,15 @@ const BookingPage = () => {
       setSelectedSlots([]);
 
       try {
-        const [courtRes, availabilityRes] = await Promise.all([
+        const [courtRes, availabilityRes, allCourtsRes] = await Promise.all([
           courtService.getPublicCourtById(courtIdParam),
           courtService.getCourtSlots(courtIdParam, dateParam),
+          courtService.getPublicCourts(),
         ]);
 
         setCourt(courtRes.data?.data || courtRes.data);
         setSlots(availabilityRes.data?.data || []);
+        setCourts(allCourtsRes.data?.data || allCourtsRes.data || []);
 
         const storedUser = localStorage.getItem("current_user");
 
@@ -201,19 +234,26 @@ const BookingPage = () => {
 
         if (data?.paid) {
           clearInterval(intervalId);
+          const wasDeposit = paymentInfo?.is_deposit;
+          const remainingAtVenue = paymentInfo?.remaining_at_venue;
           setIsPaymentModalOpen(false);
           setPaymentInfo(null);
           setCreatedBookingInfo(null);
 
+          const depositNote = wasDeposit
+            ? ` Vui lòng thanh toán nốt ${Number(remainingAtVenue || 0).toLocaleString("vi-VN")}đ tại sân sau khi chơi xong.`
+            : "";
+
           if (isLoggedIn()) {
-            alert("Thanh toán thành công! Đơn đặt sân đã được xác nhận.");
+            alert("Thanh toán thành công! Đơn đặt sân đã được xác nhận." + depositNote);
             navigate("/booking-history");
           } else {
+            const bookingCodes = data.booking_codes || [];
             setSuccessModal({
               isOpen: true,
-              title: "Thanh toán thành công!",
-              message: "Đơn của bạn đã được xác nhận. Vui lòng lưu lại mã đơn để tra cứu sau này.",
-              bookings: [],
+              title: wasDeposit ? "Đặt cọc giữ chỗ thành công!" : "Thanh toán thành công!",
+              message: `Đơn của bạn đã được xác nhận. Vui lòng lưu lại mã đơn để tra cứu sau này.${depositNote}`,
+              bookings: bookingCodes.map((code) => ({ booking_code: code })),
             });
           }
         }
@@ -288,22 +328,23 @@ const BookingPage = () => {
 
     setIsSubmitting(true);
 
+    let payload;
     try {
-      const isPrepaid = (bookingType === "recurring" || bookingType === "long_term") ? true : !payLater;
       const totalAmount = selectedSlots.reduce(
         (acc, s) => acc + Number(s.price),
         0,
       );
 
-      let payload = {
+      payload = {
         court_id: courtIdParam,
         booking_type: bookingType,
         customer_name: customerForm.fullName,
         customer_phone: customerForm.phone,
         note: customerForm.note || "",
-        is_prepaid: isPrepaid,
+        is_prepaid: true,
         total_amount: totalAmount,
         promotion_code: promotionCode.trim() || undefined,
+        payment_option: bookingType === "single" ? paymentOption : "full",
       };
 
       if (bookingType === "single") {
@@ -345,45 +386,48 @@ const BookingPage = () => {
         payload.specific_dates = specificDates;
       }
 
-      if (isPrepaid) {
-        // Thanh toán online: tạo intent trước, chưa tạo booking
-        const intentRes = await bookingService.preparePayment(payload);
-        const intentData = intentRes.data?.data;
-        setCreatedBookingInfo({ intent_code: intentData.intent_code });
-        setPaymentInfo(intentData);
-        setIsPaymentModalOpen(true);
-        return;
-      }
-
-      // Giữ chỗ / thanh toán tại sân: tạo booking ngay
-      const response = await bookingService.createBooking(payload);
-
-      if (response.status === 201 || response.data?.status === "success") {
-        const responseData = response.data?.data || response.data;
-        setCreatedBookingInfo(responseData);
-
-        if (isLoggedIn()) {
-          alert(
-            "🎉 " + (response.data?.message || "Đặt sân thành công!"),
-          );
-          navigate("/booking-history");
-        } else {
-          setSuccessModal({
-            isOpen: true,
-            title: "Đặt sân thành công!",
-            message:
-              "Vui lòng lưu lại mã đơn để tra cứu lịch đặt sân sau này.",
-            bookings: responseData?.bookings || [],
-          });
-        }
-      }
+      // Luôn thanh toán online trước (đủ 100% hoặc cọc giữ chỗ) — tạo intent trước, chưa tạo booking
+      const intentRes = await bookingService.preparePayment(payload);
+      const intentData = intentRes.data?.data;
+      setCreatedBookingInfo({ intent_code: intentData.intent_code });
+      setPaymentInfo(intentData);
+      setIsPaymentModalOpen(true);
     } catch (error) {
-      console.error("Lỗi xử lý đặt sân:", error);
-      alert(
-        "❌ " +
-          (error.response?.data?.message ||
-            "Thao tác thất bại, vui lòng kiểm tra lại!"),
-      );
+      // 409: một số buổi trùng lịch — hệ thống đề xuất đổi sân trống khác / bỏ buổi kín sân
+      if (error.response?.status === 409 && error.response.data?.data) {
+        const { moved = [], unavailable = [], playable_count: playableCount = 0 } = error.response.data.data;
+        const lines = [];
+        if (moved.length > 0) {
+          lines.push("Các buổi sau bị trùng lịch, sẽ ĐỔI sang sân khác còn trống:");
+          moved.forEach((m) => lines.push(`  • ${m.date} → ${m.court_name}`));
+        }
+        if (unavailable.length > 0) {
+          lines.push("Các ngày sau KHÔNG còn sân nào trống, sẽ KHÔNG đặt:");
+          unavailable.forEach((d) => lines.push(`  • ${d}`));
+        }
+        lines.push("", `Tổng cộng sẽ đặt ${playableCount} buổi. Bạn có muốn tiếp tục?`);
+        if (window.confirm(lines.join("\n"))) {
+          try {
+            const retryRes = await bookingService.preparePayment({
+              ...payload,
+              accept_adjustments: true,
+            });
+            const retryData = retryRes.data?.data;
+            setCreatedBookingInfo({ intent_code: retryData.intent_code });
+            setPaymentInfo(retryData);
+            setIsPaymentModalOpen(true);
+          } catch (err2) {
+            alert("❌ " + (err2.response?.data?.message || "Thao tác thất bại, vui lòng kiểm tra lại!"));
+          }
+        }
+      } else {
+        console.error("Lỗi xử lý đặt sân:", error);
+        alert(
+          "❌ " +
+            (error.response?.data?.message ||
+              "Thao tác thất bại, vui lòng kiểm tra lại!"),
+        );
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -431,16 +475,24 @@ const BookingPage = () => {
   const previewDiscount = (promotionPreview?.discount_amount || 0) * sessionMultiplier;
   const estimatedTotal = Math.max(0, totalPrice - previewDiscount);
 
+  // Mã tự động: khi khách đã chọn khung giờ, tự tính giảm giá để hiển thị ngay
+  useEffect(() => {
+    if (isAutoPromoFilled && totalPrice > 0 && !promotionPreview && !isCheckingPromotion) {
+      handleValidatePromotion();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAutoPromoFilled, totalPrice]);
+
   const inputClass = "user-input";
 
   return (
     <div className="bg-zinc-950 min-h-screen py-10 relative overflow-hidden">
-      <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-lime-500/[0.03] rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-lime-400/[0.02] rounded-full blur-3xl pointer-events-none" />
 
       <div className="user-page-container relative z-10">
         <button
           onClick={() => navigate("/#courts")}
-          className="inline-flex items-center gap-2 text-xs font-bold text-zinc-500 hover:text-lime-400 mb-8 transition-colors uppercase tracking-widest"
+          className="inline-flex items-center gap-2 text-xs font-bold text-zinc-500 hover:text-lime-500 mb-8 transition-colors uppercase tracking-widest"
         >
           ← Trở về sơ đồ sân
         </button>
@@ -449,7 +501,7 @@ const BookingPage = () => {
           <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="mb-6 p-4 bg-red-500/10 border border-red-500/20 text-red-400 text-sm font-bold rounded-2xl"
+            className="mb-6 p-4 bg-red-400/10 border border-red-400/30 text-red-300 text-sm font-bold rounded-2xl"
           >
             {errorMessage}
           </motion.div>
@@ -463,7 +515,7 @@ const BookingPage = () => {
               className="user-card-glass flex flex-col sm:flex-row justify-between items-center gap-4"
             >
               <div className="flex items-center gap-4">
-                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-lime-500 to-emerald-500 text-zinc-950 flex items-center justify-center font-black text-xl shadow-lg shadow-lime-500/20">
+                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-lime-400 to-teal-500 text-white flex items-center justify-center font-black text-xl shadow-lg shadow-lime-400/10">
                   🏸
                 </div>
 
@@ -477,25 +529,78 @@ const BookingPage = () => {
                 </div>
               </div>
 
-              <div className="bg-zinc-800/80 p-2 rounded-2xl border border-zinc-700/50 flex items-center gap-3">
-                <span className="text-[10px] font-bold text-zinc-500 uppercase ml-2 whitespace-nowrap">
-                  Ngày:
-                </span>
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setIsMapOpen(!isMapOpen)}
+                  className="flex items-center gap-1.5 px-4 py-2.5 border border-zinc-700 hover:border-lime-400 hover:bg-lime-400/10 hover:text-lime-500 rounded-2xl text-xs font-extrabold text-zinc-400 bg-zinc-900 transition-all shadow-sm"
+                >
+                  <span className="material-symbols-outlined text-[16px]">map</span>
+                  {isMapOpen ? "Ẩn sơ đồ" : "Xem sơ đồ sân"}
+                </button>
 
-                <input
-                  type="date"
-                  min={todayStr}
-                  value={dateParam}
-                  onChange={(e) =>
-                    setSearchParams({
-                      courtId: courtIdParam,
-                      date: e.target.value,
-                    })
-                  }
-                  className="user-input py-2 w-auto"
-                />
+                <div className="bg-zinc-900 p-2 rounded-2xl border border-zinc-700 shadow-sm flex items-center gap-3">
+                  <span className="text-[10px] font-bold text-zinc-500 uppercase ml-2 whitespace-nowrap">
+                    Ngày:
+                  </span>
+
+                  <input
+                    type="date"
+                    min={todayStr}
+                    value={dateParam}
+                    onChange={(e) =>
+                      setSearchParams({
+                        courtId: courtIdParam,
+                        date: e.target.value,
+                      })
+                    }
+                    className="user-input py-1 px-3 w-auto border-none shadow-none focus:ring-0"
+                  />
+                </div>
               </div>
             </motion.div>
+
+            {isMapOpen && courts.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="user-card-glass bg-zinc-900 border border-zinc-700 p-6 rounded-3xl shadow-sm"
+              >
+                <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-4 flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-[16px] text-lime-500">domain</span>
+                  Chọn sân nhanh từ sơ đồ:
+                </h3>
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 bg-zinc-900/60 p-4 rounded-2xl border border-zinc-700">
+                  {courts.map((c) => {
+                    const isSelectedCourt = Number(c.id) === Number(courtIdParam);
+                    return (
+                      <button
+                        key={c.id}
+                        type="button"
+                        onClick={() => {
+                          setSearchParams({
+                            courtId: c.id,
+                            date: dateParam,
+                          });
+                        }}
+                        className={`relative py-4 px-3 rounded-xl border text-center transition-all duration-300 flex flex-col items-center justify-center gap-1 shadow-sm group ${
+                          isSelectedCourt
+                            ? "bg-lime-400/10 border-lime-400 text-lime-300 font-bold ring-2 ring-lime-400/10"
+                            : "bg-zinc-900 border-zinc-700 text-zinc-300 hover:border-lime-400 hover:text-lime-500"
+                        }`}
+                      >
+                        <span className="material-symbols-outlined text-base">sports_tennis</span>
+                        <div>
+                          <p className="text-[11px] font-black uppercase tracking-wide">{c.name}</p>
+                          <p className="text-[9px] text-zinc-500 mt-0.5">{c.floor_type || "Thảm BWF"}</p>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </motion.div>
+            )}
 
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -532,10 +637,10 @@ const BookingPage = () => {
                     >
                       <div className="flex items-center gap-2 mb-4">
                         <span className="text-lg">{session.icon}</span>
-                        <span className="text-[10px] font-extrabold uppercase tracking-widest text-zinc-400">
+                        <span className="text-[10px] font-extrabold uppercase tracking-widest text-zinc-500">
                           {session.label}
                         </span>
-                        <span className="text-[10px] text-zinc-600 font-semibold ml-auto">
+                        <span className="text-[10px] text-zinc-500 font-semibold ml-auto">
                           {session.slots.filter((s) => s.is_available).length}{" "}
                           trống
                         </span>
@@ -567,28 +672,32 @@ const BookingPage = () => {
                                 stiffness: 300,
                                 damping: 25,
                               }}
-                              className={`p-4 rounded-2xl border-2 text-left transition-all duration-300 h-[85px] flex flex-col justify-between relative overflow-hidden
+                              className={`p-4 rounded-2xl border text-left transition-all duration-300 h-[85px] flex flex-col justify-between relative overflow-hidden
                                                                 ${
-                                                                  isDisabled
-                                                                    ? "bg-zinc-800/30 border-zinc-800/50 opacity-40 cursor-not-allowed text-zinc-500"
-                                                                    : isSelected
-                                                                      ? "bg-lime-500 border-lime-400 text-zinc-950 shadow-xl shadow-lime-500/25"
-                                                                      : "bg-zinc-800/70 border-zinc-700/60 text-white hover:border-lime-500/40 hover:bg-zinc-800 hover:shadow-[0_0_20px_rgba(163,230,53,0.08)]"
+                                                                  isPassed
+                                                                    ? "bg-zinc-700 border-zinc-500 cursor-not-allowed"
+                                                                    : isBusy
+                                                                      ? "bg-red-900/70 border-red-600 cursor-not-allowed"
+                                                                      : isSelected
+                                                                        ? "bg-lime-500 border-lime-400 text-white shadow-lg shadow-lime-500/15"
+                                                                        : "bg-lime-400/20 border-lime-400/60 text-lime-300 hover:border-lime-300 hover:bg-lime-400/25 shadow-sm"
                                                                 }`}
                             >
                               {isSelected && (
-                                <div className="absolute top-2 right-2 w-5 h-5 bg-zinc-950 rounded-full flex items-center justify-center text-lime-400 text-[10px] font-black">
+                                <div className="absolute top-2 right-2 w-5 h-5 bg-white rounded-full flex items-center justify-center text-lime-500 text-[10px] font-black shadow-sm">
                                   ✓
                                 </div>
                               )}
 
                               <span
                                 className={`font-mono font-extrabold text-sm ${
-                                  isDisabled
-                                    ? "text-zinc-600"
-                                    : isSelected
-                                      ? "text-zinc-950"
-                                      : "text-white"
+                                  isPassed
+                                    ? "text-zinc-300"
+                                    : isBusy
+                                      ? "text-red-200"
+                                      : isSelected
+                                        ? "text-white"
+                                        : "text-lime-300"
                                 }`}
                               >
                                 {slot.time_slot}
@@ -597,30 +706,30 @@ const BookingPage = () => {
                               <div className="flex justify-between items-end">
                                 <span
                                   className={`text-[9px] font-bold uppercase ${
-                                    isDisabled
-                                      ? "text-zinc-600"
-                                      : isSelected
-                                        ? "text-zinc-800"
-                                        : "text-zinc-400"
+                                    isPassed
+                                      ? "text-zinc-400"
+                                      : isBusy
+                                        ? "text-red-300"
+                                        : isSelected
+                                          ? "text-lime-100"
+                                          : "text-lime-400"
                                   }`}
                                 >
-                                  {isPassed
-                                    ? "Hết giờ"
-                                    : isBusy
-                                      ? "Đã kín"
-                                      : "Giá ca"}
+                                  {isPassed ? "Hết giờ" : isBusy ? "Đã kín" : "Giá ca"}
                                 </span>
 
                                 <span
                                   className={`text-sm font-extrabold ${
-                                    isDisabled
-                                      ? "text-zinc-600"
-                                      : isSelected
-                                        ? "text-zinc-950"
-                                        : "text-lime-400"
+                                    isPassed
+                                      ? "text-zinc-400"
+                                      : isBusy
+                                        ? "text-red-300"
+                                        : isSelected
+                                          ? "text-white"
+                                          : "text-lime-300"
                                   }`}
                                 >
-                                  {isPassed ? "--" : `${slot.price / 1000}k`}
+                                  {isPassed ? "--" : isBusy ? "×" : `${slot.price / 1000}k`}
                                 </span>
                               </div>
                             </motion.button>
@@ -638,9 +747,9 @@ const BookingPage = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.15 }}
-            className="user-card-glass p-0 overflow-hidden sticky top-8 shadow-2xl shadow-black/30"
+            className="user-card-glass p-0 overflow-hidden sticky top-8 shadow-lg shadow-zinc-200/50"
           >
-            <div className="grid grid-cols-3 bg-zinc-800/80 p-1.5 m-3 rounded-2xl">
+            <div className="grid grid-cols-3 bg-zinc-800 p-1.5 m-3 rounded-2xl">
               {[
                 { type: "single", label: "Đặt lẻ" },
                 { type: "recurring", label: "Định kỳ" },
@@ -651,18 +760,17 @@ const BookingPage = () => {
                   type="button"
                   onClick={() => {
                     setBookingType(t.type);
-                    setPayLater(false);
                   }}
                   className={`relative py-3 rounded-xl text-[10px] font-extrabold uppercase tracking-widest transition-all duration-300 ${
                     bookingType === t.type
-                      ? "text-zinc-950"
-                      : "text-zinc-500 hover:text-zinc-300"
+                      ? "text-white"
+                      : "text-zinc-500 hover:text-white"
                   }`}
                 >
                   {bookingType === t.type && (
                     <motion.div
                       layoutId="bookingTypeTab"
-                      className="absolute inset-0 bg-lime-500 rounded-xl shadow-lg shadow-lime-500/20"
+                      className="absolute inset-0 bg-lime-500 rounded-xl shadow-md"
                       transition={{
                         type: "spring",
                         stiffness: 350,
@@ -684,7 +792,7 @@ const BookingPage = () => {
 
                 <div className="flex flex-wrap gap-2 min-h-[40px]">
                   {selectedSlots.length === 0 ? (
-                    <p className="text-xs text-zinc-600 italic">
+                    <p className="text-xs text-zinc-400 italic">
                       Chưa chọn giờ nào...
                     </p>
                   ) : (
@@ -693,7 +801,7 @@ const BookingPage = () => {
                         key={s.time_slot}
                         initial={{ scale: 0.8, opacity: 0 }}
                         animate={{ scale: 1, opacity: 1 }}
-                        className="px-3 py-1.5 bg-lime-500/15 text-lime-400 text-xs font-bold rounded-xl border border-lime-500/25"
+                        className="px-3 py-1.5 bg-lime-400/10 text-lime-500 text-xs font-bold rounded-xl border border-lime-400/30"
                       >
                         {s.time_slot}
                       </motion.span>
@@ -708,9 +816,9 @@ const BookingPage = () => {
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: "auto" }}
                     exit={{ opacity: 0, height: 0 }}
-                    className="bg-purple-500/10 p-4 rounded-2xl border border-purple-500/20 space-y-3 overflow-hidden"
+                    className="bg-purple-400/10 p-4 rounded-2xl border border-purple-400/30 space-y-3 overflow-hidden"
                   >
-                    <p className="text-[10px] font-bold text-purple-400 uppercase tracking-widest">
+                    <p className="text-[10px] font-bold text-purple-300 uppercase tracking-widest">
                       Thời hạn hợp đồng
                     </p>
 
@@ -758,8 +866,8 @@ const BookingPage = () => {
                             onClick={() => toggleDay(d.value)}
                             className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
                               selectedDays.includes(d.value)
-                                ? "bg-purple-500 text-white"
-                                : "bg-zinc-800 text-zinc-400 border border-zinc-700 hover:border-purple-400"
+                                ? "bg-purple-600 text-white"
+                                : "bg-zinc-900 text-zinc-400 border border-zinc-700 hover:border-purple-500"
                             }`}
                           >
                             {d.label}
@@ -768,7 +876,7 @@ const BookingPage = () => {
                       </div>
                     </div>
 
-                    <p className="text-[9px] text-purple-400/70 italic">
+                    <p className="text-[9px] text-purple-300 italic">
                       * Khung giờ đã chọn sẽ lặp vào các ngày được đánh dấu trong suốt thời hạn hợp đồng.
                     </p>
                   </motion.div>
@@ -781,9 +889,9 @@ const BookingPage = () => {
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: "auto" }}
                     exit={{ opacity: 0, height: 0 }}
-                    className="bg-amber-500/10 p-4 rounded-2xl border border-amber-500/20 space-y-3 overflow-hidden"
+                    className="bg-amber-400/10 p-4 rounded-2xl border border-amber-400/30 space-y-3 overflow-hidden"
                   >
-                    <p className="text-[10px] font-bold text-amber-400 uppercase tracking-widest">
+                    <p className="text-[10px] font-bold text-amber-300 uppercase tracking-widest">
                       Lịch dài hạn — chọn từng ngày cụ thể
                     </p>
 
@@ -836,10 +944,10 @@ const BookingPage = () => {
                                 onClick={() => toggleSpecificDate(dateStr)}
                                 className={`rounded-lg py-1.5 text-[10px] font-bold transition-colors ${
                                   disabled
-                                    ? "text-zinc-700 cursor-not-allowed"
+                                    ? "text-zinc-300 cursor-not-allowed"
                                     : isSelected
-                                      ? "bg-amber-500 text-zinc-950"
-                                      : "bg-zinc-800 text-zinc-300 hover:bg-amber-500/20 hover:text-amber-300"
+                                      ? "bg-amber-400 text-white"
+                                      : "bg-zinc-900 text-zinc-300 border border-zinc-700 hover:bg-amber-400/20 hover:text-amber-300"
                                 }`}
                               >
                                 {date.getDate()}
@@ -851,13 +959,13 @@ const BookingPage = () => {
                     </div>
 
                     {specificDates.length > 0 && (
-                      <div className="bg-amber-500/5 rounded-xl p-2 border border-amber-500/10">
-                        <p className="text-[9px] text-amber-400 font-bold mb-1">
+                      <div className="bg-amber-400/10 rounded-xl p-2 border border-amber-400/30">
+                        <p className="text-[9px] text-amber-300 font-bold mb-1">
                           Đã chọn {specificDates.length} ngày:
                         </p>
                         <div className="flex flex-wrap gap-1">
                           {[...specificDates].sort().map((d) => (
-                            <span key={d} className="text-[9px] bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded-md font-mono">
+                            <span key={d} className="text-[9px] bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded-md font-mono border border-amber-400/30">
                               {new Date(d).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" })}
                             </span>
                           ))}
@@ -865,196 +973,224 @@ const BookingPage = () => {
                       </div>
                     )}
 
-                    <p className="text-[9px] text-amber-400/70 italic">
+                    <p className="text-[9px] text-amber-300 italic">
                       * Mỗi tuần có thể chọn ngày khác nhau. Tất cả dùng chung khung giờ đã chọn ở trên.
                     </p>
                   </motion.div>
                 )}
               </AnimatePresence>
 
-              <div className="pt-5 border-t border-dashed border-zinc-700/50">
+              <div className="pt-5 border-t border-dashed border-zinc-700">
                 {bookingType === "long_term" && specificDates.length > 0 && (
-                  <div className="flex justify-between items-center text-xs text-zinc-500 mb-1.5">
-                    <span>{perSessionPrice.toLocaleString()}đ/ngày</span>
-                    <span>× {specificDates.length} ngày</span>
+                  <div className="flex justify-between items-center text-xs text-zinc-500 mb-2">
+                    <span>Đơn giá ngày thường:</span>
+                    <span className="font-mono font-bold text-zinc-300">{perSessionPrice.toLocaleString()}đ × {specificDates.length} ngày</span>
                   </div>
                 )}
-                <div className="flex justify-between items-end">
+
+                {/* Hộp quà tặng "Kỷ niệm 1 năm" / Khuyến mãi tự động */}
+                {autoPromo && (
+                  <div className="mb-4 rounded-2xl border border-lime-400/30 bg-lime-400/10 p-3 flex items-start gap-2.5 shadow-sm">
+                    <span className="material-symbols-outlined text-lime-500 text-base mt-0.5 animate-bounce">celebration</span>
+                    <div>
+                      <p className="text-[11px] font-black text-lime-300 uppercase tracking-wider">{autoPromo.name}</p>
+                      <p className="text-[10px] text-zinc-400 mt-1 leading-relaxed">
+                        Ưu đãi tự động: giảm{" "}
+                        <span className="font-extrabold text-lime-500">
+                          {autoPromo.discount_type === "percent"
+                            ? `${autoPromo.discount_value}%`
+                            : `${Number(autoPromo.discount_value).toLocaleString("vi-VN")}đ`}
+                        </span>
+                        . Đã tự động điền mã <b className="font-mono text-lime-300">{autoPromo.code}</b>.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Tóm tắt tổng tiền */}
+                <div className="flex justify-between items-center bg-zinc-900/60 border border-zinc-700 rounded-2xl p-4 mb-4 shadow-sm">
                   <div>
-                    <span className="text-xs font-bold text-zinc-500 uppercase">
-                      {bookingType === "long_term" ? "Ước tính:" : "Tổng cộng:"}
+                    <span className="text-[10px] font-extrabold text-zinc-500 uppercase tracking-widest block">
+                      Tổng tiền thanh toán
                     </span>
                     {bookingType === "long_term" && (
-                      <p className="text-[10px] text-amber-500/70 mt-0.5">
-                        * Giá cuối tuần có thể khác ngày thường
-                      </p>
+                      <span className="text-[9px] text-amber-300 font-bold block mt-0.5">
+                        * Có thể thay đổi theo ngày
+                      </span>
                     )}
                   </div>
                   <div className="text-right">
-                    <span className="text-3xl font-black text-lime-400 tracking-tighter">
-                      {totalPrice.toLocaleString()}
+                    <span className="text-3xl font-black text-lime-500 tracking-tighter block leading-none">
+                      {(estimatedTotal > 0 ? estimatedTotal : totalPrice).toLocaleString("vi-VN")}
+                      <span className="text-xs text-zinc-500 font-bold ml-1">đ</span>
                     </span>
-                    <span className="text-xs text-zinc-500 font-semibold ml-1">
-                      VNĐ
-                    </span>
+                    {promotionPreview && (
+                      <span className="text-[10px] text-zinc-500 line-through block mt-1">
+                        {totalPrice.toLocaleString("vi-VN")}đ
+                      </span>
+                    )}
                   </div>
                 </div>
+
+                {bookingType === "single" && paymentOption === "deposit" && (() => {
+                  const grandTotal = estimatedTotal > 0 ? estimatedTotal : totalPrice;
+                  const effectiveDeposit = Math.max(1000, Math.min(grandTotal, Math.round(grandTotal * depositPercent / 100)));
+                  return (
+                    <div className="mt-3 pt-3 border-t border-zinc-700 grid grid-cols-2 gap-3">
+                      <div>
+                        <span className="text-[9px] font-bold text-lime-400 uppercase tracking-widest block">Cọc giữ chỗ</span>
+                        <span className="text-sm font-black text-lime-300">
+                          {effectiveDeposit.toLocaleString("vi-VN")}đ
+                        </span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest block">Còn lại tại sân</span>
+                        <span className="text-sm font-black text-zinc-300">
+                          {Math.max(0, grandTotal - effectiveDeposit).toLocaleString("vi-VN")}đ
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
 
               {promotionPreview && (
-                <div className="rounded-2xl border border-lime-500/20 bg-lime-500/10 p-4 text-xs font-bold text-lime-300">
-                  <div className="flex justify-between">
-                    <span>Voucher {promotionPreview.code}</span>
-                    <span>
-                      -{Number(previewDiscount).toLocaleString("vi-VN")}đ
-                    </span>
-                  </div>
-                  <div className="mt-2 flex justify-between border-t border-lime-500/20 pt-2 text-white">
-                    <span>Tạm tính sau giảm</span>
-                    <span>{estimatedTotal.toLocaleString("vi-VN")}đ</span>
-                  </div>
+                <div className="rounded-2xl border border-lime-400/30 bg-lime-400/10 px-4 py-3 text-xs font-bold text-lime-300 shadow-sm flex items-center justify-between mb-4">
+                  <span className="inline-flex items-center gap-1.5"><span className="material-symbols-outlined text-[15px]">local_activity</span> Voucher {promotionPreview.code}</span>
+                  <span>-{Number(previewDiscount).toLocaleString("vi-VN")}đ</span>
                 </div>
               )}
 
               <form onSubmit={handleFinalizeBooking} className="space-y-4">
-                <input
-                  className={inputClass}
-                  placeholder="Họ và tên đại diện *"
-                  required
-                  value={customerForm.fullName}
-                  onChange={(e) =>
-                    setCustomerForm({
-                      ...customerForm,
-                      fullName: e.target.value,
-                    })
-                  }
-                />
+                {/* Nhập thông tin liên hệ */}
+                <div className="space-y-2">
+                  <p className="text-[10px] font-extrabold text-zinc-500 uppercase tracking-widest">Thông tin khách chơi</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <input
+                      className={`${inputClass} py-2.5 text-xs`}
+                      placeholder="Họ tên đại diện *"
+                      required
+                      value={customerForm.fullName}
+                      onChange={(e) =>
+                        setCustomerForm({
+                          ...customerForm,
+                          fullName: e.target.value,
+                        })
+                      }
+                    />
 
-                <input
-                  className={inputClass}
-                  placeholder="Số điện thoại liên hệ *"
-                  required
-                  value={customerForm.phone}
-                  onChange={(e) =>
-                    setCustomerForm({
-                      ...customerForm,
-                      phone: e.target.value,
-                    })
-                  }
-                />
+                    <input
+                      className={`${inputClass} py-2.5 text-xs`}
+                      placeholder="Số điện thoại *"
+                      required
+                      value={customerForm.phone}
+                      onChange={(e) =>
+                        setCustomerForm({
+                          ...customerForm,
+                          phone: e.target.value,
+                        })
+                      }
+                    />
+                  </div>
+                </div>
 
-                <div className="rounded-2xl border border-zinc-700/60 bg-zinc-800/35 p-3">
+                {/* Nhập mã giảm giá */}
+                <div className="rounded-2xl border border-zinc-700 bg-zinc-900/60 p-3 space-y-2">
+                  <p className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest">Có mã giảm giá khác?</p>
                   <div className="flex gap-2">
                     <input
-                      className={`${inputClass} uppercase`}
-                      placeholder="Mã giảm giá nếu có"
+                      className={`${inputClass} uppercase py-2 px-3 text-xs bg-zinc-900`}
+                      placeholder="MÃ VOUCHER"
                       value={promotionCode}
                       onChange={(e) => {
                         setPromotionCode(e.target.value.toUpperCase());
                         setPromotionPreview(null);
                         setPromotionMessage("");
+                        setIsAutoPromoFilled(false);
                       }}
                     />
                     <button
                       type="button"
                       onClick={handleValidatePromotion}
                       disabled={isCheckingPromotion || !promotionCode.trim()}
-                      className="shrink-0 rounded-2xl bg-lime-500 px-4 text-xs font-black uppercase text-zinc-950 hover:bg-lime-400 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="shrink-0 rounded-xl bg-lime-500 hover:bg-lime-400 px-4 text-xs font-black uppercase text-white disabled:cursor-not-allowed disabled:opacity-50 transition-colors"
                     >
-                      {isCheckingPromotion ? "..." : "Áp mã"}
+                      {isCheckingPromotion ? "..." : "Áp dụng"}
                     </button>
                   </div>
                   {promotionMessage && (
-                    <p
-                      className={`mt-2 text-[11px] font-semibold ${promotionPreview ? "text-lime-300" : "text-amber-300"}`}
-                    >
+                    <p className={`text-[10px] font-semibold ${promotionPreview ? "text-lime-500" : "text-amber-300"}`}>
                       {promotionMessage}
                     </p>
                   )}
                 </div>
 
-                {bookingType === "single" ? (
-                  <div className="grid grid-cols-2 gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setPayLater(false)}
-                      className={`p-4 rounded-2xl border text-left transition-all ${
-                        !payLater
-                          ? "bg-lime-500 text-zinc-950 border-lime-400"
-                          : "bg-zinc-800/50 text-zinc-400 border-zinc-700/50 hover:border-lime-500/30"
-                      }`}
-                    >
-                      <p className="text-xs font-extrabold uppercase">
-                        Thanh toán online
-                      </p>
-                      <p className="text-[10px] mt-1 opacity-80">
-                        Chuyển khoản trước qua QR
-                      </p>
-                    </button>
+                {/* Phương thức thanh toán */}
+                <div className="space-y-2">
+                  <p className="text-[10px] font-extrabold text-zinc-500 uppercase tracking-widest">Phương thức thanh toán</p>
+                  {bookingType === "single" ? (
+                    <>
+                      <div className="grid grid-cols-2 gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setPaymentOption("full")}
+                          className={`p-3.5 rounded-2xl border text-left transition-all duration-300 ${
+                            paymentOption === "full"
+                              ? "bg-lime-500 text-zinc-950 border-lime-400 shadow-md shadow-lime-400/20"
+                              : "bg-zinc-900 text-zinc-400 border-zinc-700 hover:border-lime-400/40 hover:bg-zinc-900/60 shadow-sm"
+                          }`}
+                        >
+                          <p className="text-[11px] font-black uppercase tracking-wider">Thanh toán đủ</p>
+                          <p className={`text-[9px] mt-0.5 ${paymentOption === "full" ? "text-zinc-800" : "text-zinc-500"}`}>Chuyển khoản 100% qua QR</p>
+                        </button>
 
-                    <button
-                      type="button"
-                      onClick={() => setPayLater(true)}
-                      className={`p-4 rounded-2xl border text-left transition-all ${
-                        payLater
-                          ? "bg-lime-500 text-zinc-950 border-lime-400"
-                          : "bg-zinc-800/50 text-zinc-400 border-zinc-700/50 hover:border-lime-500/30"
-                      }`}
-                    >
-                      <p className="text-xs font-extrabold uppercase">
-                        Thanh toán tại sân
-                      </p>
-                      <p className="text-[10px] mt-1 opacity-80">
-                        Giữ chỗ, đến sân thanh toán
-                      </p>
-                    </button>
-                  </div>
-                ) : bookingType === "long_term" ? (
-                  <div className="p-3 bg-amber-500/10 text-amber-400 text-[10px] font-bold text-center rounded-xl uppercase border border-amber-500/20 tracking-wider">
-                    Đặt dài hạn bắt buộc thanh toán online trước
-                  </div>
-                ) : (
-                  <div className="p-3 bg-purple-500/10 text-purple-400 text-[10px] font-bold text-center rounded-xl uppercase border border-purple-500/20 tracking-wider">
-                    Đặt sân định kỳ bắt buộc thanh toán online
-                    trước
-                  </div>
-                )}
+                        <button
+                          type="button"
+                          onClick={() => setPaymentOption("deposit")}
+                          className={`p-3.5 rounded-2xl border text-left transition-all duration-300 ${
+                            paymentOption === "deposit"
+                              ? "bg-lime-500 text-zinc-950 border-lime-400 shadow-md shadow-lime-400/20"
+                              : "bg-zinc-900 text-zinc-400 border-zinc-700 hover:border-lime-400/40 hover:bg-zinc-900/60 shadow-sm"
+                          }`}
+                        >
+                          <p className="text-[11px] font-black uppercase tracking-wider">Đặt cọc {depositPercent}%</p>
+                          <p className={`text-[9px] mt-0.5 ${paymentOption === "deposit" ? "text-zinc-800" : "text-zinc-500"}`}>Giữ chỗ, trả nốt tại sân</p>
+                        </button>
+                      </div>
+                      {paymentOption === "deposit" && (
+                        <p className="text-[10px] text-amber-300 bg-amber-400/10 border border-amber-400/30 rounded-xl px-3 py-2 leading-relaxed">
+                          Bạn sẽ chuyển khoản trước {depositPercent}% tổng tiền để giữ chỗ, phần còn lại thanh toán tại sân sau khi chơi xong.
+                          Tiền cọc <b>không hoàn lại</b> nếu hủy hoặc không đến đúng giờ.
+                        </p>
+                      )}
+                    </>
+                  ) : bookingType === "long_term" ? (
+                    <div className="p-3 bg-amber-400/10 text-amber-300 text-[10px] font-bold text-center rounded-xl uppercase border border-amber-400/30 tracking-wider">
+                      Đặt dài hạn bắt buộc thanh toán online trước
+                    </div>
+                  ) : (
+                    <div className="p-3 bg-purple-400/10 text-purple-300 text-[10px] font-bold text-center rounded-xl uppercase border border-purple-400/30 tracking-wider">
+                      Đặt định kỳ bắt buộc thanh toán online trước
+                    </div>
+                  )}
+                </div>
 
+                {/* Nút thanh toán duy nhất */}
                 <motion.button
                   type="submit"
                   disabled={selectedSlots.length === 0 || isSubmitting}
-                  whileHover={
-                    selectedSlots.length > 0 && !isSubmitting
-                      ? {
-                          scale: 1.02,
-                          boxShadow: "0 0 25px rgba(163,230,53,0.3)",
-                        }
-                      : {}
-                  }
-                  whileTap={
-                    selectedSlots.length > 0 && !isSubmitting
-                      ? { scale: 0.98 }
-                      : {}
-                  }
-                  className={`user-btn-primary w-full py-4 ${selectedSlots.length === 0 ? "opacity-50 cursor-not-allowed" : ""}`}
+                  whileHover={selectedSlots.length > 0 && !isSubmitting ? { scale: 1.02 } : {}}
+                  whileTap={selectedSlots.length > 0 && !isSubmitting ? { scale: 0.98 } : {}}
+                  className={`user-btn-primary w-full py-4 text-xs font-black uppercase tracking-widest ${selectedSlots.length === 0 ? "opacity-50 cursor-not-allowed shadow-none" : ""}`}
                 >
                   {isSubmitting && (
-                    <span className="w-4 h-4 border-2 border-zinc-950 border-t-transparent rounded-full animate-spin" />
+                    <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
                   )}
-
                   {isSubmitting
                     ? "Đang xử lý..."
-                    : bookingType === "recurring"
-                      ? "Thanh toán lịch định kỳ"
-                      : bookingType === "long_term"
-                        ? `Thanh toán dài hạn (${specificDates.length} ngày)`
-                        : payLater
-                        ? "Xác nhận giữ chỗ"
-                        : `Thanh toán ${
-                            estimatedTotal > 0
-                              ? estimatedTotal.toLocaleString() + "đ"
-                              : ""
-                          }`}
+                    : bookingType === "single" && paymentOption === "deposit"
+                      ? `TIẾP TỤC — ĐẶT CỌC ${depositPercent}%`
+                      : "TIẾP TỤC THANH TOÁN"}
                 </motion.button>
               </form>
             </div>
@@ -1069,20 +1205,19 @@ const BookingPage = () => {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden"
+              className="bg-zinc-900 border border-zinc-700 w-full max-w-md rounded-3xl overflow-hidden shadow-xl"
             >
-              <div className="p-6 border-b border-zinc-100">
-                <h3 className="text-lg font-extrabold text-zinc-900">
+              <div className="p-6 border-b border-zinc-800">
+                <h3 className="text-lg font-extrabold text-white">
                   Thanh toán đặt sân
                 </h3>
                 <p className="text-xs text-zinc-500 mt-1">
-                  Quét mã QR hoặc chuyển khoản đúng nội dung bên
-                  dưới.
+                  Quét mã QR hoặc chuyển khoản đúng nội dung bên dưới.
                 </p>
               </div>
 
               <div className="p-6 space-y-5">
-                <div className="bg-zinc-50 rounded-2xl p-4 flex justify-center border border-zinc-100">
+                <div className="bg-white rounded-2xl p-4 flex justify-center border border-zinc-800">
                   <img
                     src={paymentInfo.qr_url}
                     alt="QR thanh toán"
@@ -1093,48 +1228,62 @@ const BookingPage = () => {
                 <div className="space-y-3 text-sm">
                   <div className="flex justify-between gap-4">
                     <span className="text-zinc-500">Ngân hàng</span>
-                    <span className="font-bold text-zinc-900 text-right">
+                    <span className="font-bold text-white text-right">
                       {paymentInfo.bank_name}
                     </span>
                   </div>
 
                   <div className="flex justify-between gap-4">
                     <span className="text-zinc-500">Số tài khoản</span>
-                    <span className="font-bold text-zinc-900 text-right">
+                    <span className="font-bold text-white text-right">
                       {paymentInfo.bank_account}
                     </span>
                   </div>
 
                   <div className="flex justify-between gap-4">
                     <span className="text-zinc-500">Chủ tài khoản</span>
-                    <span className="font-bold text-zinc-900 text-right">
+                    <span className="font-bold text-white text-right">
                       {paymentInfo.account_holder}
                     </span>
                   </div>
 
                   <div className="flex justify-between gap-4">
-                    <span className="text-zinc-500">Số tiền</span>
-                    <span className="font-extrabold text-lime-600 text-right">
-                      {Number(paymentInfo.remaining_amount ?? paymentInfo.amount ?? 0).toLocaleString(
-                        "vi-VN",
-                      )}{" "}
-                      VNĐ
+                    <span className="text-zinc-500">{paymentInfo.is_deposit ? "Đặt cọc giữ chỗ" : "Số tiền"}</span>
+                    <span className="font-extrabold text-lime-500 text-right">
+                      {Number(paymentInfo.amount ?? 0).toLocaleString("vi-VN")} VNĐ
                     </span>
                   </div>
 
-                  <div className="bg-amber-50 border border-amber-100 rounded-2xl p-3">
-                    <p className="text-[11px] text-amber-700 font-bold uppercase mb-1">
+                  {paymentInfo.is_deposit && (
+                    <div className="flex justify-between gap-4">
+                      <span className="text-zinc-500">Còn lại thanh toán tại sân</span>
+                      <span className="font-extrabold text-zinc-300 text-right">
+                        {Number(paymentInfo.remaining_at_venue ?? 0).toLocaleString("vi-VN")} VNĐ
+                      </span>
+                    </div>
+                  )}
+
+                  <div className="bg-amber-400/10 border border-amber-400/30 rounded-2xl p-3">
+                    <p className="text-[11px] text-amber-300 font-bold uppercase mb-1">
                       Nội dung chuyển khoản
                     </p>
-                    <p className="text-sm font-extrabold text-amber-900 break-all">
+                    <p className="text-sm font-extrabold text-amber-200 break-all font-mono">
                       {paymentInfo.transfer_content}
                     </p>
                   </div>
 
-                  <div className="bg-lime-50 border border-lime-100 rounded-2xl p-3">
-                    <p className="text-[11px] text-lime-700 font-semibold">
-                      Sau khi chuyển khoản thành công, hệ thống sẽ
-                      tự xác nhận và chuyển trang.
+                  {paymentInfo.is_deposit && (
+                    <div className="bg-amber-400/10 border border-amber-400/30 rounded-2xl p-3">
+                      <p className="text-[11px] text-amber-300 font-semibold leading-relaxed">
+                        Đây là tiền cọc giữ chỗ, <b>không hoàn lại</b> nếu hủy hoặc không đến.
+                        Phần còn lại vui lòng thanh toán tại sân sau khi chơi xong.
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="bg-lime-400/10 border border-lime-400/30 rounded-2xl p-3">
+                    <p className="text-[11px] text-lime-300 font-semibold">
+                      Sau khi chuyển khoản thành công, hệ thống sẽ tự xác nhận và chuyển trang.
                     </p>
                   </div>
                 </div>
@@ -1143,7 +1292,7 @@ const BookingPage = () => {
                   <button
                     type="button"
                     onClick={handleClosePaymentModal}
-                    className="flex-1 py-3 rounded-2xl bg-zinc-100 text-zinc-700 text-xs font-bold hover:bg-zinc-200"
+                    className="flex-1 py-3 rounded-2xl bg-zinc-800 text-zinc-300 text-xs font-bold hover:bg-zinc-200 border border-zinc-700 transition-colors"
                   >
                     Tôi đã chuyển khoản
                   </button>
@@ -1156,7 +1305,7 @@ const BookingPage = () => {
                       );
                       alert("Đã sao chép nội dung chuyển khoản!");
                     }}
-                    className="flex-1 py-3 rounded-2xl bg-zinc-900 text-white text-xs font-bold hover:bg-zinc-800"
+                    className="flex-1 py-3 rounded-2xl bg-lime-500 text-white text-xs font-extrabold hover:bg-lime-400 transition-colors"
                   >
                     Copy nội dung
                   </button>
@@ -1174,10 +1323,10 @@ const BookingPage = () => {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden"
+              className="bg-zinc-900 border border-zinc-700 w-full max-w-md rounded-3xl overflow-hidden shadow-xl"
             >
-              <div className="p-6 border-b border-zinc-100">
-                <h3 className="text-lg font-extrabold text-zinc-900">
+              <div className="p-6 border-b border-zinc-700">
+                <h3 className="text-lg font-extrabold text-white">
                   {successModal.title}
                 </h3>
                 <p className="text-xs text-zinc-500 mt-1">
@@ -1186,8 +1335,8 @@ const BookingPage = () => {
               </div>
 
               <div className="p-6 space-y-4">
-                <div className="bg-lime-50 border border-lime-100 rounded-2xl p-4">
-                  <p className="text-[11px] font-bold text-lime-700 uppercase mb-2">
+                <div className="bg-lime-400/10 border border-lime-400/30 rounded-2xl p-4">
+                  <p className="text-[11px] font-bold text-lime-500 uppercase mb-2">
                     Mã đơn đặt sân
                   </p>
 
@@ -1195,9 +1344,9 @@ const BookingPage = () => {
                     {successModal.bookings?.map((booking, index) => (
                       <div
                         key={booking.booking_id || index}
-                        className="bg-white border border-lime-100 rounded-xl p-3"
+                        className="bg-zinc-900 border border-zinc-700 rounded-xl p-3 shadow-sm"
                       >
-                        <p className="text-sm font-extrabold text-zinc-900">
+                        <p className="text-sm font-extrabold text-lime-500">
                           {booking.booking_code || "Chưa có mã đơn"}
                         </p>
 
@@ -1220,11 +1369,9 @@ const BookingPage = () => {
                   </div>
                 </div>
 
-                <div className="bg-amber-50 border border-amber-100 rounded-2xl p-3">
-                  <p className="text-[11px] text-amber-700 font-semibold leading-relaxed">
-                    Bạn nên chụp màn hình hoặc lưu lại mã đơn
-                    này. Sau này có thể dùng mã đơn để tra cứu
-                    lịch đặt sân.
+                <div className="bg-amber-400/10 border border-amber-400/30 rounded-2xl p-3">
+                  <p className="text-[11px] text-amber-300 font-semibold leading-relaxed">
+                    Bạn nên chụp màn hình hoặc lưu lại mã đơn này. Sau này có thể dùng mã đơn để tra cứu lịch đặt sân.
                   </p>
                 </div>
 

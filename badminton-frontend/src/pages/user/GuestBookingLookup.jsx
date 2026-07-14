@@ -17,10 +17,6 @@ import { bookingService } from "../../services/user/bookingService";
 const currency = (value) => `${Number(value || 0).toLocaleString("vi-VN")} đ`;
 
 const statusMap = {
-  pending: {
-    label: "Chờ xác nhận",
-    className: "user-badge-warning",
-  },
   confirmed: {
     label: "Đã xác nhận",
     className: "user-badge-info",
@@ -51,11 +47,7 @@ const paymentMap = {
 };
 
 const Pill = ({ item }) => (
-  <span
-    className={`user-badge ${item.className}`}
-  >
-    {item.label}
-  </span>
+  <span className={`user-badge ${item.className}`}>{item.label}</span>
 );
 
 const GuestBookingLookup = () => {
@@ -102,21 +94,21 @@ const GuestBookingLookup = () => {
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
-      <section className="border-b border-zinc-800/70 bg-[radial-gradient(circle_at_top_left,rgba(132,204,22,0.18),transparent_34%),linear-gradient(135deg,#09090b_0%,#18181b_55%,#0f172a_100%)]">
+      <section className="border-b border-zinc-700 bg-zinc-900 shadow-sm">
         <div className="user-page-container grid gap-8 py-12 lg:grid-cols-[0.95fr_1.05fr] lg:py-16">
           <motion.div
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             className="flex flex-col justify-center"
           >
-            <div className="mb-5 inline-flex w-fit items-center gap-2 rounded-full border border-lime-400/20 bg-lime-400/10 px-3 py-1 text-xs font-bold uppercase tracking-wide text-lime-300">
+            <div className="mb-5 inline-flex w-fit items-center gap-2 rounded-full border border-lime-400/30 bg-lime-400/10 px-3 py-1 text-xs font-bold uppercase tracking-wide text-lime-500">
               <FileSearch className="h-4 w-4" />
               Tra cứu nhanh
             </div>
-            <h1 className="max-w-xl text-3xl font-black tracking-tight sm:text-4xl">
+            <h1 className="max-w-xl text-3xl font-black tracking-tight sm:text-4xl text-white">
               Xem tình trạng đơn đặt sân
             </h1>
-            <p className="mt-4 max-w-xl text-sm leading-6 text-zinc-400">
+            <p className="mt-4 max-w-xl text-sm leading-6 text-zinc-500">
               Dành cho khách đặt sân không đăng nhập. Nhập đúng mã đơn và số
               điện thoại đã đặt để xem lịch chơi, trạng thái xác nhận và thanh
               toán.
@@ -128,7 +120,7 @@ const GuestBookingLookup = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.08 }}
             onSubmit={handleSubmit}
-            className="user-card-glass"
+            className="user-card-glass shadow-sm bg-zinc-900"
           >
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="block">
@@ -173,7 +165,7 @@ const GuestBookingLookup = () => {
               Tra cứu đơn
             </button>
             {errorMessage && (
-              <p className="mt-4 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-300">
+              <p className="mt-4 rounded-xl border border-red-400/30 bg-red-400/10 px-4 py-3 text-sm font-semibold text-red-300">
                 {errorMessage}
               </p>
             )}
@@ -183,9 +175,9 @@ const GuestBookingLookup = () => {
 
       <section className="user-page-container py-8">
         {!booking ? (
-          <div className="rounded-2xl border border-dashed border-zinc-800 bg-zinc-900/35 px-6 py-16 text-center">
-            <FileSearch className="mx-auto h-10 w-10 text-zinc-700" />
-            <p className="mt-4 text-sm font-bold text-zinc-400">
+          <div className="rounded-2xl border border-dashed border-zinc-700 bg-zinc-900 px-6 py-16 text-center shadow-inner">
+            <FileSearch className="mx-auto h-10 w-10 text-zinc-500" />
+            <p className="mt-4 text-sm font-bold text-zinc-500">
               Thông tin đơn sẽ hiển thị tại đây sau khi tra cứu.
             </p>
           </div>
@@ -195,8 +187,8 @@ const GuestBookingLookup = () => {
             animate={{ opacity: 1, y: 0 }}
             className="grid gap-5 lg:grid-cols-[1.25fr_0.75fr]"
           >
-            <div className="user-card-glass p-6">
-              <div className="flex flex-col gap-3 border-b border-zinc-800 pb-5 sm:flex-row sm:items-start sm:justify-between">
+            <div className="user-card-glass bg-zinc-900 border border-zinc-700 shadow-sm p-6">
+              <div className="flex flex-col gap-3 border-b border-zinc-700 pb-5 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <p className="text-xs font-bold uppercase tracking-wide text-zinc-500">
                     Mã đơn
@@ -204,7 +196,7 @@ const GuestBookingLookup = () => {
                   <h2 className="mt-1 font-mono text-2xl font-black text-white">
                     {booking.booking_code}
                   </h2>
-                  <p className="mt-1 text-sm text-zinc-400">
+                  <p className="mt-1 text-sm text-zinc-500">
                     {booking.customer_name} · {booking.customer_phone}
                   </p>
                 </div>
@@ -229,8 +221,8 @@ const GuestBookingLookup = () => {
               </div>
 
               <div className="mt-5 grid gap-3 sm:grid-cols-3">
-                <div className="rounded-xl bg-zinc-950/70 p-4">
-                  <CalendarDays className="mb-3 h-5 w-5 text-lime-300" />
+                <div className="rounded-xl bg-zinc-900/60 border border-zinc-700 shadow-sm p-4">
+                  <CalendarDays className="mb-3 h-5 w-5 text-lime-500" />
                   <p className="text-xs font-bold uppercase text-zinc-500">
                     Ngày chơi
                   </p>
@@ -238,7 +230,7 @@ const GuestBookingLookup = () => {
                     {booking.summary?.play_date || "-"}
                   </p>
                 </div>
-                <div className="rounded-xl bg-zinc-950/70 p-4">
+                <div className="rounded-xl bg-zinc-900/60 border border-zinc-700 shadow-sm p-4">
                   <Clock3 className="mb-3 h-5 w-5 text-sky-300" />
                   <p className="text-xs font-bold uppercase text-zinc-500">
                     Khung giờ
@@ -247,8 +239,8 @@ const GuestBookingLookup = () => {
                     {booking.summary?.time_slot || "-"}
                   </p>
                 </div>
-                <div className="rounded-xl bg-zinc-950/70 p-4">
-                  <BadgeCheck className="mb-3 h-5 w-5 text-emerald-300" />
+                <div className="rounded-xl bg-zinc-900/60 border border-zinc-700 shadow-sm p-4">
+                  <BadgeCheck className="mb-3 h-5 w-5 text-lime-500" />
                   <p className="text-xs font-bold uppercase text-zinc-500">
                     Loại đơn
                   </p>
@@ -259,14 +251,14 @@ const GuestBookingLookup = () => {
               </div>
 
               <div className="mt-6">
-                <h3 className="text-sm font-black uppercase tracking-wide text-zinc-300">
+                <h3 className="text-sm font-black uppercase tracking-wide text-white">
                   Chi tiết sân
                 </h3>
-                <div className="mt-3 overflow-hidden rounded-xl border border-zinc-800">
+                <div className="mt-3 overflow-hidden rounded-xl border border-zinc-700 shadow-sm">
                   {booking.details?.map((detail) => (
                     <div
                       key={detail.id}
-                      className="grid gap-3 border-b border-zinc-800 bg-zinc-950/40 p-4 last:border-b-0 sm:grid-cols-[1.1fr_1fr_0.8fr]"
+                      className="grid gap-3 border-b border-zinc-700 bg-zinc-900 p-4 last:border-b-0 sm:grid-cols-[1.1fr_1fr_0.8fr]"
                     >
                       <div>
                         <p className="text-sm font-bold text-white">
@@ -276,10 +268,10 @@ const GuestBookingLookup = () => {
                           {detail.booking_date}
                         </p>
                       </div>
-                      <p className="text-sm font-semibold text-zinc-300">
+                      <p className="text-sm font-semibold text-zinc-400">
                         {detail.start_time} - {detail.end_time}
                       </p>
-                      <p className="text-sm font-black text-lime-300 sm:text-right">
+                      <p className="text-sm font-black text-lime-500 sm:text-right">
                         {currency(detail.price)}
                       </p>
                     </div>
@@ -289,22 +281,22 @@ const GuestBookingLookup = () => {
 
               {booking.services?.length > 0 && (
                 <div className="mt-6">
-                  <h3 className="text-sm font-black uppercase tracking-wide text-zinc-300">
+                  <h3 className="text-sm font-black uppercase tracking-wide text-white">
                     Dịch vụ / hàng hóa
                   </h3>
-                  <div className="mt-3 overflow-hidden rounded-xl border border-zinc-800">
+                  <div className="mt-3 overflow-hidden rounded-xl border border-zinc-700 shadow-sm">
                     {booking.services.map((item) => (
                       <div
                         key={item.id}
-                        className="grid gap-3 border-b border-zinc-800 bg-zinc-950/40 p-4 last:border-b-0 sm:grid-cols-[1.2fr_0.4fr_0.8fr]"
+                        className="grid gap-3 border-b border-zinc-700 bg-zinc-900 p-4 last:border-b-0 sm:grid-cols-[1.2fr_0.4fr_0.8fr]"
                       >
                         <p className="text-sm font-bold text-white">
                           {item.name}
                         </p>
-                        <p className="text-sm font-semibold text-zinc-400">
+                        <p className="text-sm font-semibold text-zinc-500">
                           x{item.quantity}
                         </p>
-                        <p className="text-sm font-black text-lime-300 sm:text-right">
+                        <p className="text-sm font-black text-lime-500 sm:text-right">
                           {currency(item.total_price)}
                         </p>
                       </div>
@@ -314,54 +306,54 @@ const GuestBookingLookup = () => {
               )}
             </div>
 
-            <aside className="user-card-glass p-6">
+            <aside className="user-card-glass bg-zinc-900 border border-zinc-700 shadow-sm p-6">
               <div className="mb-5 flex items-center gap-2">
-                <WalletCards className="h-5 w-5 text-lime-300" />
-                <h3 className="text-sm font-black uppercase tracking-wide text-zinc-300">
+                <WalletCards className="h-5 w-5 text-lime-500" />
+                <h3 className="text-sm font-black uppercase tracking-wide text-white">
                   Thanh toán
                 </h3>
               </div>
               <div className="space-y-3 text-sm">
-                <div className="flex justify-between text-zinc-400">
+                <div className="flex justify-between text-zinc-500">
                   <span>Tiền sân</span>
                   <strong className="text-white">
                     {currency(booking.subtotal_court)}
                   </strong>
                 </div>
-                <div className="flex justify-between text-zinc-400">
+                <div className="flex justify-between text-zinc-500">
                   <span>Dịch vụ</span>
                   <strong className="text-white">
                     {currency(totalServices || booking.subtotal_service)}
                   </strong>
                 </div>
-                <div className="flex justify-between text-zinc-400">
+                <div className="flex justify-between text-zinc-500">
                   <span>Giảm giá</span>
-                  <strong className="text-emerald-300">
+                  <strong className="text-lime-500">
                     -{currency(booking.discount_amount)}
                   </strong>
                 </div>
-                <div className="border-t border-zinc-800 pt-3">
+                <div className="border-t border-zinc-700 pt-3">
                   <div className="flex justify-between">
                     <span className="font-bold text-zinc-300">Tổng tiền</span>
-                    <strong className="text-xl text-lime-300">
+                    <strong className="text-xl text-lime-500">
                       {currency(booking.total_price)}
                     </strong>
                   </div>
                 </div>
-                <div className="flex justify-between text-zinc-400">
+                <div className="flex justify-between text-zinc-500">
                   <span>Đã thanh toán</span>
                   <strong className="text-white">
                     {currency(booking.deposit_amount)}
                   </strong>
                 </div>
-                <div className="flex justify-between text-zinc-400">
+                <div className="flex justify-between text-zinc-500">
                   <span>Còn lại</span>
                   <strong className="text-white">
                     {currency(booking.remaining_amount)}
                   </strong>
                 </div>
               </div>
-              <div className="mt-5 rounded-xl border border-zinc-800 bg-zinc-950/60 p-4">
+              <div className="mt-5 rounded-xl border border-zinc-700 bg-zinc-900/60 p-4">
                 <div className="flex items-start gap-3">
                   <CreditCard className="mt-0.5 h-5 w-5 text-sky-300" />
                   <p className="text-xs leading-5 text-zinc-400">

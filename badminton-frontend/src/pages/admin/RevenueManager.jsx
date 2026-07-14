@@ -397,9 +397,11 @@ const RevenueManager = () => {
       </div>
 
       {/* METHOD SUMMARY + TABLE */}
+      {/* min-w-0: grid item mặc định min-width:auto nên bảng rộng bên trong sẽ đẩy
+          cột lưới tràn màn hình thay vì cuộn ngang — phải ép về 0 để overflow-x hoạt động */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
         {/* BIỂU ĐỒ ĐƠN GIẢN */}
-        <div className="admin-card p-5">
+        <div className="admin-card p-5 min-w-0">
           <div className="flex items-center justify-between mb-5">
             <div>
               <h3 className="text-sm font-extrabold text-zinc-900">
@@ -454,7 +456,7 @@ const RevenueManager = () => {
         </div>
 
         {/* TABLE */}
-        <div className="xl:col-span-2 admin-card overflow-hidden">
+        <div className="xl:col-span-2 admin-card overflow-hidden min-w-0">
           <div className="p-5 border-b border-zinc-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
             <div>
               <h3 className="text-sm font-extrabold text-zinc-900">
