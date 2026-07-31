@@ -1,4 +1,5 @@
 import { Fragment, useState, useEffect, useMemo, useCallback } from "react";
+import { toast } from "../../utils/toast";
 import { useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { adminBookingService } from "../../services/admin/bookingService";
@@ -10,6 +11,16 @@ import {
   relativeDayLabel,
   relativeDayStyle,
 } from "../../utils/bookingDateGroups";
+
+const formatBookingTimeRange = (details) => {
+  if (!details || details.length === 0) return "—";
+  const starts = details.map((d) => d.start_time).filter(Boolean).sort();
+  const ends = details.map((d) => d.end_time).filter(Boolean).sort();
+  if (starts.length === 0 || ends.length === 0) return "—";
+  const earliest = starts[0].slice(0, 5);
+  const latest = ends[ends.length - 1].slice(0, 5);
+  return `${earliest} – ${latest}`;
+};
 
 const SingleBookings = () => {
   const location = useLocation();
@@ -175,7 +186,7 @@ const SingleBookings = () => {
       fetchData(pagination.current_page, searchTerm);
     } catch (error) {
       console.error(error);
-      alert(error.response?.data?.message || "Có lỗi xảy ra trong quá trình xử lý!");
+      toast.error(error.response?.data?.message || "Có lỗi xảy ra trong quá trình xử lý!");
     } finally {
       setIsProcessing(false);
       setTimeout(() => setMessage({ type: "", text: "" }), 2500);
@@ -187,7 +198,7 @@ const SingleBookings = () => {
   // --- LOGIC ĐỔI LỊCH ---
   const openRescheduleModal = (booking) => {
     const detail = booking.details?.[0];
-    if (!detail) return alert("Không tìm thấy chi tiết ca chơi!");
+    if (!detail) return toast.error("Không tìm thấy chi tiết ca chơi!");
     setRescheduleForm({
       court_id: detail.court_id,
       booking_date: detail.booking_date,
@@ -214,7 +225,7 @@ const SingleBookings = () => {
     } catch (error) {
       const errorMsg =
         error.response?.data?.message || "Có lỗi xảy ra khi đổi lịch!";
-      alert(errorMsg);
+      toast.error(errorMsg);
     } finally {
       setIsProcessing(false);
       setTimeout(() => setMessage({ type: "", text: "" }), 2500);
@@ -370,9 +381,7 @@ const SingleBookings = () => {
                   const dateStr = detail?.booking_date
                     ? new Date(detail.booking_date).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" })
                     : "—";
-                  const timeStr = detail
-                    ? `${detail.start_time.slice(0, 5)} – ${detail.end_time.slice(0, 5)}`
-                    : "—";
+                  const timeStr = formatBookingTimeRange(b.details);
                   const sc = statusConfig[b.status] || statusConfig.confirmed;
                   const isCancelled = b.status === "cancelled";
                   const isNotificationTarget = location.state?.notificationBookingCode === b.booking_code;
@@ -399,11 +408,18 @@ const SingleBookings = () => {
                             {b.customer_name?.charAt(0)?.toUpperCase() || "?"}
                           </div>
                           <div className="min-w-0">
-                            <p className="text-[13px] font-semibold text-zinc-800 truncate leading-tight">
-                              {b.customer_name}
-                            </p>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <p className="text-[13px] font-semibold text-zinc-800 truncate leading-tight">
+                                {b.customer_name}
+                              </p>
+                              {b.staff?.full_name && (
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-800 border border-amber-200 shrink-0">
+                                  NV: {b.staff.full_name}
+                                </span>
+                              )}
+                            </div>
                             <p className="text-[10px] text-zinc-400 font-mono truncate">
-                              {b.booking_code}
+                              {b.booking_code} · {b.customer_phone}
                             </p>
                           </div>
                         </div>
@@ -444,9 +460,20 @@ const SingleBookings = () => {
                           <p className="text-sm font-bold text-zinc-800">
                             {Number(b.total_price).toLocaleString()}₫
                           </p>
-                          <p className={`text-[10px] ${b.payment_status === "paid" ? "text-emerald-600" : "text-amber-500"}`}>
-                            {b.payment_status === "paid" ? "✓ Đã thu" : "○ Chưa thu"}
-                          </p>
+                          {(() => {
+                            const total = Number(b.total_price || 0);
+                            const remaining = Number(b.remaining_amount || 0);
+                            const paid = Math.max(0, total - remaining);
+                            return remaining > 0 ? (
+                              <p className="text-[10px] leading-tight">
+                                <span className="text-emerald-600">Đã thu {paid.toLocaleString()}₫</span>
+                                <span className="text-zinc-300"> · </span>
+                                <span className="text-amber-500 font-semibold">Còn nợ {remaining.toLocaleString()}₫</span>
+                              </p>
+                            ) : (
+                              <p className="text-[10px] text-emerald-600">✓ Đã thu đủ</p>
+                            );
+                          })()}
                         </div>
                         <div className="flex items-center gap-1">
                           {b.payment_status !== "paid" && !isCancelled && (

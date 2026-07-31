@@ -24,6 +24,8 @@ const CourtManager = () => {
     has_lighting: true,
     capacity: 4,
     location_note: "",
+    is_maintenance: false,
+    is_contract_only: false,
     status: "active",
   });
 
@@ -55,6 +57,8 @@ const CourtManager = () => {
       has_lighting: true,
       capacity: 4,
       location_note: "Khu vực cụm chính",
+      is_maintenance: false,
+      is_contract_only: false,
       status: "active",
     });
     setIsModalOpen(true);
@@ -70,6 +74,8 @@ const CourtManager = () => {
       has_lighting: court.has_lighting ? true : false,
       capacity: court.capacity || 4,
       location_note: court.location_note || "",
+      is_maintenance: Boolean(court.is_maintenance),
+      is_contract_only: court.is_contract_only ? true : false,
       status: court.status || "active",
     });
     setIsModalOpen(true);
@@ -82,6 +88,7 @@ const CourtManager = () => {
     const payload = {
       ...formData,
       has_lighting: formData.has_lighting ? 1 : 0,
+      is_maintenance: formData.is_maintenance ? 1 : 0,
       capacity: formData.capacity ? parseInt(formData.capacity) : null,
     };
     try {
@@ -119,8 +126,15 @@ const CourtManager = () => {
   };
 
   const totalCourts = courts.length;
-  const activeCourts = courts.filter((c) => c.status === "active").length;
-  const maintenanceCourts = totalCourts - activeCourts;
+  const availableCourts = courts.filter(
+    (court) => court.status === "active" && !court.is_maintenance,
+  ).length;
+  const maintenanceCourts = courts.filter(
+    (court) => court.status === "active" && court.is_maintenance,
+  ).length;
+  const inactiveCourts = courts.filter(
+    (court) => court.status === "inactive",
+  ).length;
 
   const inputClass =
     "admin-input";
@@ -142,7 +156,7 @@ const CourtManager = () => {
               <p className="admin-stat-label lbl-default">Tổng sân</p>
             </div>
             <div className="admin-stat-badge badge-success">
-              <p className="admin-stat-value val-success">{activeCourts}</p>
+              <p className="admin-stat-value val-success">{availableCourts}</p>
               <p className="admin-stat-label lbl-success">Sẵn sàng</p>
             </div>
             {maintenanceCourts > 0 && (
@@ -151,6 +165,12 @@ const CourtManager = () => {
                   {maintenanceCourts}
                 </p>
                 <p className="admin-stat-label lbl-danger">Bảo trì</p>
+              </div>
+            )}
+            {inactiveCourts > 0 && (
+              <div className="admin-stat-badge badge-default">
+                <p className="admin-stat-value val-default">{inactiveCourts}</p>
+                <p className="admin-stat-label lbl-default">Ngừng HĐ</p>
               </div>
             )}
           </div>
@@ -230,18 +250,35 @@ const CourtManager = () => {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {courts.map((court, i) => {
-            const isActive = court.status === "active";
+            const isInactive = court.status === "inactive";
+            const isMaintenance = !isInactive && Boolean(court.is_maintenance);
+            const isAvailable = !isInactive && !isMaintenance;
+            const stateLabel = isInactive
+              ? "Ngừng hoạt động"
+              : isMaintenance
+                ? "Đang bảo trì"
+                : "Sẵn sàng";
+            const stateClass = isInactive
+              ? "text-zinc-500 bg-zinc-100"
+              : isMaintenance
+                ? "text-amber-700 bg-amber-50"
+                : "text-emerald-700 bg-emerald-50";
+            const stateDotClass = isInactive
+              ? "bg-zinc-400"
+              : isMaintenance
+                ? "bg-amber-500"
+                : "bg-emerald-500";
             return (
               <motion.div
                 key={court.id}
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.04 }}
-                className={`admin-card overflow-hidden group ${isActive ? "border-zinc-200/60 hover:border-zinc-300" : "border-zinc-200/60 opacity-60"}`}
+                className={`admin-card overflow-hidden group ${isInactive ? "border-zinc-200/60 opacity-60" : "border-zinc-200/60 hover:border-zinc-300"}`}
               >
                 {/* Dải màu */}
                 <div
-                  className={`h-1 ${isActive ? "bg-emerald-500" : "bg-zinc-300"}`}
+                  className={`h-1 ${isAvailable ? "bg-emerald-500" : isMaintenance ? "bg-amber-400" : "bg-zinc-300"}`}
                 />
 
                 <div className="p-5">
@@ -255,14 +292,21 @@ const CourtManager = () => {
                         {court.name}
                       </h4>
                     </div>
-                    <span
-                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium ${isActive ? "text-emerald-700 bg-emerald-50" : "text-zinc-500 bg-zinc-100"}`}
-                    >
+                    <div className="flex flex-col items-end gap-1">
                       <span
-                        className={`w-1.5 h-1.5 rounded-full ${isActive ? "bg-emerald-500" : "bg-zinc-400"}`}
-                      />
-                      {isActive ? "Hoạt động" : "Bảo trì"}
-                    </span>
+                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium ${stateClass}`}
+                      >
+                        <span
+                          className={`w-1.5 h-1.5 rounded-full ${stateDotClass}`}
+                        />
+                        {stateLabel}
+                      </span>
+                      {court.is_contract_only && (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium text-violet-700 bg-violet-50">
+                          Sân hội viên
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   {/* Chi tiết */}
@@ -408,6 +452,19 @@ const CourtManager = () => {
                     <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${formData.has_lighting ? "translate-x-6" : "translate-x-1"}`} />
                   </button>
                 </div>
+                <div className="flex items-center justify-between py-1">
+                  <div>
+                    <span className="text-xs text-zinc-600">Chỉ dành cho hội viên</span>
+                    <p className="text-[10px] text-zinc-400 mt-0.5">Ẩn với khách thường, chỉ hiển thị cho khách đang có thẻ thành viên hoạt động</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, is_contract_only: !formData.is_contract_only })}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors flex-shrink-0 ${formData.is_contract_only ? "bg-violet-600" : "bg-zinc-300"}`}
+                  >
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${formData.is_contract_only ? "translate-x-6" : "translate-x-1"}`} />
+                  </button>
+                </div>
                 <div>
                   <label className="admin-form-label">
                     Vị trí trong trung tâm
@@ -424,14 +481,46 @@ const CourtManager = () => {
                   <span className="text-xs text-zinc-600">Trạng thái</span>
                   <select
                     value={formData.status}
-                    onChange={(e) =>
-                      setFormData({ ...formData, status: e.target.value })
-                    }
+                    onChange={(e) => {
+                      const status = e.target.value;
+                      setFormData({
+                        ...formData,
+                        status,
+                        is_maintenance:
+                          status === "inactive"
+                            ? false
+                            : formData.is_maintenance,
+                      });
+                    }}
                     className="admin-input"
                   >
-                    <option value="active">Hoạt động</option>
-                    <option value="inactive">Bảo trì</option>
+                    <option value="active">Đang khai thác</option>
+                    <option value="inactive">Ngừng hoạt động / Ẩn</option>
                   </select>
+                </div>
+                <div className="flex items-center justify-between gap-4 py-1">
+                  <div>
+                    <span className="text-xs text-zinc-600">Bảo trì tạm thời</span>
+                    <p className="text-[10px] text-zinc-400 mt-0.5">
+                      {formData.status === "inactive"
+                        ? "Chỉ bật được khi sân đang khai thác"
+                        : "Bật để tạm ngừng nhận lịch đặt mới"}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={formData.status === "inactive"}
+                    onClick={() =>
+                      setFormData({
+                        ...formData,
+                        is_maintenance: !formData.is_maintenance,
+                      })
+                    }
+                    className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${formData.is_maintenance ? "bg-amber-500" : "bg-zinc-300"}`}
+                    aria-label="Bật hoặc tắt bảo trì tạm thời"
+                  >
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${formData.is_maintenance ? "translate-x-6" : "translate-x-1"}`} />
+                  </button>
                 </div>
                 <div className="flex gap-2 pt-3 border-t border-zinc-100">
                   <button
@@ -461,4 +550,3 @@ const CourtManager = () => {
 };
 
 export default CourtManager;
-

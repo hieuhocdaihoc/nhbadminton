@@ -24,10 +24,6 @@ class MasterDatabaseSeeder extends Seeder
         $court05     = '71504586-8d59-43ad-ac8f-d40a529651fb'; // Sân 05
 
         // ID dịch vụ bổ sung
-        $svcDen      = '019e2eea-496b-7203-a558-63991dd9cbfa'; // Đèn
-        $svcVot1     = 'e16d513f-4ad0-11f1-b356-0250edbfc5ac'; // Thuê vợt Yonex
-        $svcVot2     = 'e16d53ad-4ad0-11f1-b356-0250edbfc5ac'; // Thuê vợt Lining
-        $svcGiay     = 'e16d542d-4ad0-11f1-b356-0250edbfc5ac'; // Thuê giày
         $svcDanLuoi  = 'e16d5465-4ad0-11f1-b356-0250edbfc5ac'; // Đan lưới
 
         // ID danh mục
@@ -40,10 +36,11 @@ class MasterDatabaseSeeder extends Seeder
         // =====================================================================
         // TÀI KHOẢN HỆ THỐNG (admin + staff mẫu)
         // =====================================================================
+        $systemAdminId = DB::table('users')->where('email', 'admin@nhbadminton.vn')->value('id')
+            ?? 'aaaaaaaa-0000-0000-0000-000000000001';
         DB::table('users')->updateOrInsert(
-            ['phone' => '0999999999'],
+            ['id' => $systemAdminId],
             [
-                'id'            => 'aaaaaaaa-0000-0000-0000-000000000001',
                 'full_name'     => 'Admin NHBadminton',
                 'email'         => 'admin@nhbadminton.vn',
                 'phone'         => '0999999999',
@@ -57,15 +54,48 @@ class MasterDatabaseSeeder extends Seeder
             ]
         );
 
+        $systemStaffId = DB::table('users')->where('email', 'staff@nhbadminton.vn')->value('id')
+            ?? 'bbbbbbbb-0000-0000-0000-000000000002';
         DB::table('users')->updateOrInsert(
-            ['phone' => '0888888888'],
+            ['id' => $systemStaffId],
             [
-                'id'            => 'bbbbbbbb-0000-0000-0000-000000000002',
                 'full_name'     => 'Nhân viên mẫu',
                 'email'         => 'staff@nhbadminton.vn',
                 'phone'         => '0888888888',
                 'password_hash' => Hash::make('Staff@123'),
                 'role'          => 'staff',
+                'status'        => 'active',
+                'points'        => 0,
+                'total_spent'   => 0,
+                'created_at'    => now(),
+                'updated_at'    => now(),
+            ]
+        );
+
+        DB::table('users')->updateOrInsert(
+            ['id' => $userId],
+            [
+                'full_name'     => 'Nguyen Van A',
+                'email'         => 'nguyen.van.a@example.test',
+                'phone'         => '0901234567',
+                'password_hash' => Hash::make('Customer@123'),
+                'role'          => 'customer',
+                'status'        => 'active',
+                'points'        => 1500,
+                'total_spent'   => 0,
+                'created_at'    => now(),
+                'updated_at'    => now(),
+            ]
+        );
+
+        DB::table('users')->updateOrInsert(
+            ['id' => $userId2],
+            [
+                'full_name'     => 'Khach Hang Mau',
+                'email'         => 'customer.two@example.test',
+                'phone'         => '0933333333',
+                'password_hash' => Hash::make('Customer@123'),
+                'role'          => 'customer',
                 'status'        => 'active',
                 'points'        => 0,
                 'total_spent'   => 0,
@@ -179,8 +209,8 @@ class MasterDatabaseSeeder extends Seeder
             'booking_code'     => 'BILL-VL001',
             'user_id'          => $userId,
             'subtotal_court'   => 120000,
-            'subtotal_service' => 50000,
-            'total_price'      => 170000,
+            'subtotal_service' => 0,
+            'total_price'      => 120000,
             'status'           => 'completed',
             'payment_status'   => 'paid',
             'customer_name'    => 'Nguyen Van A',
@@ -200,21 +230,13 @@ class MasterDatabaseSeeder extends Seeder
             'price_per_hour'   => 60000,
             'price'            => 120000,
         ]);
-        DB::table('booking_service_details')->insert([
-            'id'          => (string) Str::uuid(),
-            'booking_id'  => $b1,
-            'service_id'  => $svcVot1,
-            'quantity'    => 2,
-            'unit_price'  => 25000,
-            'total_price' => 50000,
-        ]);
         DB::table('payments')->insert([
             'id'             => (string) Str::uuid(),
             'payment_code'   => 'PAY-001',
             'booking_id'     => $b1,
             'user_id'        => $userId,
             'payment_method' => 'cash',
-            'amount'         => 170000,
+            'amount'         => 120000,
             'paid_at'        => '2026-06-25 19:15:00',
             'status'         => 'success',
         ]);
@@ -252,8 +274,8 @@ class MasterDatabaseSeeder extends Seeder
             'booking_code'     => 'BILL-VL003',
             'user_id'          => $userId2,
             'subtotal_court'   => 150000,
-            'subtotal_service' => 30000,
-            'total_price'      => 180000,
+            'subtotal_service' => 0,
+            'total_price'      => 150000,
             'status'           => 'playing',
             'payment_status'   => 'paid',
             'customer_name'    => 'Khach Hang Khach',
@@ -272,22 +294,13 @@ class MasterDatabaseSeeder extends Seeder
             'price_per_hour'   => 60000,
             'price'            => 150000,
         ]);
-        DB::table('booking_service_details')->insert([
-            'id'          => (string) Str::uuid(),
-            'booking_id'  => $b3,
-            'service_id'  => $svcDen,
-            'quantity'    => 3,
-            'unit_price'  => 10000,
-            'total_price' => 30000,
-            'note'        => '3 đèn bàn',
-        ]);
         DB::table('payments')->insert([
             'id'             => (string) Str::uuid(),
             'payment_code'   => 'PAY-003',
             'booking_id'     => $b3,
             'user_id'        => $userId2,
             'payment_method' => 'bank_transfer',
-            'amount'         => 180000,
+            'amount'         => 150000,
             'paid_at'        => '2026-06-28 08:00:00',
             'status'         => 'success',
         ]);
@@ -325,8 +338,8 @@ class MasterDatabaseSeeder extends Seeder
             'booking_code'     => 'BILL-VL005',
             'user_id'          => null,
             'subtotal_court'   => 60000,
-            'subtotal_service' => 30000,
-            'total_price'      => 90000,
+            'subtotal_service' => 0,
+            'total_price'      => 60000,
             'status'           => 'completed',
             'payment_status'   => 'paid',
             'customer_name'    => 'Le Van Cuong',
@@ -346,21 +359,13 @@ class MasterDatabaseSeeder extends Seeder
             'price_per_hour'   => 60000,
             'price'            => 60000,
         ]);
-        DB::table('booking_service_details')->insert([
-            'id'          => (string) Str::uuid(),
-            'booking_id'  => $b5,
-            'service_id'  => $svcGiay,
-            'quantity'    => 1,
-            'unit_price'  => 30000,
-            'total_price' => 30000,
-        ]);
         DB::table('payments')->insert([
             'id'             => (string) Str::uuid(),
             'payment_code'   => 'PAY-005',
             'booking_id'     => $b5,
             'user_id'        => null,
             'payment_method' => 'cash',
-            'amount'         => 90000,
+            'amount'         => 60000,
             'paid_at'        => '2026-07-01 06:10:00',
             'status'         => 'success',
         ]);
@@ -375,7 +380,7 @@ class MasterDatabaseSeeder extends Seeder
             'subtotal_service' => 80000,
             'total_price'      => 260000,
             'status'           => 'confirmed',
-            'payment_status'   => 'partial',
+            'payment_status'   => 'partially_paid',
             'deposit_amount'   => 100000,
             'remaining_amount' => 160000,
             'customer_name'    => 'Nguyen Van A',
@@ -392,14 +397,6 @@ class MasterDatabaseSeeder extends Seeder
             'duration_minutes' => 180,
             'price_per_hour'   => 60000,
             'price'            => 180000,
-        ]);
-        DB::table('booking_service_details')->insert([
-            'id'          => (string) Str::uuid(),
-            'booking_id'  => $b6,
-            'service_id'  => $svcVot2,
-            'quantity'    => 1,
-            'unit_price'  => 50000,
-            'total_price' => 50000,
         ]);
         DB::table('booking_service_details')->insert([
             'id'          => (string) Str::uuid(),
@@ -560,8 +557,8 @@ class MasterDatabaseSeeder extends Seeder
                 'user_id'              => $userId,
                 'recurring_booking_id' => $lt1,
                 'subtotal_court'       => 120000,
-                'subtotal_service'     => $isPast ? 20000 : null,
-                'total_price'          => $isPast ? 140000 : 120000,
+                'subtotal_service'     => 0,
+                'total_price'          => 120000,
                 'status'               => $isPast ? 'completed' : 'confirmed',
                 'payment_status'       => $isPast ? 'paid' : 'unpaid',
                 'customer_name'        => 'Nguyen Van A',
@@ -582,21 +579,13 @@ class MasterDatabaseSeeder extends Seeder
                 'price'            => 120000,
             ]);
             if ($isPast) {
-                DB::table('booking_service_details')->insert([
-                    'id'          => (string) Str::uuid(),
-                    'booking_id'  => $ltb,
-                    'service_id'  => $svcDen,
-                    'quantity'    => 2,
-                    'unit_price'  => 10000,
-                    'total_price' => 20000,
-                ]);
                 DB::table('payments')->insert([
                     'id'             => (string) Str::uuid(),
                     'payment_code'   => 'PAY-LT1-' . str_pad($idx + 1, 2, '0', STR_PAD_LEFT),
                     'booking_id'     => $ltb,
                     'user_id'        => $userId,
                     'payment_method' => 'cash',
-                    'amount'         => 140000,
+                    'amount'         => 120000,
                     'paid_at'        => $date . ' 19:20:00',
                     'status'         => 'success',
                 ]);

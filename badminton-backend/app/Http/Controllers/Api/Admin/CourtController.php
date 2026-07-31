@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Api\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Court;
 use App\Models\Booking;
-use App\Models\CourtPriceHistory;
 use App\Models\RecurringBooking;
 use Illuminate\Http\Request;
 
@@ -27,14 +26,20 @@ class CourtController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'name'          => ['required', 'string', 'max:100'],
-            'court_code'    => ['required', 'string', 'max:50', 'unique:courts,court_code'],
-            'floor_type'    => ['nullable', 'string', 'max:100'],
-            'has_lighting'  => ['boolean'],
-            'capacity'      => ['nullable', 'integer'],
-            'location_note' => ['nullable', 'string', 'max:255'],
-            'status'        => ['string', 'in:active,inactive'],
+            'name'             => ['required', 'string', 'max:100'],
+            'court_code'       => ['required', 'string', 'max:50', 'unique:courts,court_code'],
+            'floor_type'       => ['nullable', 'string', 'max:100'],
+            'has_lighting'     => ['boolean'],
+            'capacity'         => ['nullable', 'integer'],
+            'location_note'    => ['nullable', 'string', 'max:255'],
+            'is_maintenance'   => ['boolean'],
+            'is_contract_only' => ['boolean'],
+            'status'           => ['string', 'in:active,inactive'],
         ]);
+
+        if (($validated['status'] ?? 'active') === 'inactive') {
+            $validated['is_maintenance'] = false;
+        }
 
         $court = Court::create($validated);
 
@@ -50,23 +55,50 @@ class CourtController extends Controller
         return response()->json(['data' => Court::findOrFail($id)]);
     }
 
+    /** Chức năng: Lấy chi tiết sân công khai, áp dụng cùng quyền truy cập với danh sách sân. */
+    public function showPublic(Request $request, $id)
+    {
+        $court = Court::where('status', 'active')
+            ->where('is_maintenance', false)
+            ->with(['images' => fn($query) => $query->where('is_primary', true)])
+            ->findOrFail($id);
+
+        if ($court->is_contract_only && !$this->hasActiveMembershipCard($request->user('sanctum'))) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Sân này chỉ dành cho khách hàng có thẻ thành viên đang hoạt động.',
+            ], 403);
+        }
+
+        return response()->json(['data' => $court]);
+    }
+
     /** Chức năng: Cập nhật thông tin cấu hình và trạng thái của sân. */
     public function update(Request $request, $id)
     {
         $court = Court::findOrFail($id);
 
         $validated = $request->validate([
-            'name'           => ['required', 'string', 'max:100'],
-            'court_code'     => ['required', 'string', 'max:50', 'unique:courts,court_code,' . $court->id],
-            'floor_type'     => ['nullable', 'string', 'max:100'],
-            'has_lighting'   => ['boolean'],
-            'capacity'       => ['nullable', 'integer'],
-            'is_maintenance' => ['boolean'],
-            'status'         => ['string', 'in:active,inactive'],
+            'name'             => ['required', 'string', 'max:100'],
+            'court_code'       => ['required', 'string', 'max:50', 'unique:courts,court_code,' . $court->id],
+            'floor_type'       => ['nullable', 'string', 'max:100'],
+            'has_lighting'     => ['boolean'],
+            'capacity'         => ['nullable', 'integer'],
+            'location_note'    => ['nullable', 'string', 'max:255'],
+            'is_maintenance'   => ['boolean'],
+            'is_contract_only' => ['boolean'],
+            'status'           => ['string', 'in:active,inactive'],
         ]);
 
-        $newStatus      = $request->input('status', $court->status);
-        $newMaintenance = $request->boolean('is_maintenance', $court->is_maintenance);
+        $newStatus = $validated['status'] ?? $court->status;
+        $newMaintenance = array_key_exists('is_maintenance', $validated)
+            ? (bool) $validated['is_maintenance']
+            : $court->is_maintenance;
+
+        if ($newStatus === 'inactive') {
+            $newMaintenance = false;
+            $validated['is_maintenance'] = false;
+        }
 
         if (($newStatus === 'inactive' || $newMaintenance) && $court->status === 'active' && !$court->is_maintenance) {
             $upcomingCount = $this->countUpcomingBookings($court->id);
@@ -104,8 +136,6 @@ class CourtController extends Controller
         $hasHistory = $court->bookingDetails()->exists() || $court->recurringBookings()->exists();
 
         if (!$hasHistory) {
-            CourtPriceHistory::where('court_id', $court->id)->delete();
-            $court->pricing()->delete();
             $court->images()->delete();
             $court->delete();
 
@@ -113,23 +143,43 @@ class CourtController extends Controller
         }
 
         $court->status = 'inactive';
+        $court->is_maintenance = false;
         $court->save();
 
         return response()->json(['message' => 'Sân đã từng có lịch sử đặt sân nên chỉ được chuyển sang ngưng hoạt động (không xóa được) để giữ nguyên dữ liệu cũ.']);
     }
 
-    /** Chức năng: Lấy danh sách sân đang public cho khách xem và đặt lịch. */
-    public function getPublicCourts()
+    /**
+     * Lấy danh sách sân cho trang đặt lịch công khai.
+     * Sân is_contract_only chỉ hiển thị cho khách có thẻ thành viên đang active.
+     */
+    public function getPublicCourts(Request $request)
     {
-        $courts = Court::where('status', 'active')
+        $query = Court::where('status', 'active')
+            ->where('is_maintenance', false)
             ->with(['images' => fn($q) => $q->where('is_primary', true)])
-            ->orderBy('name')
-            ->get();
+            ->orderBy('name');
+
+        // Kiểm tra khách có thẻ thành viên active không
+        // Dùng auth('sanctum')->user() vì đây là public route (không có middleware auth)
+        $hasActiveCard = $this->hasActiveMembershipCard($request->user('sanctum'));
+
+        if (!$hasActiveCard) {
+            $query->where('is_contract_only', false);
+        }
 
         return response()->json([
             'status' => 'success',
-            'data'   => $courts,
+            'data'   => $query->get(),
         ]);
+    }
+
+    private function hasActiveMembershipCard($user): bool
+    {
+        return $user && \App\Models\MembershipCard::where('user_id', $user->id)
+            ->where('status', 'active')
+            ->where('valid_to', '>=', today())
+            ->exists();
     }
 
     /** Chức năng: Đếm tổng số booking sắp tới (đơn lẻ và định kỳ) cho một sân. */

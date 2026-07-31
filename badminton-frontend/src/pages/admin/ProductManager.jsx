@@ -144,11 +144,15 @@ const ProductManager = () => {
     }
   };
 
+  // Tải dữ liệu nền đúng một lần khi trang được mở.
   useEffect(() => {
     loadInitData();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  // Từ khóa chỉ được áp dụng khi người dùng gửi biểu mẫu tìm kiếm.
   useEffect(() => {
     fetchProducts(1);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCategoryFilter]);
 
   const handleSearchSubmit = (e) => {

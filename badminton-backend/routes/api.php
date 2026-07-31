@@ -24,6 +24,8 @@ use App\Http\Controllers\Api\Admin\{
     SystemSettingController
 };
 use App\Http\Controllers\Api\Admin\ReviewController as AdminReviewController;
+use App\Http\Controllers\Api\Admin\MembershipController as AdminMembership;
+use App\Http\Controllers\Api\User\MembershipController as UserMembership;
 use App\Http\Controllers\Api\Payment\SePayController;
 
 
@@ -39,9 +41,12 @@ Route::post('/login', [AuthController::class, 'login'])->name('login');
 // Cấu hình hệ thống (địa chỉ, hotline, giờ hoạt động...) cho Footer/Trang chủ hiển thị
 Route::get('/settings', [SystemSettingController::class, 'index']);
 
+// Gói thành viên công khai
+Route::get('/membership/packages', [UserMembership::class, 'packages']);
+
 // Tra cứu sân & bảng giá công khai
 Route::get('/courts', [CourtController::class, 'getPublicCourts']);
-Route::get('/courts/{id}', [CourtController::class, 'show']);
+Route::get('/courts/{id}', [CourtController::class, 'showPublic']);
 Route::get('/courts/{id}/pricing', [CourtPricingController::class, 'getPublicPricing']);
 Route::get('/pricings/public', [CourtPricingController::class, 'getPublicAllPricings']);
 Route::post('/courts/calculate-price', [CourtPricingController::class, 'calculatePrice']);
@@ -55,6 +60,7 @@ Route::get('/booking-intents/{code}/status', [SePayController::class, 'intentSta
 Route::get('/courts/{id}/availability', [UserBooking::class, 'getCourtAvailability']);
 Route::post('/bookings', [UserBooking::class, 'store']);
 Route::post('/bookings/prepare', [UserBooking::class, 'preparePayment']);
+Route::post('/bookings/estimate', [UserBooking::class, 'estimatePrice']);
 Route::post('/bookings/guest-lookup', [UserBooking::class, 'lookupGuestBooking']);
 Route::post('/bookings/validate-promotion', [UserBooking::class, 'validatePromotion']);
 // Mã giảm giá ngày đặc biệt đang hiệu lực (tự động áp) — cho banner trang đặt sân
@@ -81,6 +87,16 @@ Route::middleware('auth:sanctum')->group(function () {
         ->middleware('role:customer');
     Route::post('/reviews', [UserReviewController::class, 'store'])
         ->middleware('role:customer');
+    // Thẻ thành viên của khách
+    Route::get('/membership/my-card', [UserMembership::class, 'myCard'])
+        ->middleware('role:customer');
+    // Khách tự mua gói: tạo intent + QR; chỉ cấp thẻ sau khi webhook xác nhận tiền
+    Route::post('/membership/purchase', [UserMembership::class, 'purchase'])
+        ->middleware('role:customer');
+    Route::get('/membership/purchase/{intentCode}/status', [UserMembership::class, 'purchaseStatus'])
+        ->middleware('role:customer');
+    Route::delete('/membership/purchase/{intentCode}', [UserMembership::class, 'cancelPurchase'])
+        ->middleware('role:customer');
 
     Route::controller(AuthController::class)->group(function () {
         Route::get('/profile', 'getProfile');
@@ -88,8 +104,6 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/change-password', 'changePassword');
         Route::post('/logout', 'logout');
         Route::post('/logout-all', 'logoutAllDevices');
-        Route::post('/address', 'addAddress');
-        Route::put('/address/{id}', 'updateAddress');
         Route::post('/avatar', 'uploadAvatar');
     });
 
@@ -153,6 +167,7 @@ Route::middleware('auth:sanctum')->group(function () {
             // Ghi nhận hoàn tiền (hệ thống chỉ lưu thông tin, hoàn tiền thực hiện thủ công)
             Route::get('/refunds', 'refunds');
             Route::post('/refunds', 'storeRefund');
+            Route::patch('/refunds/{id}/status', 'updateRefundStatus');
         });
 
         Route::controller(NotificationController::class)->group(function () {
@@ -193,9 +208,21 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::apiResource('products', ProductController::class)->except(['index', 'show']);
         Route::apiResource('promotions', PromotionController::class)->except(['index', 'show']);
 
+        // Quản lý gói & thẻ thành viên
+        Route::controller(AdminMembership::class)->group(function () {
+            Route::get('membership/packages', 'indexPackages');
+            Route::post('membership/packages', 'storePackage');
+            Route::put('membership/packages/{id}', 'updatePackage');
+            Route::delete('membership/packages/{id}', 'destroyPackage');
+
+            Route::get('membership/cards', 'indexCards');
+            Route::get('membership/cards/{id}', 'showCard');
+            Route::post('membership/cards', 'storeCard');
+            Route::patch('membership/cards/{id}/activate', 'activateCard');
+            Route::patch('membership/cards/{id}/cancel', 'cancelCard');
+        });
+
         Route::middleware('role:admin')->group(function () {
-            Route::patch('staff-shifts/{id}/check-in', [StaffShiftController::class, 'checkIn']);
-            Route::patch('staff-shifts/{id}/check-out', [StaffShiftController::class, 'checkOut']);
             Route::apiResource('staff-shifts', StaffShiftController::class);
 
             Route::get('settings', [SystemSettingController::class, 'index']);

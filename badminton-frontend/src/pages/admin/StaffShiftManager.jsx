@@ -6,8 +6,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock3,
-  LogIn,
-  LogOut,
   Pencil,
   Plus,
   Trash2,
@@ -59,7 +57,7 @@ const getWeekStart = (base = new Date()) => {
   return d;
 };
 const addDays  = (d, n) => { const r = new Date(d); r.setDate(r.getDate() + n); return r; };
-const toYMD    = (d) => d.toISOString().slice(0, 10);
+const toYMD    = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 const toDM     = (d) => `${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}`;
 const toDMY    = (d) => `${toDM(d)}/${d.getFullYear()}`;
 const VN_DAY   = ["CN","T2","T3","T4","T5","T6","T7"];
@@ -89,10 +87,17 @@ const StaffShiftManager = () => {
   const [isLoading,     setIsLoading]     = useState(true);
   const [isSaving,      setIsSaving]      = useState(false);
   const [message,       setMessage]       = useState({ type: "", text: "" });
-  const [checkoutModal, setCheckoutModal] = useState({ open: false, shift: null, note: "" });
 
-  const weekEnd  = addDays(weekStart, 6);
-  const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+  const showMessage = useCallback((type, text) => {
+    setMessage({ type, text });
+    setTimeout(() => setMessage({ type: "", text: "" }), 2500);
+  }, []);
+
+  const weekEnd = useMemo(() => addDays(weekStart, 6), [weekStart]);
+  const weekDays = useMemo(
+    () => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)),
+    [weekStart],
+  );
   const todayYMD = toYMD(new Date());
 
   // ── Lấy ca làm việc cho tuần hiện tại ────────────────────────────────────────
@@ -112,7 +117,7 @@ const StaffShiftManager = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [weekStart, filterStaff]);
+  }, [weekStart, weekEnd, filterStaff, showMessage]);
 
   useEffect(() => { fetchShifts(); }, [fetchShifts]);
 
@@ -146,11 +151,6 @@ const StaffShiftManager = () => {
   }), [shifts]);
 
   // ── Hàm hỗ trợ ───────────────────────────────────────────────────────────────
-  const showMessage = (type, text) => {
-    setMessage({ type, text });
-    setTimeout(() => setMessage({ type: "", text: "" }), 2500);
-  };
-
   const resetForm = () => { setForm(defaultForm); setIsEditing(false); };
 
   const handlePresetChange = (shiftName) => {
@@ -220,22 +220,6 @@ const StaffShiftManager = () => {
     } catch (err) {
       showMessage("error", err.response?.data?.message || "Không thể xóa.");
     }
-  };
-
-  const handleCheckIn = async (shift) => {
-    try { await staffShiftService.checkIn(shift.id); showMessage("success", "Đã điểm danh vào ca."); fetchShifts(); }
-    catch (err) { showMessage("error", err.response?.data?.message || "Không thể điểm danh."); }
-  };
-
-  const handleCheckOut = (shift) => {
-    setCheckoutModal({ open: true, shift, note: shift.note || "" });
-  };
-
-  const confirmCheckOut = async () => {
-    const { shift, note } = checkoutModal;
-    setCheckoutModal((m) => ({ ...m, open: false }));
-    try { await staffShiftService.checkOut(shift.id, note); showMessage("success", "Đã điểm danh ra ca."); fetchShifts(); }
-    catch (err) { showMessage("error", err.response?.data?.message || "Không thể điểm danh."); }
   };
 
   const inputCls = "admin-input";
@@ -440,20 +424,6 @@ const StaffShiftManager = () => {
 
                                         {/* Hover action buttons */}
                                         <div className="absolute -top-1.5 -right-1 hidden group-hover/card:flex items-center gap-0.5 shadow-md">
-                                          {shift.status === "scheduled" && (
-                                            <button type="button" onClick={(e) => { e.stopPropagation(); handleCheckIn(shift); }}
-                                              title="Vào ca"
-                                              className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-white hover:bg-emerald-600 shadow-sm transition-colors">
-                                              <LogIn className="h-3 w-3" />
-                                            </button>
-                                          )}
-                                          {shift.status === "working" && (
-                                            <button type="button" onClick={(e) => { e.stopPropagation(); handleCheckOut(shift); }}
-                                              title="Ra ca"
-                                              className="flex h-5 w-5 items-center justify-center rounded-full bg-amber-500 text-white hover:bg-amber-600 shadow-sm transition-colors">
-                                              <LogOut className="h-3 w-3" />
-                                            </button>
-                                          )}
                                           <button type="button" onClick={(e) => { e.stopPropagation(); handleEdit(shift); }}
                                             title="Sửa"
                                             className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-500 text-white hover:bg-blue-600 shadow-sm transition-colors">
@@ -483,7 +453,7 @@ const StaffShiftManager = () => {
             {/* Footer hint */}
             <div className="border-t border-zinc-100 bg-zinc-50/60 px-4 py-2 text-center">
               <p className="text-[10px] text-zinc-400">
-                Bấm vào ô trống để xếp ca · Di chuột lên badge nhân viên để sửa / xóa / điểm danh
+                Bấm vào ô trống để xếp ca · Di chuột lên badge nhân viên để sửa / xóa ca
               </p>
             </div>
           </div>
@@ -604,50 +574,6 @@ const StaffShiftManager = () => {
         </aside>
       </div>
 
-      {/* ─── MODAL BÀN GIAO CA ─── */}
-      <AnimatePresence>
-        {checkoutModal.open && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="w-full max-w-sm rounded-xl border border-zinc-200 bg-white shadow-xl"
-            >
-              <div className="flex items-center justify-between border-b border-zinc-100 px-5 py-4">
-                <h3 className="text-sm font-bold text-zinc-800">Bàn giao ca</h3>
-                <button onClick={() => setCheckoutModal((m) => ({ ...m, open: false }))}
-                  className="text-zinc-400 hover:text-zinc-600">✕</button>
-              </div>
-              <div className="p-5 space-y-3">
-                <p className="text-xs text-zinc-500">
-                  Nhân viên: <strong className="text-zinc-800">{checkoutModal.shift?.staff?.full_name}</strong>
-                  {" · "}{checkoutModal.shift?.shift_name}
-                </p>
-                <div>
-                  <label className="mb-1.5 block text-[11px] font-bold text-zinc-500">Ghi chú bàn giao</label>
-                  <textarea
-                    rows={3}
-                    value={checkoutModal.note}
-                    onChange={(e) => setCheckoutModal((m) => ({ ...m, note: e.target.value }))}
-                    placeholder="Nội dung bàn giao, công việc cần lưu ý..."
-                    className="admin-input resize-none"
-                  />
-                </div>
-                <div className="flex gap-2 pt-1">
-                  <button onClick={confirmCheckOut} className="admin-btn-primary flex-1 py-2 text-sm">
-                    Xác nhận ra ca
-                  </button>
-                  <button onClick={() => setCheckoutModal((m) => ({ ...m, open: false }))}
-                    className="admin-btn-outline flex-1 py-2 text-sm">
-                    Hủy
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
     </div>
   );
 };

@@ -18,6 +18,7 @@ class CleanSlateSeeder extends Seeder
         Schema::disableForeignKeyConstraints();
 
         $tables = [
+            'membership_card_usages',
             'purchase_order_details',
             'purchase_orders',
             'inventory_transactions',
@@ -28,6 +29,8 @@ class CleanSlateSeeder extends Seeder
             'booking_intents',
             'booking_details',
             'bookings',
+            'membership_cards',
+            'membership_packages',
             'recurring_bookings',
             'reviews',
             'notifications',
@@ -39,7 +42,6 @@ class CleanSlateSeeder extends Seeder
             'categories',
             'suppliers',
             'promotions',
-            'user_addresses',
             'personal_access_tokens',
             'courts',
             'system_settings',
@@ -125,23 +127,16 @@ class CleanSlateSeeder extends Seeder
             ['day_type' => 'weekend', 'start_time' => '17:00:00', 'end_time' => '22:00:00', 'price' => 150000, 'min_booking_minutes' => 60],
         ];
 
-        foreach ([$court01, $court02, $court03, $court04, $court05] as $courtId) {
-            foreach ($pricingSlots as $slot) {
-                DB::table('court_pricing')->insert(array_merge($slot, [
-                    'id'       => (string) Str::uuid(),
-                    'court_id' => $courtId,
-                ]));
-            }
+        foreach ($pricingSlots as $slot) {
+            DB::table('court_pricing')->insert(array_merge($slot, [
+                'id' => (string) Str::uuid(),
+            ]));
         }
 
         // =====================================================================
         // 6. DỊCH VỤ BỔ SUNG
         // =====================================================================
         $services = [
-            ['id' => '019e2eea-496b-7203-a558-63991dd9cbfa', 'name' => 'Thuê đèn chiếu sáng', 'service_type' => 'rental', 'price' => 15000, 'unit' => 'buổi', 'status' => 'active'],
-            ['id' => 'e16d513f-4ad0-11f1-b356-0250edbfc5ac', 'name' => 'Thuê vợt Yonex',      'service_type' => 'rental', 'price' => 25000, 'unit' => 'cái',   'status' => 'active'],
-            ['id' => 'e16d53ad-4ad0-11f1-b356-0250edbfc5ac', 'name' => 'Thuê vợt Lining',     'service_type' => 'rental', 'price' => 20000, 'unit' => 'cái',   'status' => 'active'],
-            ['id' => 'e16d542d-4ad0-11f1-b356-0250edbfc5ac', 'name' => 'Thuê giày',           'service_type' => 'rental', 'price' => 30000, 'unit' => 'đôi',   'status' => 'active'],
             ['id' => 'e16d5465-4ad0-11f1-b356-0250edbfc5ac', 'name' => 'Đan lưới vợt',        'service_type' => 'other',  'price' => 80000, 'unit' => 'cái',   'status' => 'active'],
         ];
 
@@ -226,6 +221,8 @@ class CleanSlateSeeder extends Seeder
             ['setting_key' => 'open_time',                   'setting_value' => '05:00'],
             ['setting_key' => 'close_time',                  'setting_value' => '22:00'],
             ['setting_key' => 'deposit_percent',             'setting_value' => '20'],
+            ['setting_key' => 'cancel_request_min_hours',    'setting_value' => '24'],
+            ['setting_key' => 'overtime_grace_minutes',      'setting_value' => '15'],
             ['setting_key' => 'reschedule_advance_hours',    'setting_value' => '24'],
             ['setting_key' => 'reschedule_same_day_hours',   'setting_value' => '2'],
         ];

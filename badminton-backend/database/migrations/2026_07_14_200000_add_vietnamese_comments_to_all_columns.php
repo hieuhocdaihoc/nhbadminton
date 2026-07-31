@@ -3,10 +3,13 @@
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
 
-return new class extends Migration
-{
+return new class extends Migration {
     public function up(): void
     {
+        if (DB::getDriverName() !== 'mysql') {
+            return;
+        }
+
         // Tắt strict mode để ALTER TABLE với TIMESTAMP NULL không bị warn->error
         DB::statement("SET SESSION sql_mode = ''");
 
@@ -26,7 +29,7 @@ return new class extends Migration
             MODIFY membership_level VARCHAR(20) NOT NULL DEFAULT 'bronze' COMMENT 'Cấp độ thành viên: đồng / bạc / vàng / kim cương',
             MODIFY points       INT             NOT NULL DEFAULT 0 COMMENT 'Điểm tích luỹ hiện tại',
             MODIFY total_spent  DECIMAL(15,2)   NOT NULL DEFAULT 0 COMMENT 'Tổng số tiền khách đã chi tiêu',
-            MODIFY status       ENUM('active','inactive','banned') NOT NULL DEFAULT 'active' COMMENT 'Trạng thái tài khoản: đang hoạt động / tạm khoá / bị cấm',
+            MODIFY status       ENUM('active','blocked') NOT NULL DEFAULT 'active' COMMENT 'Trạng thái tài khoản: đang hoạt động / bị khóa',
             MODIFY created_at   TIMESTAMP       NULL COMMENT 'Thời điểm tạo tài khoản',
             MODIFY updated_at   TIMESTAMP       NULL COMMENT 'Thời điểm cập nhật gần nhất'
         ");
@@ -297,7 +300,6 @@ return new class extends Migration
         // =====================================================================
         DB::statement("ALTER TABLE court_pricing
             MODIFY id                  CHAR(36)     NOT NULL COMMENT 'Mã khung giá (UUID)',
-            MODIFY court_id            CHAR(36)     NULL     COMMENT 'Mã sân áp dụng khung giá này',
             MODIFY day_type            VARCHAR(30)  NULL     COMMENT 'Loại ngày áp dụng: weekday = thường / weekend = cuối tuần / holiday = ngày lễ',
             MODIFY start_time          TIME         NOT NULL COMMENT 'Giờ bắt đầu khung giờ áp dụng',
             MODIFY end_time            TIME         NOT NULL COMMENT 'Giờ kết thúc khung giờ áp dụng',
@@ -313,7 +315,6 @@ return new class extends Migration
         DB::statement("ALTER TABLE court_price_histories
             MODIFY id               CHAR(36)     NOT NULL COMMENT 'Mã bản ghi lịch sử (UUID)',
             MODIFY court_pricing_id CHAR(36)     NULL     COMMENT 'Mã khung giá bị thay đổi',
-            MODIFY court_id         CHAR(36)     NULL     COMMENT 'Mã sân liên quan đến thay đổi giá',
             MODIFY old_price        DECIMAL(12,2) NULL    COMMENT 'Giá cũ trước khi thay đổi (VNĐ/giờ)',
             MODIFY new_price        DECIMAL(12,2) NULL    COMMENT 'Giá mới sau khi thay đổi (VNĐ/giờ)',
             MODIFY action           VARCHAR(20)  NOT NULL DEFAULT 'update' COMMENT 'Hành động: update = cập nhật / create = tạo mới / delete = xoá bảng giá',
@@ -378,20 +379,6 @@ return new class extends Migration
             MODIFY quantity          INT          NOT NULL DEFAULT 1 COMMENT 'Số lượng nhập trong dòng này',
             MODIFY import_price      DECIMAL(12,2) NOT NULL DEFAULT 0 COMMENT 'Giá nhập mỗi đơn vị (VNĐ)',
             MODIFY total_price       DECIMAL(12,2) NOT NULL DEFAULT 0 COMMENT 'Thành tiền dòng này (= giá nhập × số lượng)'
-        ");
-
-        // =====================================================================
-        // 25. user_addresses — Bảng địa chỉ giao hàng của khách
-        // =====================================================================
-        DB::statement("ALTER TABLE user_addresses
-            MODIFY id           CHAR(36)     NOT NULL COMMENT 'Mã địa chỉ (UUID)',
-            MODIFY user_id      CHAR(36)     NULL     COMMENT 'Mã tài khoản người dùng sở hữu địa chỉ này',
-            MODIFY province     VARCHAR(100) NULL     COMMENT 'Tỉnh / Thành phố',
-            MODIFY district     VARCHAR(100) NULL     COMMENT 'Quận / Huyện',
-            MODIFY ward         VARCHAR(100) NULL     COMMENT 'Phường / Xã',
-            MODIFY address_line VARCHAR(255) NULL     COMMENT 'Số nhà, tên đường, toà nhà...',
-            MODIFY address_type VARCHAR(30)  NOT NULL DEFAULT 'home' COMMENT 'Loại địa chỉ: home = nhà riêng / office = cơ quan / other = khác',
-            MODIFY is_default   TINYINT(1)   NOT NULL DEFAULT 0 COMMENT 'Địa chỉ mặc định dùng khi giao hàng (1 = mặc định)'
         ");
     }
 

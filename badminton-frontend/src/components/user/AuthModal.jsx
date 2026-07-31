@@ -20,14 +20,14 @@ const AuthModal = ({
 
   const pwChecks = {
     length: password.length >= 8,
-    special: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~]/.test(password),
+    special: /[^A-Za-z0-9\s]/.test(password),
   };
   const pwScore = Object.values(pwChecks).filter(Boolean).length; // 0,1,2
   const pwStrength = pwScore === 0 ? null : pwScore === 1 ? "weak" : "strong";
 
   // Validate SĐT Việt Nam: 10 số, bắt đầu 03/05/08
   const isValidPhone = (p) =>
-    /^0[35789][0-9]{8}$/.test(p.replace(/[\s\-]/g, ""));
+    /^0[35789][0-9]{8}$/.test(p.replace(/[\s-]/g, ""));
 
   // XỬ LÝ GỌI API BACKEND THỰC TẾ
   const handleSubmit = async (e) => {
@@ -103,7 +103,7 @@ const AuthModal = ({
       try {
         await authService.register(
           fullName,
-          phone.replace(/[\s\-]/g, ""),
+          phone.replace(/[\s-]/g, ""),
           email,
           password,
         );

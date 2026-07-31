@@ -15,10 +15,10 @@ class StaffShiftController extends Controller
     public function index(Request $request)
     {
         $query = StaffShift::with(['staff:id,full_name,phone,email,status'])
-            ->when($request->filled('staff_id'),  fn($q) => $q->where('staff_id', $request->staff_id))
-            ->when($request->filled('status'),    fn($q) => $q->where('status', $request->status))
+            ->when($request->filled('staff_id'), fn($q) => $q->where('staff_id', $request->staff_id))
+            ->when($request->filled('status'), fn($q) => $q->where('status', $request->status))
             ->when($request->filled('date_from'), fn($q) => $q->whereDate('shift_date', '>=', $request->date_from))
-            ->when($request->filled('date_to'),   fn($q) => $q->whereDate('shift_date', '<=', $request->date_to))
+            ->when($request->filled('date_to'), fn($q) => $q->whereDate('shift_date', '<=', $request->date_to))
             ->when($request->filled('keyword'), function ($q) use ($request) {
                 $keyword = $request->keyword;
                 $q->where(function ($sub) use ($keyword) {
@@ -57,7 +57,7 @@ class StaffShiftController extends Controller
 
         return response()->json([
             'message' => 'Tạo ca làm thành công',
-            'data'    => $shift->load('staff:id,full_name,phone,email,status'),
+            'data' => $shift->load('staff:id,full_name,phone,email,status'),
         ], 201);
     }
 
@@ -72,13 +72,13 @@ class StaffShiftController extends Controller
     /** Chức năng: Cập nhật thông tin ca làm và kiểm tra lại trùng ca nếu đổi lịch. */
     public function update(Request $request, $id)
     {
-        $shift     = StaffShift::findOrFail($id);
+        $shift = StaffShift::findOrFail($id);
         $validated = $this->validatedShift($request, true);
 
-        $staffId   = $validated['staff_id']   ?? $shift->staff_id;
-        $shiftDate = $validated['shift_date']  ?? $shift->shift_date->format('Y-m-d');
-        $startTime = $validated['start_time']  ?? $shift->start_time;
-        $endTime   = $validated['end_time']    ?? $shift->end_time;
+        $staffId = $validated['staff_id'] ?? $shift->staff_id;
+        $shiftDate = $validated['shift_date'] ?? $shift->shift_date->format('Y-m-d');
+        $startTime = $validated['start_time'] ?? $shift->start_time;
+        $endTime = $validated['end_time'] ?? $shift->end_time;
 
         if ($this->findOverlappingShift($staffId, $shiftDate, $startTime, $endTime, $shift->id)) {
             return response()->json(['message' => 'Nhân viên đã có ca làm trùng khung giờ trong ngày này.'], 422);
@@ -88,7 +88,7 @@ class StaffShiftController extends Controller
 
         return response()->json([
             'message' => 'Cập nhật ca làm thành công',
-            'data'    => $shift->fresh()->load('staff:id,full_name,phone,email,status'),
+            'data' => $shift->fresh()->load('staff:id,full_name,phone,email,status'),
         ]);
     }
 
@@ -110,8 +110,8 @@ class StaffShiftController extends Controller
     public function myShifts(Request $request)
     {
         $staffId = $request->user()->id;
-        $now     = now()->setTimezone('Asia/Ho_Chi_Minh');
-        $today   = $now->format('Y-m-d');
+        $now = now()->setTimezone('Asia/Ho_Chi_Minh');
+        $today = $now->format('Y-m-d');
         $currentTime = $now->format('H:i');
 
         $currentShift = StaffShift::where('staff_id', $staffId)
@@ -137,53 +137,10 @@ class StaffShiftController extends Controller
 
         return response()->json([
             'data' => [
-                'is_on_shift'    => !is_null($currentShift),
-                'current_shift'  => $currentShift,
+                'is_on_shift' => !is_null($currentShift),
+                'current_shift' => $currentShift,
                 'upcoming_shifts' => $upcomingShifts,
             ],
-        ]);
-    }
-
-    /** Chức năng: Ghi nhận thời điểm nhân viên bắt đầu ca làm thực tế. */
-    public function checkIn($id)
-    {
-        $shift = StaffShift::findOrFail($id);
-
-        if (!in_array($shift->status, ['scheduled', 'working'], true)) {
-            return response()->json(['message' => 'Chỉ ca đã xếp mới được điểm danh vào ca.'], 422);
-        }
-
-        $shift->update([
-            'check_in_time' => $shift->check_in_time ?: now(),
-            'status'        => 'working',
-        ]);
-
-        return response()->json([
-            'message' => 'Điểm danh vào ca thành công',
-            'data'    => $shift->fresh()->load('staff:id,full_name,phone,email,status'),
-        ]);
-    }
-
-    /** Chức năng: Ghi nhận thời điểm nhân viên kết thúc ca và lưu ghi chú bàn giao. */
-    public function checkOut(Request $request, $id)
-    {
-        $shift = StaffShift::findOrFail($id);
-
-        if ($shift->status !== 'working') {
-            return response()->json(['message' => 'Chỉ ca đang làm mới được điểm danh ra ca.'], 422);
-        }
-
-        $request->validate(['note' => ['nullable', 'string']]);
-
-        $shift->update([
-            'check_out_time' => now(),
-            'status'         => 'completed',
-            'note'           => $request->filled('note') ? $request->note : $shift->note,
-        ]);
-
-        return response()->json([
-            'message' => 'Điểm danh ra ca thành công',
-            'data'    => $shift->fresh()->load('staff:id,full_name,phone,email,status'),
         ]);
     }
 
@@ -193,15 +150,15 @@ class StaffShiftController extends Controller
         $required = $isUpdate ? 'sometimes' : 'required';
 
         return $request->validate([
-            'staff_id'       => [$required, 'string', Rule::exists('users', 'id')->where(fn($q) => $q->where('role', 'staff'))],
-            'shift_date'     => [$required, 'date'],
-            'shift_name'     => ['nullable', 'string', 'max:50'],
-            'start_time'     => [$required, 'date_format:H:i'],
-            'end_time'       => [$required, 'date_format:H:i', 'after:start_time'],
-            'check_in_time'  => ['nullable', 'date'],
+            'staff_id' => [$required, 'string', Rule::exists('users', 'id')->where(fn($q) => $q->where('role', 'staff'))],
+            'shift_date' => [$required, 'date'],
+            'shift_name' => ['nullable', 'string', 'max:50'],
+            'start_time' => [$required, 'date_format:H:i'],
+            'end_time' => [$required, 'date_format:H:i', 'after:start_time'],
+            'check_in_time' => ['nullable', 'date'],
             'check_out_time' => ['nullable', 'date', 'after_or_equal:check_in_time'],
-            'status'         => ['nullable', Rule::in(self::STATUSES)],
-            'note'           => ['nullable', 'string'],
+            'status' => ['nullable', Rule::in(self::STATUSES)],
+            'note' => ['nullable', 'string'],
         ]);
     }
 

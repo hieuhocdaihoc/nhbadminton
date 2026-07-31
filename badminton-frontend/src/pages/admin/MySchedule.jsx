@@ -26,7 +26,9 @@ const MySchedule = ({ upcomingShifts = [], staffName = "" }) => {
   const handleLogout = async () => {
     try {
       await authService.logout();
-    } catch (_) {}
+    } catch {
+      // Phiên cục bộ vẫn phải được xóa nếu API thu hồi token không phản hồi.
+    }
     localStorage.removeItem("access_token");
     localStorage.removeItem("current_user");
     localStorage.removeItem("current_role");

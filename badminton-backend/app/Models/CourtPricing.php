@@ -18,7 +18,6 @@ class CourtPricing extends Model
     public $timestamps = false;
 
     protected $fillable = [
-        'court_id',
         'day_type',
         'start_time',
         'end_time',
@@ -36,10 +35,4 @@ class CourtPricing extends Model
     ];
 
     // Relationships
-
-    /** Quan hệ: Mức giá thuộc về một sân */
-    public function court()
-    {
-        return $this->belongsTo(Court::class, 'court_id', 'id');
-    }
 }

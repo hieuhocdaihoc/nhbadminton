@@ -44,9 +44,5 @@ export const pricingService = {
   },
 
   // 7. Lịch sử sửa giá sân (số lần cập nhật, chênh lệch cũ/mới, ai sửa)
-  getPriceHistory: (courtId = "") => {
-    return axiosClient.get("/admin/court-pricing-history", {
-      params: { court_id: courtId || undefined },
-    });
-  },
+  getPriceHistory: () => axiosClient.get("/admin/court-pricing-history"),
 };

@@ -11,16 +11,22 @@ use App\Models\Court;
 use App\Models\CourtPricing;
 use App\Models\InventoryTransaction;
 use App\Models\Product;
+use App\Models\MembershipCard;
+use App\Models\Promotion;
 use App\Models\RecurringBooking;
+use App\Models\Refund;
 use App\Models\User;
 use App\Services\PaymentService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class BookingController extends Controller
 {
+    private const CHECK_IN_EARLY_MINUTES = 30;
+
     private const ALLOWED_TRANSITIONS = [
         'confirmed' => ['cancelled'],
         'playing' => ['completed'],
@@ -180,6 +186,9 @@ class BookingController extends Controller
     {
         $request->validate([
             'status' => ['required', 'in:pending,confirmed,cancelled,completed'],
+            // Khi hủy đơn dùng thẻ: đánh dấu no_show = khách không đến → trừ ca phạt.
+            // Hủy thường (khách báo trước) thì không trừ, ca được trả lại thẻ.
+            'no_show' => ['nullable', 'boolean'],
         ]);
 
         return DB::transaction(function () use ($request, $bookingId) {
@@ -202,7 +211,28 @@ class BookingController extends Controller
                 ], 422);
             }
 
-            $booking->update(['status' => $newStatus]);
+            // No-show đơn dùng thẻ: trừ ca phạt bằng số giờ thực tế của đơn.
+            $cardPenalty = null;
+            if ($newStatus === 'cancelled' && $request->boolean('no_show') && $booking->membership_card_id) {
+                $penaltySessions = $booking->details()->count();
+                $card = \App\Models\MembershipCard::find($booking->membership_card_id);
+                if ($card && $penaltySessions > 0 && $card->remainingSessions() > 0) {
+                    $deduct = min($penaltySessions, $card->remainingSessions());
+                    $cardPenalty = \App\Http\Controllers\Api\Admin\MembershipController::deductSessions(
+                        $card,
+                        $booking->id,
+                        $deduct,
+                        "Phạt no-show {$booking->booking_code}"
+                    );
+                }
+            }
+
+            $statusUpdate = ['status' => $newStatus];
+            if ($newStatus === 'completed') {
+                $statusUpdate['check_out_at'] = now();
+                $statusUpdate['check_in_at'] = $booking->check_in_at ?? now();
+            }
+            $booking->update($statusUpdate);
 
             $reward = ($oldStatus !== 'completed' && $newStatus === 'completed')
                 ? $this->rewardCustomerForCompletedBooking($booking->fresh())
@@ -210,9 +240,12 @@ class BookingController extends Controller
 
             return response()->json([
                 'status' => 'success',
-                'message' => 'Cập nhật trạng thái đơn thành công!',
+                'message' => $cardPenalty
+                    ? "Đã hủy đơn (no-show) và trừ {$cardPenalty['sessions_deducted']} ca phạt — còn {$cardPenalty['remaining_sessions']} ca."
+                    : 'Cập nhật trạng thái đơn thành công!',
                 'data' => $booking->fresh(['details', 'user']),
                 'reward' => $reward,
+                'card_penalty' => $cardPenalty,
             ]);
         });
     }
@@ -227,7 +260,7 @@ class BookingController extends Controller
             'booking_code' => ['required', 'string'],
         ]);
 
-        $booking = Booking::findOrFail($bookingId);
+        $booking = Booking::with('details')->findOrFail($bookingId);
 
         if ($booking->status !== 'confirmed') {
             $label = match ($booking->status) {
@@ -253,7 +286,29 @@ class BookingController extends Controller
             ], 422);
         }
 
-        $booking->update(['status' => 'playing']);
+        $schedule = $this->bookingScheduleBounds($booking);
+        if (!$schedule) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Đơn không có ca chơi hợp lệ để check-in.',
+            ], 422);
+        }
+
+        $checkInOpensAt = $schedule['start']->copy()->subMinutes(self::CHECK_IN_EARLY_MINUTES);
+        if (now()->lt($checkInOpensAt)) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Chưa đến thời gian check-in cho ca chơi này.',
+            ], 422);
+        }
+        if (now()->gte($schedule['end'])) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Ca chơi đã qua giờ kết thúc, không thể check-in.',
+            ], 422);
+        }
+
+        $booking->update(['status' => 'playing', 'check_in_at' => now()]);
 
         return response()->json([
             'status' => 'success',
@@ -283,6 +338,51 @@ class BookingController extends Controller
                 ], 422);
             }
 
+            $schedule = $this->bookingScheduleBounds($booking);
+            if (!$schedule) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Đơn không có ca chơi hợp lệ để checkout.',
+                ], 422);
+            }
+            if (now()->lt($schedule['start'])) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Chưa đến giờ bắt đầu ca chơi, không thể checkout.',
+                ], 422);
+            }
+
+            // ── Phụ trội quá giờ: nếu checkout TRỄ hơn giờ kết thúc đã đặt vượt mức ân hạn
+            // thì tính thêm tiền phần vượt theo giá/giờ của buổi cuối, cộng vào tiền phải thu.
+            $graceMinutes = max(0, (int) (\App\Models\SystemSetting::getAll()['overtime_grace_minutes'] ?? 15));
+            $lastDetail = $booking->details
+                ->sortByDesc(fn($d) => Carbon::parse($d->booking_date)->format('Y-m-d') . ' ' . $d->end_time)
+                ->first();
+            $overtimeInfo = null;
+            if ($lastDetail) {
+                $bookedEnd = Carbon::parse(Carbon::parse($lastDetail->booking_date)->format('Y-m-d') . ' ' . $lastDetail->end_time);
+                $lateMinutes = max(0, (int) floor((now()->timestamp - $bookedEnd->timestamp) / 60));
+                $billableMinutes = max(0, $lateMinutes - $graceMinutes);
+                if ($billableMinutes > 0) {
+                    $rate = (float) $lastDetail->price_per_hour;
+                    $overtimeFee = (int) round($billableMinutes / 60 * $rate);
+                    if ($overtimeFee > 0) {
+                        $lastDetail->update([
+                            'overtime_minutes' => $billableMinutes,
+                            'overtime_fee' => $overtimeFee,
+                        ]);
+                        $booking->update([
+                            'subtotal_court' => $booking->subtotal_court + $overtimeFee,
+                            'total_price' => $booking->total_price + $overtimeFee,
+                            'remaining_amount' => $booking->remaining_amount + $overtimeFee,
+                            'payment_status' => $booking->payment_status === 'paid' ? 'partially_paid' : $booking->payment_status,
+                        ]);
+                        $booking->refresh();
+                        $overtimeInfo = ['minutes' => $billableMinutes, 'fee' => $overtimeFee];
+                    }
+                }
+            }
+
             if ($booking->remaining_amount > 0 && $booking->payment_status !== 'paid') {
                 app(PaymentService::class)->recordSuccessfulPayment($booking, [
                     'payment_code' => 'PAY-' . now()->format('YmdHis') . '-' . strtoupper(Str::random(6)),
@@ -295,13 +395,44 @@ class BookingController extends Controller
                 $booking->refresh();
             }
 
-            $booking->update(['status' => 'completed']);
+            $booking->update([
+                'status' => 'completed',
+                'check_out_at' => now(),
+                'check_in_at' => $booking->check_in_at ?? now(),
+            ]);
+
+            // Trừ ca từ thẻ thành viên: trừ đúng số ca đã lên kế hoạch của đơn.
+            // Đơn lẻ: card_sessions_planned = số slot; hợp đồng định kỳ/dài hạn: = số giờ của buổi
+            // (1 buổi chỉ có 1 detail nên không dùng details()->count() được).
+            $cardDeduction = null;
+            if ($booking->membership_card_id) {
+                $actualSessions = (int) ($booking->card_sessions_planned ?: $booking->details()->count());
+                if ($actualSessions > 0) {
+                    $card = MembershipCard::find($booking->membership_card_id);
+                    if ($card && $card->isUsable()) {
+                        // Không trừ quá số ca còn lại (phòng dữ liệu lệch giữa lúc đặt và lúc checkout)
+                        $sessionsToDeduct = min($actualSessions, $card->remainingSessions());
+                        $cardDeduction = \App\Http\Controllers\Api\Admin\MembershipController::deductSessions(
+                            $card,
+                            $booking->id,
+                            $sessionsToDeduct,
+                            "Hoàn thành {$booking->booking_code}"
+                        );
+                    }
+                }
+            }
+
+            $overtimeMsg = $overtimeInfo
+                ? " Tính phụ trội {$overtimeInfo['minutes']} phút quá giờ: +" . number_format($overtimeInfo['fee']) . "đ."
+                : '';
 
             return response()->json([
                 'status' => 'success',
-                'message' => 'Checkout thành công! Ca chơi đã hoàn thành.',
+                'message' => 'Checkout thành công! Ca chơi đã hoàn thành.' . $overtimeMsg,
                 'data' => $booking->fresh(['details', 'user']),
                 'reward' => $this->rewardCustomerForCompletedBooking($booking->fresh()),
+                'card_deduction' => $cardDeduction,
+                'overtime' => $overtimeInfo,
             ]);
         });
     }
@@ -367,6 +498,30 @@ class BookingController extends Controller
     /**
      * Chức năng: Đổi ngày, giờ hoặc sân cho một buổi chơi cụ thể sau khi kiểm tra trùng lịch và tính lại giá.
      */
+    /** Ưu đãi điểm khi đổi lịch: khách có >=1000 điểm được giảm 5.000đ mỗi giờ chơi. */
+    private function rescheduleLoyaltyDiscount(?User $user, int|float $totalMinutes): float
+    {
+        if (!$user || $user->role !== 'customer' || (int) $user->points < 1000) {
+            return 0;
+        }
+
+        return max(0, ($totalMinutes / 60) * 5000);
+    }
+
+    /** Giảm giá theo mã khuyến mãi (phần trăm hoặc số tiền cố định) trên tổng tiền mới. */
+    private function reschedulePromotionDiscount(?Promotion $promotion, int|float $base): float
+    {
+        if (!$promotion || $base <= 0) {
+            return 0;
+        }
+
+        if ($promotion->discount_type === 'percent') {
+            return min($base, $base * ((float) $promotion->discount_value / 100));
+        }
+
+        return min($base, (float) $promotion->discount_value);
+    }
+    /** nhân viên đổi lịch giúp khách. */
     public function reschedule(Request $request, $detailId)
     {
         $validated = $request->validate([
@@ -435,15 +590,76 @@ class BookingController extends Controller
                 'price_per_hour' => $newDuration > 0 ? ($newPrice / ($newDuration / 60)) : 0,
             ]);
 
+            // ── Tính lại TOÀN BỘ tiền của đơn sau khi đổi lịch ──────────────────
+            // Không cộng dồn chênh lệch thô nữa mà tính lại từ đầu để áp đúng
+            // khuyến mãi (%/tiền) và ưu đãi điểm theo tổng số giờ mới.
+            $oldTotal = (float) $booking->total_price;
+            $booking->load('details');
+
+            $subtotalCourt = (float) $booking->details->sum('price');
+            $totalMinutes = (int) $booking->details->sum('duration_minutes');
+            $base = $subtotalCourt + (float) $booking->subtotal_service;
+
+            if (!empty($booking->membership_card_id)) {
+                // Đơn dùng thẻ thành viên: không áp KM/điểm, giữ nguyên mức giảm đã lưu
+                $discountAmount = (float) $booking->discount_amount;
+            } else {
+                $loyalty = $this->rescheduleLoyaltyDiscount($booking->user, $totalMinutes);
+                $promotion = $booking->promotion_id ? Promotion::find($booking->promotion_id) : null;
+                $promoDiscount = $this->reschedulePromotionDiscount($promotion, $base);
+                $discountAmount = min($base, $loyalty + $promoDiscount);
+            }
+
+            $newTotal = max(0, $base - $discountAmount);
+            $paidAmount = max(0, $oldTotal - (float) $booking->remaining_amount); // số đã thu trước đó
+            $rawRemaining = $newTotal - $paidAmount;
+            $overpaid = $rawRemaining < 0 ? abs($rawRemaining) : 0.0;
+            $newRemaining = max(0, $rawRemaining);
+
+            // Tính lại trạng thái thanh toán cho khớp số còn nợ sau khi đổi lịch
+            if ($newRemaining <= 0) {
+                $newPaymentStatus = 'paid';
+            } elseif ($paidAmount > 0) {
+                $newPaymentStatus = 'partially_paid';
+            } else {
+                $newPaymentStatus = 'unpaid';
+            }
+
             $booking->update([
-                'subtotal_court' => $booking->subtotal_court + $priceDiff,
-                'total_price' => $booking->total_price + $priceDiff,
-                'remaining_amount' => $booking->remaining_amount + $priceDiff,
+                'subtotal_court' => $subtotalCourt,
+                'discount_amount' => $discountAmount,
+                'total_price' => $newTotal,
+                'remaining_amount' => $newRemaining,
+                'payment_status' => $newPaymentStatus,
             ]);
+
+            // Điểm 3: nếu đổi lịch làm giảm giá khiến khách đã trả DƯ tiền → ghi nhận
+            // phiếu hoàn tiền (trạng thái "recorded") để nhân viên hoàn cho khách.
+            if ($overpaid > 0) {
+                Refund::create([
+                    'payment_id' => null,
+                    'amount' => $overpaid,
+                    'reason' => "Đổi lịch làm giảm giá đơn {$booking->booking_code}, hoàn phần chênh cho khách.",
+                    'refund_method' => 'cash',
+                    'processed_by' => optional(request()->user())->id,
+                    'status' => 'recorded',
+                ]);
+            }
+
+            $diff = $newTotal - $oldTotal;
+            if ($overpaid > 0) {
+                $priceMsg = 'Giá giảm, khách đã trả dư ' . number_format($overpaid) . 'đ — đã ghi nhận phiếu hoàn tiền.';
+            } elseif ($diff > 0) {
+                $priceMsg = 'Giá tăng ' . number_format($diff) . 'đ, khách cần thanh toán thêm phần chênh lệch.';
+            } elseif ($diff < 0) {
+                $priceMsg = 'Giá giảm ' . number_format(abs($diff)) . 'đ so với trước.';
+            } else {
+                $priceMsg = 'Giá không đổi.';
+            }
 
             return response()->json([
                 'status' => 'success',
-                'message' => 'Đổi lịch thành công! Hóa đơn đã được cập nhật giá.',
+                'message' => 'Đổi lịch thành công! ' . $priceMsg,
                 'data' => $booking->load('details'),
             ]);
         });
@@ -466,7 +682,7 @@ class BookingController extends Controller
 
             if (in_array($booking->status, ['cancelled', 'completed'], true)) {
                 return response()->json([
-                    'status'  => 'error',
+                    'status' => 'error',
                     'message' => 'Không thể thêm dịch vụ/sản phẩm cho đơn đã hoàn thành hoặc đã hủy.',
                 ], 422);
             }
@@ -478,8 +694,15 @@ class BookingController extends Controller
             if ($validated['type'] === 'product') {
                 $product = Product::lockForUpdate()->findOrFail($validated['item_id']);
 
+                if ($product->status !== 'active') {
+                    throw ValidationException::withMessages([
+                        'item_id' => "Sản phẩm {$product->name} hiện đang tạm ngưng.",
+                    ]);
+                }
                 if ($product->stock_quantity < $quantity) {
-                    throw new \Exception("Hàng hóa này chỉ còn {$product->stock_quantity} sản phẩm trong kho!");
+                    throw ValidationException::withMessages([
+                        'quantity' => "Sản phẩm chỉ còn {$product->stock_quantity} trong kho.",
+                    ]);
                 }
 
                 $unitPrice = $product->selling_price;
@@ -502,6 +725,11 @@ class BookingController extends Controller
                 ]);
             } else {
                 $service = AdditionalService::findOrFail($validated['item_id']);
+                if ($service->status !== 'active') {
+                    throw ValidationException::withMessages([
+                        'item_id' => "Dịch vụ {$service->name} hiện đang tạm ngưng.",
+                    ]);
+                }
                 $unitPrice = $service->price;
                 $serviceId = $service->id;
             }
@@ -553,7 +781,7 @@ class BookingController extends Controller
 
             if (in_array($booking->status, ['cancelled', 'completed'], true)) {
                 return response()->json([
-                    'status'  => 'error',
+                    'status' => 'error',
                     'message' => 'Không thể thêm dịch vụ/sản phẩm cho đơn đã hoàn thành hoặc đã hủy.',
                 ], 422);
             }
@@ -569,8 +797,15 @@ class BookingController extends Controller
                 if ($item['type'] === 'product') {
                     $product = Product::lockForUpdate()->findOrFail($item['item_id']);
 
+                    if ($product->status !== 'active') {
+                        throw ValidationException::withMessages([
+                            'items' => "Sản phẩm {$product->name} hiện đang tạm ngưng.",
+                        ]);
+                    }
                     if ($product->stock_quantity < $quantity) {
-                        throw new \Exception("Sản phẩm {$product->name} chỉ còn {$product->stock_quantity} trong kho.");
+                        throw ValidationException::withMessages([
+                            'items' => "Sản phẩm {$product->name} chỉ còn {$product->stock_quantity} trong kho.",
+                        ]);
                     }
 
                     $unitPrice = $product->selling_price;
@@ -598,7 +833,9 @@ class BookingController extends Controller
                     $service = AdditionalService::findOrFail($item['item_id']);
 
                     if ($service->status === 'inactive') {
-                        throw new \Exception("Dịch vụ {$service->name} hiện đang tạm ngưng.");
+                        throw ValidationException::withMessages([
+                            'items' => "Dịch vụ {$service->name} hiện đang tạm ngưng.",
+                        ]);
                     }
 
                     $unitPrice = $service->price;
@@ -707,6 +944,30 @@ class BookingController extends Controller
     }
 
     /**
+     * @return array{start: Carbon, end: Carbon}|null
+     */
+    private function bookingScheduleBounds(Booking $booking): ?array
+    {
+        $booking->loadMissing('details');
+        if ($booking->details->isEmpty()) {
+            return null;
+        }
+
+        $starts = $booking->details->map(
+            fn($detail) => Carbon::parse(
+                Carbon::parse($detail->booking_date)->format('Y-m-d') . ' ' . $detail->start_time
+            )
+        );
+        $ends = $booking->details->map(
+            fn($detail) => Carbon::parse(
+                Carbon::parse($detail->booking_date)->format('Y-m-d') . ' ' . $detail->end_time
+            )
+        );
+
+        return ['start' => $starts->min(), 'end' => $ends->max()];
+    }
+
+    /**
      * Chức năng: Xác định hạng thành viên dựa trên tổng điểm tích lũy.
      */
     private function resolveMembershipLevel(int $points): string
@@ -721,12 +982,11 @@ class BookingController extends Controller
     /**
      * Chức năng: Tính giá tiền sân theo bảng giá hiệu lực tại ngày và khung giờ tương ứng.
      */
-    private function internalCalculatePrice(string $courtId, string $date, string $start, string $end): float
+    private function internalCalculatePrice(string $courtId, string $date, string $start, string $end): float // $courtId giữ để tương thích call sites
     {
         $dayType = (date('N', strtotime($date)) >= 6) ? 'weekend' : 'weekday';
 
-        $pricings = CourtPricing::where('court_id', $courtId)
-            ->where('day_type', $dayType)
+        $pricings = CourtPricing::where('day_type', $dayType)
             ->where(fn($q) => $q->whereNull('effective_from')->orWhere('effective_from', '<=', $date))
             ->where(fn($q) => $q->whereNull('effective_to')->orWhere('effective_to', '>=', $date))
             ->orderByDesc('effective_from')

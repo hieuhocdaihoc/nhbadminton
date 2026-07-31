@@ -24,8 +24,10 @@ class ProductController extends Controller
 
         if ($request->filled('keyword')) {
             $keyword = $request->keyword;
-            $query->where('name', 'like', "%{$keyword}%")
-                ->orWhere('sku', 'like', "%{$keyword}%");
+            $query->where(function ($subQuery) use ($keyword) {
+                $subQuery->where('name', 'like', "%{$keyword}%")
+                    ->orWhere('sku', 'like', "%{$keyword}%");
+            });
         }
 
         if ($request->filled('category_id')) {
@@ -90,6 +92,11 @@ class ProductController extends Controller
             'category_id'        => ['required', 'exists:categories,id'],
             'name'               => ['required', 'string', 'max:200'],
             'sku'                => ['required', 'string', 'max:100', 'unique:products,sku', self::SKU_REGEX_RULE],
+            'brand'              => ['nullable', 'string', 'max:100'],
+            'description'        => ['nullable', 'string'],
+            'short_description'  => ['nullable', 'string'],
+            'material'           => ['nullable', 'string', 'max:100'],
+            'origin'             => ['nullable', 'string', 'max:100'],
             'low_stock_threshold' => ['nullable', 'integer', 'min:0'],
             'selling_price'      => ['required', 'numeric', 'min:0'],
         ], [
@@ -100,11 +107,11 @@ class ProductController extends Controller
             'category_id'        => $validated['category_id'],
             'name'               => $validated['name'],
             'sku'                => $validated['sku'],
-            'brand'              => $request->brand,
-            'description'        => $request->description,
-            'short_description'  => $request->short_description,
-            'material'           => $request->material,
-            'origin'             => $request->origin,
+            'brand'              => $validated['brand'] ?? null,
+            'description'        => $validated['description'] ?? null,
+            'short_description'  => $validated['short_description'] ?? null,
+            'material'           => $validated['material'] ?? null,
+            'origin'             => $validated['origin'] ?? null,
             'selling_price'      => $validated['selling_price'],
             'stock_quantity'     => 0,
             'sold_count'         => 0,
@@ -132,6 +139,12 @@ class ProductController extends Controller
             'category_id'    => ['sometimes', 'required', 'exists:categories,id'],
             'name'           => ['sometimes', 'required', 'string', 'max:200'],
             'sku'            => ['sometimes', 'required', 'string', 'max:100', 'unique:products,sku,' . $id, self::SKU_REGEX_RULE],
+            'brand'          => ['nullable', 'string', 'max:100'],
+            'description'    => ['nullable', 'string'],
+            'short_description' => ['nullable', 'string'],
+            'material'       => ['nullable', 'string', 'max:100'],
+            'origin'         => ['nullable', 'string', 'max:100'],
+            'low_stock_threshold' => ['sometimes', 'required', 'integer', 'min:0'],
             'selling_price'  => ['sometimes', 'required', 'numeric', 'min:0'],
             'status'         => ['sometimes', 'required', 'in:' . implode(',', self::STATUSES)],
         ], [

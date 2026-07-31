@@ -47,4 +47,9 @@ export const bookingService = {
     getAutoPromotion: () => {
         return axiosClient.get('/promotions/auto-today');
     },
+
+    // Ước tính tổng tiền theo đúng ngày chơi thực tế (định kỳ/dài hạn)
+    estimatePrice: (payload) => {
+        return axiosClient.post('/bookings/estimate', payload);
+    },
 };

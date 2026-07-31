@@ -20,6 +20,8 @@ class Booking extends Model
         'recurring_booking_id',
         'staff_id',
         'promotion_id',
+        'membership_card_id',
+        'card_sessions_planned',
         'subtotal_court',
         'subtotal_service',
         'discount_amount',

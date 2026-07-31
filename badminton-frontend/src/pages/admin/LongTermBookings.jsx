@@ -1,4 +1,5 @@
 import { Fragment, useState, useEffect, useMemo, useCallback } from "react";
+import { toast } from "../../utils/toast";
 import { useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { adminBookingService } from "../../services/admin/bookingService";
@@ -8,6 +9,16 @@ import {
   relativeDayLabel,
   relativeDayStyle,
 } from "../../utils/bookingDateGroups";
+
+const formatBookingTimeRange = (details) => {
+  if (!details || details.length === 0) return "—";
+  const starts = details.map((d) => d.start_time).filter(Boolean).sort();
+  const ends = details.map((d) => d.end_time).filter(Boolean).sort();
+  if (starts.length === 0 || ends.length === 0) return "—";
+  const earliest = starts[0].slice(0, 5);
+  const latest = ends[ends.length - 1].slice(0, 5);
+  return `${earliest} – ${latest}`;
+};
 
 const LongTermBookings = () => {
   const location = useLocation();
@@ -192,7 +203,7 @@ const LongTermBookings = () => {
       setConfirmModal({ isOpen: false, title: "", message: "", actionData: null });
       if (selectedMaster) handleSelectMaster(selectedMaster);
     } catch (e) {
-      alert(e.response?.data?.message || "Lỗi hệ thống!");
+      toast.error(e.response?.data?.message || "Lỗi hệ thống!");
     } finally {
       setIsProcessing(false);
       setTimeout(() => setMessage({ type: "", text: "" }), 2500);
@@ -202,7 +213,7 @@ const LongTermBookings = () => {
   // --- RESCHEDULE ---
   const openRescheduleModal = (sessionBooking) => {
     const detail = sessionBooking.details?.[0];
-    if (!detail) return alert("Không tìm thấy chi tiết ca chơi!");
+    if (!detail) return toast.error("Không tìm thấy chi tiết ca chơi!");
     setRescheduleForm({
       court_id: detail.court_id,
       booking_date: detail.booking_date,
@@ -221,7 +232,7 @@ const LongTermBookings = () => {
       setRescheduleModal({ isOpen: false, detailId: null, booking: null });
       if (selectedMaster) handleSelectMaster(selectedMaster);
     } catch (error) {
-      alert(error.response?.data?.message || "Có lỗi xảy ra!");
+      toast.error(error.response?.data?.message || "Có lỗi xảy ra!");
     } finally {
       setIsProcessing(false);
       setTimeout(() => setMessage({ type: "", text: "" }), 2500);
@@ -443,7 +454,12 @@ const LongTermBookings = () => {
                         className={`border-b border-zinc-100 last:border-b-0 hover:bg-zinc-50/40 transition-colors group ${isCancelled ? "opacity-45" : ""}`}
                       >
                         <td className="py-3 px-5 font-mono text-[11px] text-zinc-700">
-                          {s.booking_code}
+                          <div>{s.booking_code}</div>
+                          {s.staff?.full_name && (
+                            <span className="inline-block mt-0.5 px-1 py-0.5 rounded text-[8px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                              NV: {s.staff.full_name}
+                            </span>
+                          )}
                         </td>
                         <td className="py-3 px-3">
                           <p className="text-xs text-zinc-600">
@@ -457,7 +473,7 @@ const LongTermBookings = () => {
                         </td>
                         <td className="py-3 px-3">
                           <span className="text-xs font-mono text-zinc-600">
-                            {s.details?.[0]?.start_time?.slice(0, 5)} – {s.details?.[0]?.end_time?.slice(0, 5)}
+                            {formatBookingTimeRange(s.details)}
                           </span>
                         </td>
                         <td className="py-3 px-3 text-right">

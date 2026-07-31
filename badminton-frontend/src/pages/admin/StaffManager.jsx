@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+﻿import React, { useState, useEffect } from "react";
+import { toast } from "../../utils/toast";
 import { motion, AnimatePresence } from "framer-motion";
 import { adminUserService } from "../../services/admin/adminUserService";
 import { staffShiftService } from "../../services/admin/staffShiftService";
@@ -78,11 +79,13 @@ const StaffManager = () => {
     }
   };
 
+  // Hàm luôn nhận search/status hiện tại bằng tham số, không đọc bản chụp cũ.
   useEffect(() => {
     const timer = setTimeout(() => {
       fetchStaffs(1, search, statusFilter);
     }, 500);
     return () => clearTimeout(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search, statusFilter]);
 
   const handleEditClick = (user) => {
@@ -164,7 +167,7 @@ const StaffManager = () => {
       });
       setIsDetailOpen(true);
     } catch (error) {
-      alert("Không thể lấy chi tiết tài khoản.");
+      toast.error("Không thể lấy chi tiết tài khoản.");
     }
   };
 
@@ -181,7 +184,7 @@ const StaffManager = () => {
       setMessage({ type: "success", text: "Cập nhật trạng thái thành công!" });
       fetchStaffs(pagination.current_page);
     } catch (error) {
-      alert(error.response?.data?.message || "Thao tác thất bại.");
+      toast.error(error.response?.data?.message || "Thao tác thất bại.");
     } finally {
       setTimeout(() => setMessage({ type: "", text: "" }), 2500);
     }
@@ -203,7 +206,7 @@ const StaffManager = () => {
       setIsResetOpen(false);
       setResetUser(null);
     } catch (error) {
-      alert(error.response?.data?.message || "Reset mật khẩu thất bại.");
+      toast.error(error.response?.data?.message || "Reset mật khẩu thất bại.");
     } finally {
       setIsSaving(false);
       setTimeout(() => setMessage({ type: "", text: "" }), 2500);

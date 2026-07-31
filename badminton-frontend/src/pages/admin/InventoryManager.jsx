@@ -1,8 +1,18 @@
-import { useCallback, useEffect, useState } from "react";
+﻿import { useCallback, useEffect, useState } from "react";
+import { toast } from "../../utils/toast";
 import { motion, AnimatePresence } from "framer-motion";
 import { adminInventoryService } from "../../services/admin/inventoryService";
 import { adminProductService } from "../../services/admin/productService";
 import { adminSupplierService } from "../../services/admin/supplierService";
+
+// Bộ nhãn hiển thị dùng chung cho mọi nơi (bảng lịch sử, bộ lọc, modal điều chỉnh)
+// để đồng nhất cách gọi tên loại biến động kho.
+const TRANSACTION_TYPE_LABELS = {
+  import: "Nhập kho",
+  sale: "Bán ra",
+  export: "Xuất hủy / Hỏng hóc",
+  adjustment: "Cân bằng kho",
+};
 
 const InventoryManager = () => {
   const [activeTab, setActiveTab] = useState("movement");
@@ -104,7 +114,7 @@ const InventoryManager = () => {
       adjustForm.quantity === "" ||
       !adjustForm.note.trim()
     )
-      return alert("Vui lòng điền đủ thông tin kiểm kho!");
+      return toast.warn("Vui lòng điền đủ thông tin kiểm kho!");
     setIsProcessing(true);
     try {
       await adminInventoryService.adjustInventory({
@@ -150,9 +160,9 @@ const InventoryManager = () => {
 
   const handleCreatePoSubmit = async (e) => {
     e.preventDefault();
-    if (!newPoSupplier) return alert("Vui lòng chọn nhà cung cấp!");
+    if (!newPoSupplier) return toast.warn("Vui lòng chọn nhà cung cấp!");
     if (newPoItems.some((i) => !i.product_id || !i.quantity || !i.import_price))
-      return alert("Vui lòng điền đủ thông tin các món nhập!");
+      return toast.warn("Vui lòng điền đủ thông tin các món nhập!");
 
     setIsProcessing(true);
     try {
@@ -186,7 +196,7 @@ const InventoryManager = () => {
       setSelectedPO(res.data?.data);
       setIsPoDetailOpen(true);
     } catch {
-      alert("Không thể lấy chi tiết hóa đơn!");
+      toast.error("Không thể lấy chi tiết hóa đơn!");
     }
   };
 
@@ -263,10 +273,10 @@ const InventoryManager = () => {
                 className="bg-[#f8f8fa] border border-zinc-200 rounded-lg px-3 py-2 text-xs text-zinc-700 outline-none focus:border-zinc-400 transition-colors"
               >
                 <option value="">Tất cả luồng</option>
-                <option value="import">Nhập kho (PO)</option>
-                <option value="sale">Khách mua lẻ</option>
-                <option value="export">Xuất hủy thủ công</option>
-                <option value="adjustment">Điều chỉnh cân bằng</option>
+                <option value="import">{TRANSACTION_TYPE_LABELS.import}</option>
+                <option value="sale">{TRANSACTION_TYPE_LABELS.sale}</option>
+                <option value="export">{TRANSACTION_TYPE_LABELS.export}</option>
+                <option value="adjustment">{TRANSACTION_TYPE_LABELS.adjustment}</option>
               </select>
             </div>
           </div>
@@ -346,8 +356,8 @@ const InventoryManager = () => {
                             </p>
                           </td>
                           <td className="py-3.5 px-3 text-center">
-                            <span className="px-2 py-0.5 bg-zinc-100 text-zinc-600 rounded text-[10px] font-medium uppercase">
-                              {t.transaction_type}
+                            <span className="px-2 py-0.5 bg-zinc-100 text-zinc-600 rounded text-[10px] font-medium">
+                              {TRANSACTION_TYPE_LABELS[t.transaction_type] || t.transaction_type}
                             </span>
                           </td>
                           <td className="py-3.5 px-3 text-right">
@@ -464,8 +474,8 @@ const InventoryManager = () => {
                     }
                     className={inputClass}
                   >
-                    <option value="export">Xuất hủy / Hỏng hóc</option>
-                    <option value="adjustment">Cân bằng kho</option>
+                    <option value="export">{TRANSACTION_TYPE_LABELS.export}</option>
+                    <option value="adjustment">{TRANSACTION_TYPE_LABELS.adjustment}</option>
                   </select>
                 </div>
                 <div>

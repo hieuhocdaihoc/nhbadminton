@@ -1,8 +1,6 @@
 // src/pages/admin/DashboardReport.jsx
 import { useEffect, useMemo, useState } from "react";
 import {
-  AreaChart,
-  Area,
   XAxis,
   YAxis,
   Tooltip,
@@ -11,7 +9,6 @@ import {
   BarChart,
   Bar,
 } from "recharts";
-import ExcelJS from "exceljs";
 import { adminDashboardService } from "../../services/admin/dashboardService";
 
 const getToday = () => new Date().toLocaleDateString("sv-SE");
@@ -57,33 +54,29 @@ const getBookingStatusLabel = (status) => {
   return labels[status] || status || "—";
 };
 
+const StatCard = ({ item }) => {
+  return (
+    <div className="admin-card p-5">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="admin-stat-label">{item.label}</p>
 
+          <h4
+            className="admin-stat-value mt-2 truncate"
+            style={{ color: item.color }}
+          >
+            {item.value}
+            {item.unit && (
+              <span className="ml-1 text-xs font-medium text-zinc-400">
+                {item.unit}
+              </span>
+            )}
+          </h4>
 
-  const StatCard = ({ item }) => {
-    return (
-      <div className="admin-card p-5">
-        <div className="flex items-center justify-between gap-3">
-          <div className="min-w-0">
-            <p className="admin-stat-label">
-              {item.label}
-            </p>
-  
-            <h4
-              className="admin-stat-value mt-2 truncate"
-              style={{ color: item.color }}
-            >
-              {item.value}
-              {item.unit && (
-                <span className="ml-1 text-xs font-medium text-zinc-400">
-                  {item.unit}
-                </span>
-              )}
-            </h4>
-  
-            <p className="text-[11px] font-medium mt-2 text-zinc-500">
-              {item.sub}
-            </p>
-          </div>
+          <p className="text-[11px] font-medium mt-2 text-zinc-500">
+            {item.sub}
+          </p>
+        </div>
 
         <div
           className="w-12 h-12 rounded-2xl flex items-center justify-center text-xl shrink-0"
@@ -129,7 +122,8 @@ const DashboardReport = () => {
 
   useEffect(() => {
     let active = true;
-    adminDashboardService.getDashboardReport(filters)
+    adminDashboardService
+      .getDashboardReport(filters)
       .then((res) => {
         if (!active) return;
         setReport(res.data?.data || null);
@@ -155,7 +149,10 @@ const DashboardReport = () => {
   const charts = report?.charts || {};
   const revenueChart = charts?.revenue_chart || [];
   const timeSlotStats = charts?.time_slot_stats || [];
-  const courtPerformance = useMemo(() => report?.court_performance || [], [report]);
+  const courtPerformance = useMemo(
+    () => report?.court_performance || [],
+    [report],
+  );
   const recentBookings = useMemo(() => report?.recent_bookings || [], [report]);
 
   const bestCourt = useMemo(() => {
@@ -167,6 +164,7 @@ const DashboardReport = () => {
   // --- XUẤT FILE EXCEL ĐỊNH DẠNG ĐẸP THEO KHOẢNG NGÀY ĐANG CHỌN ---
   const handleExportExcel = async () => {
     if (!report) return;
+    const { default: ExcelJS } = await import("exceljs");
 
     const BRAND_GREEN = "FF65A30D";
     const HEADER_FONT = { color: { argb: "FFFFFFFF" }, bold: true, size: 11 };
@@ -180,7 +178,11 @@ const DashboardReport = () => {
 
     const styleHeaderRow = (row) => {
       row.eachCell((cell) => {
-        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: BRAND_GREEN } };
+        cell.fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: BRAND_GREEN },
+        };
         cell.font = HEADER_FONT;
         cell.alignment = { vertical: "middle", horizontal: "center" };
         cell.border = THIN_BORDER;
@@ -193,7 +195,11 @@ const DashboardReport = () => {
         cell.border = THIN_BORDER;
         cell.alignment = { vertical: "middle" };
         if (evenIndex) {
-          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF7FAF0" } };
+          cell.fill = {
+            type: "pattern",
+            pattern: "solid",
+            fgColor: { argb: "FFF7FAF0" },
+          };
         }
       });
     };
@@ -203,10 +209,17 @@ const DashboardReport = () => {
     wb.created = new Date();
 
     // ── Trang 1: Tổng quan ──
-    const wsOverview = wb.addWorksheet("Tổng quan", { views: [{ state: "frozen", ySplit: 3 }] });
+    const wsOverview = wb.addWorksheet("Tổng quan", {
+      views: [{ state: "frozen", ySplit: 3 }],
+    });
     wsOverview.mergeCells("A1:B1");
-    wsOverview.getCell("A1").value = `BÁO CÁO THỐNG KÊ (${filters.from_date} → ${filters.to_date})`;
-    wsOverview.getCell("A1").font = { bold: true, size: 14, color: { argb: BRAND_GREEN } };
+    wsOverview.getCell("A1").value =
+      `BÁO CÁO THỐNG KÊ (${filters.from_date} → ${filters.to_date})`;
+    wsOverview.getCell("A1").font = {
+      bold: true,
+      size: 14,
+      color: { argb: BRAND_GREEN },
+    };
     wsOverview.getCell("A1").alignment = { vertical: "middle" };
     wsOverview.getRow(1).height = 28;
 
@@ -215,18 +228,34 @@ const DashboardReport = () => {
     styleHeaderRow(overviewHeaderRow);
 
     const overviewData = [
-      ["Tổng doanh thu đã thu", Number(summary.total_revenue || 0), CURRENCY_FMT],
+      [
+        "Tổng doanh thu đã thu",
+        Number(summary.total_revenue || 0),
+        CURRENCY_FMT,
+      ],
       ["   - Tiền mặt", Number(summary.cash_revenue || 0), CURRENCY_FMT],
       ["   - Chuyển khoản", Number(summary.bank_revenue || 0), CURRENCY_FMT],
+      ["Số giao dịch", Number(summary.total_transactions || 0), "#,##0"],
       ["Lượt đặt sân", Number(summary.total_bookings || 0), "#,##0"],
       ["Khách hàng mới", Number(summary.new_customers || 0), "#,##0"],
       ["Tỷ lệ lấp đầy", Number(summary.occupancy_rate || 0) / 100, "0.0%"],
       ["Doanh thu tiền sân", Number(summary.court_revenue || 0), CURRENCY_FMT],
       ["Doanh thu dịch vụ", Number(summary.service_revenue || 0), CURRENCY_FMT],
-      ["Tổng tiền nhập hàng", Number(summary.purchase_amount || 0), CURRENCY_FMT],
       [
+        "Tổng tiền nhập hàng",
+        Number(summary.purchase_amount || 0),
+        CURRENCY_FMT,
+      ],
+      [
+        "Tổng tiền đã hoàn khách",
+        Number(summary.refund_amount || 0),
+        CURRENCY_FMT,
+      ],
+      [
+        // total_revenue backend đã trừ sẵn refund_amount 1 lần, không trừ lại ở đây kẻo trừ trùng
         "Lợi nhuận tạm tính",
-        Number(summary.total_revenue || 0) - Number(summary.purchase_amount || 0),
+        Number(summary.total_revenue || 0) -
+          Number(summary.purchase_amount || 0),
         CURRENCY_FMT,
       ],
       ["Sân hiệu suất tốt nhất", bestCourt, null],
@@ -239,14 +268,19 @@ const DashboardReport = () => {
     });
 
     // ── Trang 2: Doanh thu theo ngày ──
-    const wsRevenue = wb.addWorksheet("Doanh thu theo ngày", { views: [{ state: "frozen", ySplit: 1 }] });
+    const wsRevenue = wb.addWorksheet("Doanh thu theo ngày", {
+      views: [{ state: "frozen", ySplit: 1 }],
+    });
     wsRevenue.columns = [
       { header: "Ngày", key: "date", width: 14 },
       { header: "Doanh thu", key: "revenue", width: 20 },
     ];
     styleHeaderRow(wsRevenue.getRow(1));
     revenueChart.forEach((r, i) => {
-      const row = wsRevenue.addRow({ date: r.date, revenue: Number(r.revenue || 0) });
+      const row = wsRevenue.addRow({
+        date: r.date,
+        revenue: Number(r.revenue || 0),
+      });
       row.getCell(2).numFmt = CURRENCY_FMT;
       styleDataRow(row, i % 2 === 1);
     });
@@ -255,7 +289,9 @@ const DashboardReport = () => {
     }
 
     // ── Trang 3: Hiệu suất khai thác sân ──
-    const wsCourts = wb.addWorksheet("Hiệu suất sân", { views: [{ state: "frozen", ySplit: 1 }] });
+    const wsCourts = wb.addWorksheet("Hiệu suất sân", {
+      views: [{ state: "frozen", ySplit: 1 }],
+    });
     wsCourts.columns = [
       { header: "Sân", key: "court", width: 20 },
       { header: "Số giờ đã đặt", key: "hours", width: 16 },
@@ -273,7 +309,9 @@ const DashboardReport = () => {
     });
 
     // ── Trang 4: Danh sách đơn gần đây ──
-    const wsBookings = wb.addWorksheet("Đơn đặt sân", { views: [{ state: "frozen", ySplit: 1 }] });
+    const wsBookings = wb.addWorksheet("Đơn đặt sân", {
+      views: [{ state: "frozen", ySplit: 1 }],
+    });
     wsBookings.columns = [
       { header: "Mã đơn", key: "code", width: 16 },
       { header: "Khách hàng", key: "customer", width: 20 },
@@ -321,52 +359,22 @@ const DashboardReport = () => {
 
   const stats = [
     {
-      label: "Tổng doanh thu đã thu",
+      // Dùng chung công thức "Doanh thu thực nhận" của trang Quản lý doanh thu
+      // (tổng giao dịch thành công trừ tiền đã hoàn), thay vì chỉ riêng tiền sân theo hóa đơn.
+      label: "Tổng doanh thu",
       value: formatMoney(summary.total_revenue),
       unit: "",
-      sub: `Tiền mặt ${formatMoney(summary.cash_revenue)} · Chuyển khoản ${formatMoney(summary.bank_revenue)}`,
-      color: "#18181b",
-      icon: "💰",
-    },
-    {
-      label: "Lượt đặt sân",
-      value: formatNumber(summary.total_bookings),
-      unit: "Lượt",
-      sub: "Tính theo số hóa đơn đặt sân",
-      color: "#2563eb",
-      icon: "📅",
-    },
-    {
-      label: "Khách hàng mới",
-      value: formatNumber(summary.new_customers),
-      unit: "Khách",
-      sub: "Tính theo số điện thoại lần đầu đặt",
-      color: "#6366f1",
-      icon: "👤",
-    },
-    {
-      label: "Tỷ lệ lấp đầy",
-      value: `${Number(summary.occupancy_rate || 0)}%`,
-      unit: "TB",
-      sub: `Sân hiệu suất tốt: ${bestCourt}`,
-      color: "#10b981",
-      icon: "📊",
-    },
-    {
-      label: "Doanh thu tiền sân",
-      value: formatMoney(summary.court_revenue),
-      unit: "",
-      sub: "Tổng tiền thuê sân theo hóa đơn",
+      sub: "Doanh thu thực nhận (đã trừ tiền hoàn khách)",
       color: "#65a30d",
       icon: "🏸",
     },
     {
-      label: "Doanh thu dịch vụ",
-      value: formatMoney(summary.service_revenue),
+      label: "Số giao dịch",
+      value: Number(summary.total_transactions || 0).toLocaleString("vi-VN"),
       unit: "",
-      sub: "Dịch vụ / Pro-shop phát sinh",
-      color: "#7c3aed",
-      icon: "🧃",
+      sub: "Giao dịch thành công",
+      color: "#2563eb",
+      icon: "🧾",
     },
     {
       label: "Tổng tiền nhập hàng",
@@ -377,13 +385,14 @@ const DashboardReport = () => {
       icon: "📦",
     },
     {
+      // total_revenue backend đã trừ sẵn refund_amount 1 lần, không trừ lại ở đây kẻo trừ trùng
       label: "Lợi nhuận tạm tính",
       value: formatMoney(
         Number(summary.total_revenue || 0) -
           Number(summary.purchase_amount || 0),
       ),
       unit: "",
-      sub: "Doanh thu đã thu - tiền nhập hàng",
+      sub: "Doanh thu thực nhận - tiền nhập hàng",
       color:
         Number(summary.total_revenue || 0) -
           Number(summary.purchase_amount || 0) >=
@@ -413,9 +422,7 @@ const DashboardReport = () => {
     <div className="space-y-6 max-w-[1600px] mx-auto">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-6">
         <div>
-          <h1 className="admin-page-title text-2xl">
-            Báo cáo tổng quan
-          </h1>
+          <h1 className="admin-page-title text-2xl">Báo cáo tổng quan</h1>
           <p className="admin-page-subtitle text-sm mt-1">
             Theo dõi doanh thu, lịch đặt sân, chi phí nhập hàng và hiệu suất
             khai thác sân.
@@ -459,8 +466,18 @@ const DashboardReport = () => {
             disabled={!report || isLoading}
             className="admin-btn-secondary px-4 py-2 text-sm rounded-xl flex items-center gap-2 shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2-9.5V8a1 1 0 001 1h3.5M7 21h10a2 2 0 002-2V8.414a1 1 0 00-.293-.707l-4.414-4.414A1 1 0 0013.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M12 10v6m0 0l-3-3m3 3l3-3m2-9.5V8a1 1 0 001 1h3.5M7 21h10a2 2 0 002-2V8.414a1 1 0 00-.293-.707l-4.414-4.414A1 1 0 0013.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"
+              />
             </svg>
             Xuất Excel
           </button>
@@ -479,74 +496,7 @@ const DashboardReport = () => {
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        <div className="admin-card p-6">
-          <div className="flex items-center justify-between mb-5">
-            <div>
-              <h3 className="font-bold text-zinc-800 text-base">
-                Doanh thu theo thời gian
-              </h3>
-              <p className="text-xs text-zinc-400 mt-1">
-                Tính theo các giao dịch thanh toán thành công.
-              </p>
-            </div>
-
-            <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-3 py-1 rounded-lg border border-emerald-100">
-              {filters.from_date} → {filters.to_date}
-            </span>
-          </div>
-
-          <div className="h-72">
-            {revenueChart.length === 0 ? (
-              <div className="h-full flex items-center justify-center text-sm text-zinc-400 bg-zinc-50 rounded-2xl">
-                Chưa có dữ liệu doanh thu trong khoảng thời gian này.
-              </div>
-            ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={revenueChart}>
-                  <defs>
-                    <linearGradient
-                      id="revenueColor"
-                      x1="0"
-                      y1="0"
-                      x2="0"
-                      y2="1"
-                    >
-                      <stop
-                        offset="5%"
-                        stopColor="#10b981"
-                        stopOpacity={0.35}
-                      />
-                      <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="date" tickLine={false} axisLine={false} />
-                  <YAxis
-                    tickLine={false}
-                    axisLine={false}
-                    tickFormatter={(value) => `${value / 1000000}M`}
-                  />
-                  <Tooltip
-                    formatter={(value) =>
-                      [new Intl.NumberFormat("vi-VN").format(value) + " VNĐ", "Doanh thu"]
-                    }
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="revenue"
-                    name="Doanh thu"
-                    stroke="#059669"
-                    strokeWidth={3}
-                    fill="url(#revenueColor)"
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            )}
-          </div>
-        </div>
-
+      <div className="grid grid-cols-1 gap-5">
         <div className="admin-card p-6">
           <h3 className="font-bold text-zinc-800 text-base mb-5">
             Lượt đặt theo khung giờ
@@ -558,14 +508,25 @@ const DashboardReport = () => {
                 Chưa có dữ liệu khung giờ.
               </div>
             ) : (
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer
+                width="100%"
+                height="100%"
+                minWidth={0}
+                minHeight={1}
+              >
                 <BarChart data={timeSlotStats}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} />
                   <XAxis dataKey="label" tickLine={false} axisLine={false} />
                   <YAxis tickLine={false} axisLine={false} />
-                  <Tooltip />
+                  <Tooltip
+                    formatter={(value) => [
+                      Number(value).toLocaleString("vi-VN"),
+                      "Lượt đặt sân",
+                    ]}
+                  />
                   <Bar
                     dataKey="booking_count"
+                    name="Lượt đặt sân"
                     radius={[8, 8, 0, 0]}
                     fill="#10b981"
                   />

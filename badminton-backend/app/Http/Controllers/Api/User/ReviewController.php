@@ -89,7 +89,7 @@ class ReviewController extends Controller
         }
 
         $hasPlayedCourt = $booking->details->contains(
-            fn ($detail) => $detail->court_id === $validated['target_id']
+            fn($detail) => $detail->court_id === $validated['target_id']
         );
 
         if (!$hasPlayedCourt) {
@@ -150,7 +150,7 @@ class ReviewController extends Controller
         $now = now();
 
         $groupKey = 'review_' . ($review->id ?? Str::uuid());
-        $rows = $receiverIds->map(fn ($receiverId) => [
+        $rows = $receiverIds->map(fn($receiverId) => [
             'id' => (string) Str::uuid(),
             'receiver_id' => $receiverId,
             'sender_id' => $review->user_id,

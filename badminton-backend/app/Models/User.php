@@ -2,14 +2,16 @@
 
 namespace App\Models;
 
+use App\Services\MembershipTierService;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Support\Str;
 
 class User extends Authenticatable
 {
-    use HasApiTokens, Notifiable;
+    use HasApiTokens, HasFactory, Notifiable;
 
     protected $table = 'users';
     protected $keyType = 'string';
@@ -43,6 +45,21 @@ class User extends Authenticatable
                 $model->id = (string) Str::uuid();
             }
         });
+
+        static::saving(function ($model) {
+            if ($model->role === 'customer' || empty($model->getRawOriginal('membership_level'))) {
+                $model->membership_level = MembershipTierService::levelForPoints((int) ($model->points ?? 0));
+            }
+        });
+    }
+
+    public function getMembershipLevelAttribute(?string $value): string
+    {
+        if (($this->attributes['role'] ?? 'customer') === 'customer') {
+            return MembershipTierService::levelForPoints((int) ($this->attributes['points'] ?? 0));
+        }
+
+        return $value ?: MembershipTierService::LEVEL_DONG;
     }
 
     public function getAuthPassword()
@@ -92,12 +109,6 @@ class User extends Authenticatable
     public function payments()
     {
         return $this->hasMany(Payment::class, 'user_id', 'id');
-    }
-
-    /** Quan hệ: User có nhiều địa chỉ */
-    public function addresses()
-    {
-        return $this->hasMany(UserAddress::class, 'user_id', 'id');
     }
 
     /** Quan hệ: User đã xử lý nhiều yêu cầu hoàn tiền */

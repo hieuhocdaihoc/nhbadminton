@@ -17,5 +17,14 @@ export default defineConfig([
       globals: globals.browser,
       parserOptions: { ecmaFeatures: { jsx: true } },
     },
+    rules: {
+      // Cac trang hien tai dung effect de tai du lieu tu API khi mount/thay bo loc.
+      'react-hooks/set-state-in-effect': 'off',
+      // React 19 khong can bien React trong JSX; ten catch duoc giu de de debug.
+      'no-unused-vars': ['error', {
+        varsIgnorePattern: '^(React|Fragment)$',
+        caughtErrors: 'none',
+      }],
+    },
   },
 ])

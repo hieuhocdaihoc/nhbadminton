@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Image;
 use App\Models\User;
-use App\Models\UserAddress;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -13,7 +12,6 @@ use Illuminate\Support\Facades\Hash;
 class AuthController extends Controller
 {
     private const PHONE_REGEX = '/^0[35789][0-9]{8}$/';
-    private const ADDRESS_TYPES = ['home', 'office', 'other'];
     private const GENDERS = ['male', 'female', 'other'];
 
     /** Chức năng: Đăng ký tài khoản khách hàng mới, mã hóa mật khẩu và cấp token đăng nhập. */
@@ -151,65 +149,6 @@ class AuthController extends Controller
         $user->update($validated);
 
         return response()->json(['message' => 'Cập nhật thông tin thành công', 'user' => $user]);
-    }
-
-    /** Chức năng: Thêm địa chỉ nhận hàng/liên hệ cho người dùng và xử lý địa chỉ mặc định. */
-    public function addAddress(Request $request)
-    {
-        $user = Auth::user();
-
-        $validated = $request->validate([
-            'province'     => ['required', 'string', 'max:100'],
-            'district'     => ['required', 'string', 'max:100'],
-            'ward'         => ['required', 'string', 'max:100'],
-            'address_line' => ['required', 'string'],
-            'address_type' => ['required', 'in:' . implode(',', self::ADDRESS_TYPES)],
-            'is_default'   => ['boolean'],
-        ]);
-
-        $isDefault = $validated['is_default'] ?? false;
-
-        if ($isDefault) {
-            UserAddress::where('user_id', $user->id)->update(['is_default' => false]);
-        } elseif (UserAddress::where('user_id', $user->id)->count() === 0) {
-            $isDefault = true;
-        }
-
-        $address = UserAddress::create(array_merge($validated, [
-            'user_id'    => $user->id,
-            'is_default' => $isDefault,
-        ]));
-
-        return response()->json(['message' => 'Thêm địa chỉ mới thành công', 'address' => $address], 201);
-    }
-
-    /** Chức năng: Cập nhật địa chỉ thuộc tài khoản hiện tại và đồng bộ lại cờ mặc định nếu cần. */
-    public function updateAddress(Request $request, $id)
-    {
-        $user = Auth::user();
-
-        $address = UserAddress::where('id', $id)->where('user_id', $user->id)->first();
-
-        if (!$address) {
-            return response()->json(['message' => 'Không tìm thấy địa chỉ hợp lệ'], 404);
-        }
-
-        $validated = $request->validate([
-            'province'     => ['required', 'string', 'max:100'],
-            'district'     => ['required', 'string', 'max:100'],
-            'ward'         => ['required', 'string', 'max:100'],
-            'address_line' => ['required', 'string'],
-            'address_type' => ['required', 'in:' . implode(',', self::ADDRESS_TYPES)],
-            'is_default'   => ['boolean'],
-        ]);
-
-        if (!empty($validated['is_default'])) {
-            UserAddress::where('user_id', $user->id)->where('id', '!=', $id)->update(['is_default' => false]);
-        }
-
-        $address->update($validated);
-
-        return response()->json(['message' => 'Cập nhật địa chỉ thành công', 'address' => $address]);
     }
 
     /** Chức năng: Cho người dùng đang đăng nhập tải lên hoặc thay ảnh đại diện của chính mình. */

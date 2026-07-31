@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from "react";
+﻿import React, { useState, useEffect } from "react";
+import { toast } from "../../utils/toast";
 import { motion, AnimatePresence } from "framer-motion";
 import { adminUserService } from "../../services/admin/adminUserService";
+import { getMembershipTier } from "../../utils/membershipTier";
 
 const CustomerManager = () => {
   const [customers, setCustomers] = useState([]);
@@ -25,7 +27,6 @@ const CustomerManager = () => {
     password: "",
     gender: "",
     date_of_birth: "",
-    membership_level: "",
     status: "active",
   });
   const [isEditing, setIsEditing] = useState(false);
@@ -34,8 +35,6 @@ const CustomerManager = () => {
   const [detailUser, setDetailUser] = useState(null);
 
   const [bookingStats, setBookingStats] = useState(null);
-  const [isDetailLoading, setIsDetailLoading] = useState(false);
-
   const [isResetOpen, setIsResetOpen] = useState(false);
   const [resetUser, setResetUser] = useState(null);
   const [resetForm, setResetForm] = useState({
@@ -71,11 +70,13 @@ const CustomerManager = () => {
     }
   };
 
+  // Hàm luôn nhận search/status hiện tại bằng tham số, không đọc bản chụp cũ.
   useEffect(() => {
     const timer = setTimeout(() => {
       fetchCustomers(1, search, statusFilter);
     }, 500);
     return () => clearTimeout(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search, statusFilter]);
 
   const handleEditClick = (user) => {
@@ -88,7 +89,6 @@ const CustomerManager = () => {
       password: "",
       gender: user.gender || "",
       date_of_birth: user.date_of_birth || "",
-      membership_level: user.membership_level || "",
       status: user.status || "active",
     });
   };
@@ -103,7 +103,6 @@ const CustomerManager = () => {
       password: "",
       gender: "",
       date_of_birth: "",
-      membership_level: "",
       status: "active",
     });
   };
@@ -121,7 +120,6 @@ const CustomerManager = () => {
           email: form.email || null,
           gender: form.gender || null,
           date_of_birth: form.date_of_birth || null,
-          membership_level: form.membership_level || null,
         };
         await adminUserService.createUser(payload);
         setMessage({ type: "success", text: "Thêm khách hàng thành công!" });
@@ -132,7 +130,6 @@ const CustomerManager = () => {
           phone: form.phone,
           gender: form.gender || null,
           date_of_birth: form.date_of_birth || null,
-          membership_level: form.membership_level || null,
           status: form.status,
         };
         await adminUserService.updateUser(form.id, payload);
@@ -152,7 +149,6 @@ const CustomerManager = () => {
   };
 
   const handleViewDetail = async (id) => {
-    setIsDetailLoading(true);
     setBookingStats(null);
 
     try {
@@ -165,9 +161,7 @@ const CustomerManager = () => {
       setBookingStats(statsResponse.data?.data?.booking_stats || null);
       setIsDetailOpen(true);
     } catch (error) {
-      alert("Không thể lấy chi tiết khách hàng.");
-    } finally {
-      setIsDetailLoading(false);
+      toast.error("Không thể lấy chi tiết khách hàng.");
     }
   };
 
@@ -184,7 +178,7 @@ const CustomerManager = () => {
       setMessage({ type: "success", text: "Cập nhật trạng thái thành công!" });
       fetchCustomers(pagination.current_page);
     } catch (error) {
-      alert(error.response?.data?.message || "Thao tác thất bại.");
+      toast.error(error.response?.data?.message || "Thao tác thất bại.");
     } finally {
       setTimeout(() => setMessage({ type: "", text: "" }), 2500);
     }
@@ -206,7 +200,7 @@ const CustomerManager = () => {
       setIsResetOpen(false);
       setResetUser(null);
     } catch (error) {
-      alert(error.response?.data?.message || "Reset mật khẩu thất bại.");
+      toast.error(error.response?.data?.message || "Reset mật khẩu thất bại.");
     } finally {
       setIsSaving(false);
       setTimeout(() => setMessage({ type: "", text: "" }), 2500);
@@ -384,7 +378,7 @@ const CustomerManager = () => {
                         <td className="py-3.5 px-3">
                           <div>
                             <p className="text-[11px] font-semibold text-zinc-700">
-                              {user.membership_level || "Vãng lai"}
+                              {getMembershipTier(user.points).label}
                             </p>
                             <p className="text-[10px] text-amber-600 font-medium">
                               ★ {user.points || 0}
@@ -592,21 +586,6 @@ const CustomerManager = () => {
               </div>
             </div>
 
-            <div>
-              <label className="admin-form-label">
-                Hạng thành viên
-              </label>
-              <input
-                type="text"
-                value={form.membership_level}
-                onChange={(e) =>
-                  setForm({ ...form, membership_level: e.target.value })
-                }
-                className={inputClass}
-                placeholder="Vãng lai, Bạc, Vàng..."
-              />
-            </div>
-
             <div className="pt-2">
               <button
                 type="submit"
@@ -675,7 +654,7 @@ const CustomerManager = () => {
                       )}
                     </div>
                     <p className="text-xs text-amber-600 font-medium">
-                      {detailUser.membership_level || "Thành viên Vãng lai"} • ★{" "}
+                      {getMembershipTier(detailUser.points).label} • ★{" "}
                       {detailUser.points || 0}
                     </p>
                   </div>

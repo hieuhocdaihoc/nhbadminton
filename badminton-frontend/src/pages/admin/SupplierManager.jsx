@@ -37,8 +37,10 @@ const SupplierManager = () => {
     }
   };
 
+  // Chỉ tải lần đầu; các lần tìm kiếm được kích hoạt bởi biểu mẫu.
   useEffect(() => {
     fetchSuppliers();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Top nhà cung cấp theo tổng tiền đã nhập — tính từ dữ liệu đã tải (không phân trang)

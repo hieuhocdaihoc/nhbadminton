@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
+import { toast } from "../../utils/toast";
 import { motion, AnimatePresence } from "framer-motion";
 import { adminBookingService } from "../../services/admin/bookingService";
 import { adminProductService } from "../../services/admin/productService";
@@ -204,17 +205,6 @@ const TodayBookings = () => {
   }, [bookings]);
 
   // --- ACTIONS ---
-  const handleUpdateStatus = async (id, status) => {
-    try {
-      setMessage({ type: "", text: "" });
-      await adminBookingService.updateStatus(id, { status });
-      setMessage({ type: "success", text: "✓ Cập nhật trạng thái đơn thành công!" });
-      fetchTodayData();
-    } catch (error) {
-      alert(error.response?.data?.message || "Thao tác thất bại!");
-    }
-  };
-
   const handleUpdatePayment = async (id, payment_status) => {
     try {
       setMessage({ type: "", text: "" });
@@ -222,7 +212,7 @@ const TodayBookings = () => {
       setMessage({ type: "success", text: "✓ Cập nhật thanh toán thành công!" });
       fetchTodayData();
     } catch (error) {
-      alert(error.response?.data?.message || "Thao tác thất bại!");
+      toast.error(error.response?.data?.message || "Thao tác thất bại!");
     }
   };
 
@@ -256,17 +246,30 @@ const TodayBookings = () => {
   };
 
   // Thu tiền cuối ca + hoàn thành trong 1 bước (backend tự tính phần còn thiếu)
-  const handleCheckout = async (id) => {
-    if (!window.confirm("Xác nhận thu tiền còn lại và hoàn thành ca chơi này?")) return;
+  const handleCheckout = async (booking) => {
+    const id = typeof booking === "string" ? booking : booking?.id;
+    const actualSessions = booking?.details?.length ?? booking?.card_sessions_planned ?? 0;
+
+    let confirmMsg = "Xác nhận thu tiền còn lại và hoàn thành ca chơi này?";
+    if (booking?.membership_card_id && actualSessions > 0) {
+      confirmMsg = `Hoàn thành ca chơi và trừ ${actualSessions} ca từ thẻ thành viên?`;
+    }
+    if (!window.confirm(confirmMsg)) return;
+
     setIsCheckingOut(true);
     try {
       setMessage({ type: "", text: "" });
-      await adminBookingService.checkout(id);
-      setMessage({ type: "success", text: "✓ Đã thu tiền và hoàn thành ca chơi!" });
+      const res = await adminBookingService.checkout(id);
+      const deduction = res.data?.card_deduction;
+      if (deduction) {
+        toast.success(`✓ Đã hoàn thành và trừ ${deduction.sessions_deducted} ca — còn ${deduction.remaining_sessions} ca.`);
+      } else {
+        setMessage({ type: "success", text: "✓ Đã thu tiền và hoàn thành ca chơi!" });
+      }
       setSelectedRow(null);
       fetchTodayData();
     } catch (error) {
-      alert(error.response?.data?.message || "Thao tác thất bại!");
+      toast.error(error.response?.data?.message || "Thao tác thất bại!");
     } finally {
       setIsCheckingOut(false);
     }
@@ -305,7 +308,7 @@ const TodayBookings = () => {
     );
 
     if (hasInvalidRow) {
-      return alert("Vui lòng chọn đầy đủ mặt hàng/dịch vụ và số lượng hợp lệ!");
+      return toast.warn("Vui lòng chọn đầy đủ mặt hàng/dịch vụ và số lượng hợp lệ!");
     }
 
     const items = itemRows.map((item) => {
@@ -334,7 +337,7 @@ const TodayBookings = () => {
       handleCloseAddItemModal();
       fetchTodayData();
     } catch (error) {
-      alert(error.response?.data?.message || "Có lỗi xảy ra khi thêm món!");
+      toast.error(error.response?.data?.message || "Có lỗi xảy ra khi thêm món!");
     } finally {
       setIsAddingItem(false);
       setTimeout(() => setMessage({ type: "", text: "" }), 2500);
@@ -347,8 +350,10 @@ const TodayBookings = () => {
   };
 
   // --- FILTER ---
+  // Hàm gom dòng không đọc state khác; chỉ dữ liệu bookings làm thay đổi kết quả.
   const displayBookings = useMemo(() => {
     return buildDisplayRows(bookings);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bookings]);
 
   const activeCourts = useMemo(() => {
@@ -410,18 +415,28 @@ const TodayBookings = () => {
     { key: "paid", label: "Đã thu", count: paidCount },
   ];
 
+  // Tổng phụ phí quá giờ + số phút lố, cộng dồn từ các buổi chơi (thường chỉ buổi cuối có phụ phí)
+  const sumOvertime = (details) => {
+    const list = details || [];
+    const fee = list.reduce((sum, d) => sum + Number(d.overtime_fee || 0), 0);
+    const minutes = list.reduce((sum, d) => sum + Number(d.overtime_minutes || 0), 0);
+    return { fee, minutes };
+  };
+
   // --- Số liệu chi tiết cho ca đang mở trong drawer ---
   const rowFinance = (b) => {
+    // Tiền sân GỐC (chưa gồm phụ phí quá giờ), lấy tổng price của từng buổi
     const courtAmount = Number(b._groupPrice || b.subtotal_court || 0);
     const serviceAmount = Number(b.subtotal_service || 0);
     const totalAmount = Number(b.total_price || 0);
     const remainingAmount = Number(b.remaining_amount || 0);
     const paidAmount = totalAmount - remainingAmount;
+    const { fee: overtimeFee, minutes: overtimeMinutes } = sumOvertime(b._groupDetails || b.details);
     const isOnlyProshopDebt =
       serviceAmount > 0 &&
       remainingAmount > 0 &&
       paidAmount >= Number(b.subtotal_court || 0);
-    return { courtAmount, serviceAmount, totalAmount, remainingAmount, paidAmount, isOnlyProshopDebt };
+    return { courtAmount, serviceAmount, totalAmount, remainingAmount, paidAmount, isOnlyProshopDebt, overtimeFee, overtimeMinutes };
   };
 
   return (
@@ -589,7 +604,7 @@ const TodayBookings = () => {
                               ? `${cfg.cell} hover:scale-105 cursor-pointer`
                               : "bg-white border-zinc-100 cursor-default"
                           }`}
-                          title={b ? `${b.customer_name} · ${b.booking_code}` : "Trống"}
+                          title={b ? `${b.customer_name}${b.staff?.full_name ? ` (NV: ${b.staff.full_name})` : ''} · ${b.booking_code}` : "Trống"}
                         >
                           {b ? b.customer_name?.split(" ").slice(-1)[0] : ""}
                         </button>
@@ -618,7 +633,14 @@ const TodayBookings = () => {
                 className="flex w-full items-center justify-between rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-left hover:bg-amber-100"
               >
                 <div>
-                  <p className="text-sm font-bold text-slate-900">{b.customer_name || 'Khách vãng lai'}</p>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <p className="text-sm font-bold text-slate-900">{b.customer_name || 'Khách vãng lai'}</p>
+                    {b.staff?.full_name && (
+                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-200 text-amber-900 border border-amber-300">
+                        NV: {b.staff.full_name}
+                      </span>
+                    )}
+                  </div>
                   <p className="text-xs text-slate-500">{b.booking_code} · {b.customer_phone}</p>
                 </div>
                 <span className={`text-xs font-bold px-2 py-1 rounded-lg ${statusConfig[b.status]?.cell || 'bg-slate-100 text-slate-500'}`}>
@@ -637,7 +659,7 @@ const TodayBookings = () => {
           const sc = statusConfig[b.status] || statusConfig.confirmed;
           const isCancelled = b.status === "cancelled";
           const isCompleted = b.status === "completed";
-          const { courtAmount, serviceAmount, totalAmount, remainingAmount, paidAmount, isOnlyProshopDebt } = rowFinance(b);
+          const { courtAmount, serviceAmount, totalAmount, remainingAmount, paidAmount, isOnlyProshopDebt, overtimeFee, overtimeMinutes } = rowFinance(b);
           const timeStr =
             b._groupStart && b._groupEnd
               ? `${b._groupStart.slice(0, 5)} – ${b._groupEnd.slice(0, 5)}`
@@ -654,8 +676,13 @@ const TodayBookings = () => {
               >
                 <div className="admin-modal-header">
                   <div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <h4 className="text-sm font-semibold text-zinc-800">{b.customer_name}</h4>
+                      {b.staff?.full_name && (
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                          NV tạo: {b.staff.full_name}
+                        </span>
+                      )}
                       <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium ${sc.bg} ${sc.text}`}>
                         <span className={`w-1.5 h-1.5 rounded-full ${sc.dot}`} /> {sc.label}
                       </span>
@@ -683,6 +710,16 @@ const TodayBookings = () => {
                       <span className="text-zinc-500">Pro-shop</span>
                       <span className="font-semibold text-violet-600">{serviceAmount.toLocaleString()}₫</span>
                     </div>
+                    {overtimeFee > 0 && (
+                      <div className="flex justify-between text-xs">
+                        <span className="text-amber-600">
+                          Phụ phí quá giờ ({overtimeMinutes} phút)
+                        </span>
+                        <span className="font-semibold text-amber-600">
+                          {overtimeFee.toLocaleString()}₫
+                        </span>
+                      </div>
+                    )}
                     <div className="flex justify-between text-xs">
                       <span className="text-zinc-500">Đã thu</span>
                       <span className="font-semibold text-emerald-600">{paidAmount.toLocaleString()}₫</span>
@@ -740,7 +777,7 @@ const TodayBookings = () => {
 
                     {(b.status === "confirmed" || b.status === "playing") && (
                       <button
-                        onClick={() => handleCheckout(b.id)}
+                        onClick={() => handleCheckout(b)}
                         disabled={isCheckingOut}
                         className="admin-btn-primary py-2.5 text-xs font-medium col-span-2 disabled:opacity-60"
                       >
@@ -1061,23 +1098,37 @@ const TodayBookings = () => {
                 </tbody>
               </table>
 
-              <div className="space-y-1 text-xs mb-5">
-                <div className="flex justify-between text-zinc-500">
-                  <span>Tiền sân:</span>
-                  <span>
-                    {Number(selectedBill.subtotal_court || 0).toLocaleString()}đ
-                  </span>
-                </div>
+              {(() => {
+                // subtotal_court từ backend đã CỘNG SẴN phụ phí quá giờ (nếu có) — tách
+                // riêng ra để hiển thị đúng "Tiền sân gốc" + "Phụ phí quá giờ" cho rõ ràng.
+                const { fee: billOvertimeFee, minutes: billOvertimeMinutes } = sumOvertime(
+                  selectedBill._groupDetails || selectedBill.details,
+                );
+                const baseCourtAmount = Number(selectedBill.subtotal_court || 0) - billOvertimeFee;
 
-                <div className="flex justify-between text-zinc-500">
-                  <span>Pro-shop:</span>
-                  <span>
-                    {Number(
-                      selectedBill.subtotal_service || 0,
-                    ).toLocaleString()}
-                    đ
-                  </span>
-                </div>
+                return (
+                  <div className="space-y-1 text-xs mb-5">
+                    <div className="flex justify-between text-zinc-500">
+                      <span>Tiền sân:</span>
+                      <span>{baseCourtAmount.toLocaleString()}đ</span>
+                    </div>
+
+                    <div className="flex justify-between text-zinc-500">
+                      <span>Pro-shop:</span>
+                      <span>
+                        {Number(
+                          selectedBill.subtotal_service || 0,
+                        ).toLocaleString()}
+                        đ
+                      </span>
+                    </div>
+
+                    {billOvertimeFee > 0 && (
+                      <div className="flex justify-between text-amber-600">
+                        <span>Phụ phí quá giờ ({billOvertimeMinutes} phút):</span>
+                        <span>{billOvertimeFee.toLocaleString()}đ</span>
+                      </div>
+                    )}
 
                 <div className="flex justify-between text-zinc-500">
                   <span>Đã thu:</span>
@@ -1108,7 +1159,9 @@ const TodayBookings = () => {
                     {Number(selectedBill.total_price || 0).toLocaleString()}đ
                   </span>
                 </div>
-              </div>
+                  </div>
+                );
+              })()}
 
               <p className="text-center text-[10px] text-zinc-400 mb-6">
                 Cảm ơn quý khách!
@@ -1125,7 +1178,7 @@ const TodayBookings = () => {
                 </button>
 
                 <button
-                  onClick={() => alert("Kết nối máy in...")}
+                  onClick={() => toast.info("Kết nối máy in...")}
                   className="admin-btn-secondary flex-1 py-2.5 text-xs font-medium"
                 >
                   🖨️ In Bill

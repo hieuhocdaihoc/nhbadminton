@@ -3,9 +3,9 @@
 namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\Court;
 use App\Models\CourtPricing;
 use App\Models\CourtPriceHistory;
+use App\Services\CourtPricingResolver;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -14,11 +14,14 @@ class CourtPricingController extends Controller
     private const DAY_TYPES = ['weekday', 'weekend', 'holiday'];
     private const MIN_BOOKING_MINUTES = 30;
 
-    /** Chức năng: Lấy danh sách bảng giá sân theo sân, loại ngày và khung giờ. */
+    public function __construct(private CourtPricingResolver $pricingResolver)
+    {
+    }
+
+    /** Chức năng: Lấy danh sách bảng giá chung (áp dụng cho tất cả sân). */
     public function index()
     {
-        $pricings = CourtPricing::with('court:id,name')
-            ->orderBy('court_id')
+        $pricings = CourtPricing::orderBy('day_type')
             ->orderBy('start_time')
             ->get();
 
@@ -28,11 +31,10 @@ class CourtPricingController extends Controller
         ]);
     }
 
-    /** Chức năng: Tạo mới khung giá sân. */
+    /** Chức năng: Tạo mới một khung giá chung. */
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'court_id'            => ['required', 'exists:courts,id'],
             'day_type'            => ['required', 'in:' . implode(',', self::DAY_TYPES)],
             'start_time'          => ['required', 'date_format:H:i', 'before:end_time'],
             'end_time'            => ['required', 'date_format:H:i'],
@@ -44,10 +46,8 @@ class CourtPricingController extends Controller
 
         $pricing = CourtPricing::create($validated);
 
-        // Ghi lịch sử: tạo mới khung giá
         CourtPriceHistory::create([
             'court_pricing_id' => $pricing->id,
-            'court_id'         => $pricing->court_id,
             'old_price'        => null,
             'new_price'        => $pricing->price,
             'action'           => 'create',
@@ -61,21 +61,18 @@ class CourtPricingController extends Controller
         ], 201);
     }
 
-    /** Chức năng: Lấy chi tiết một cấu hình giá sân. */
+    /** Chức năng: Lấy chi tiết một cấu hình giá. */
     public function show($id)
     {
-        $pricing = CourtPricing::with('court:id,name')->findOrFail($id);
-
-        return response()->json(['data' => $pricing]);
+        return response()->json(['data' => CourtPricing::findOrFail($id)]);
     }
 
-    /** Chức năng: Cập nhật bảng giá sân. */
+    /** Chức năng: Cập nhật một khung giá chung. */
     public function update(Request $request, $id)
     {
         $pricing = CourtPricing::findOrFail($id);
 
         $validated = $request->validate([
-            'court_id'            => ['required', 'exists:courts,id'],
             'day_type'            => ['required', 'in:' . implode(',', self::DAY_TYPES)],
             'start_time'          => ['required', 'date_format:H:i', 'before:end_time'],
             'end_time'            => ['required', 'date_format:H:i'],
@@ -88,11 +85,9 @@ class CourtPricingController extends Controller
         $oldPrice = (float) $pricing->price;
         $pricing->update($validated);
 
-        // Ghi lịch sử nếu giá thay đổi
         if ((float) $validated['price'] !== $oldPrice) {
             CourtPriceHistory::create([
                 'court_pricing_id' => $pricing->id,
-                'court_id'         => $pricing->court_id,
                 'old_price'        => $oldPrice,
                 'new_price'        => (float) $validated['price'],
                 'action'           => 'update',
@@ -107,15 +102,13 @@ class CourtPricingController extends Controller
         ]);
     }
 
-    /** Chức năng: Xóa cấu hình giá sân không còn áp dụng. */
+    /** Chức năng: Xóa một khung giá. */
     public function destroy($id)
     {
         $pricing = CourtPricing::findOrFail($id);
 
-        // Ghi lịch sử: xóa khung giá
         CourtPriceHistory::create([
             'court_pricing_id' => $pricing->id,
-            'court_id'         => $pricing->court_id,
             'old_price'        => (float) $pricing->price,
             'new_price'        => null,
             'action'           => 'delete',
@@ -129,11 +122,8 @@ class CourtPricingController extends Controller
     }
 
     /**
-     * Chức năng: Tạo/cập nhật một mốc giá áp dụng đồng nhất cho TẤT CẢ sân trong 1 transaction.
-     * Mỗi sân được upsert theo khóa (loại ngày + khung giờ + thời vụ); lỗi giữa chừng thì
-     * rollback toàn bộ nên không bao giờ xảy ra tình trạng các sân lệch giá nhau.
-     * Nếu truyền entry_ids (chế độ sửa nhóm) thì cập nhật trực tiếp các bản ghi đó
-     * (cho phép đổi cả khung giờ/loại ngày) và tạo bù cho sân còn thiếu.
+     * Chức năng: Tạo hoặc cập nhật một mốc giá chung trong 1 transaction.
+     * Nếu truyền entry_ids thì cập nhật bản ghi đó; ngược lại tìm bản ghi trùng khóa để upsert.
      */
     public function bulkUpsert(Request $request)
     {
@@ -150,7 +140,6 @@ class CourtPricingController extends Controller
         ]);
 
         $userId   = $request->user()?->id;
-        $courts   = Court::orderBy('name')->get();
         $entryIds = $validated['entry_ids'] ?? [];
         $note     = "{$validated['day_type']} {$validated['start_time']}-{$validated['end_time']}";
 
@@ -162,76 +151,62 @@ class CourtPricingController extends Controller
             ], 422);
         }
 
-        $result = DB::transaction(function () use ($validated, $courts, $entryIds, $userId, $note) {
-            $created = 0;
-            $updated = 0;
-            $coveredCourtIds = [];
-
-            // Chế độ sửa nhóm: cập nhật các bản ghi được chỉ định trước
-            foreach (CourtPricing::whereIn('id', $entryIds)->get() as $pricing) {
+        $result = DB::transaction(function () use ($validated, $entryIds, $userId, $note) {
+            // Chế độ sửa: cập nhật bản ghi đã chỉ định
+            if (!empty($entryIds)) {
+                $pricing = CourtPricing::whereIn('id', $entryIds)->firstOrFail();
                 $this->applyRowUpdate($pricing, $validated, $userId, $note);
-                $coveredCourtIds[] = $pricing->court_id;
-                $updated++;
+                return ['created' => 0, 'updated' => 1];
             }
 
-            foreach ($courts as $court) {
-                if (in_array($court->id, $coveredCourtIds, true)) {
-                    continue;
-                }
+            // Chế độ tạo: tìm bản ghi trùng khóa để upsert, hoặc tạo mới
+            $existing = CourtPricing::where('day_type', $validated['day_type'])
+                ->where('start_time', $validated['start_time'] . ':00')
+                ->where('end_time', $validated['end_time'] . ':00')
+                ->where(function ($q) use ($validated) {
+                    $from = $validated['effective_from'] ?? null;
+                    $from ? $q->where('effective_from', $from) : $q->whereNull('effective_from');
+                })
+                ->where(function ($q) use ($validated) {
+                    $to = $validated['effective_to'] ?? null;
+                    $to ? $q->where('effective_to', $to) : $q->whereNull('effective_to');
+                })
+                ->first();
 
-                $existing = CourtPricing::where('court_id', $court->id)
-                    ->where('day_type', $validated['day_type'])
-                    ->where('start_time', $validated['start_time'] . ':00')
-                    ->where('end_time', $validated['end_time'] . ':00')
-                    ->where(function ($q) use ($validated) {
-                        $from = $validated['effective_from'] ?? null;
-                        $from ? $q->where('effective_from', $from) : $q->whereNull('effective_from');
-                    })
-                    ->where(function ($q) use ($validated) {
-                        $to = $validated['effective_to'] ?? null;
-                        $to ? $q->where('effective_to', $to) : $q->whereNull('effective_to');
-                    })
-                    ->first();
-
-                if ($existing) {
-                    $this->applyRowUpdate($existing, $validated, $userId, $note);
-                    $updated++;
-                    continue;
-                }
-
-                $pricing = CourtPricing::create([
-                    'court_id'            => $court->id,
-                    'day_type'            => $validated['day_type'],
-                    'start_time'          => $validated['start_time'],
-                    'end_time'            => $validated['end_time'],
-                    'price'               => $validated['price'],
-                    'effective_from'      => $validated['effective_from'] ?? null,
-                    'effective_to'        => $validated['effective_to'] ?? null,
-                    'min_booking_minutes' => $validated['min_booking_minutes'] ?? 60,
-                ]);
-
-                CourtPriceHistory::create([
-                    'court_pricing_id' => $pricing->id,
-                    'court_id'         => $court->id,
-                    'old_price'        => null,
-                    'new_price'        => $pricing->price,
-                    'action'           => 'create',
-                    'note'             => $note,
-                    'changed_by'       => $userId,
-                ]);
-                $created++;
+            if ($existing) {
+                $this->applyRowUpdate($existing, $validated, $userId, $note);
+                return ['created' => 0, 'updated' => 1];
             }
 
-            return ['created' => $created, 'updated' => $updated];
+            $pricing = CourtPricing::create([
+                'day_type'            => $validated['day_type'],
+                'start_time'          => $validated['start_time'],
+                'end_time'            => $validated['end_time'],
+                'price'               => $validated['price'],
+                'effective_from'      => $validated['effective_from'] ?? null,
+                'effective_to'        => $validated['effective_to'] ?? null,
+                'min_booking_minutes' => $validated['min_booking_minutes'] ?? 60,
+            ]);
+
+            CourtPriceHistory::create([
+                'court_pricing_id' => $pricing->id,
+                'old_price'        => null,
+                'new_price'        => $pricing->price,
+                'action'           => 'create',
+                'note'             => $note,
+                'changed_by'       => $userId,
+            ]);
+
+            return ['created' => 1, 'updated' => 0];
         });
 
         return response()->json([
-            'message' => "Đã áp dụng mốc giá cho {$courts->count()} sân",
+            'message' => $result['created'] ? 'Đã tạo mốc giá mới' : 'Đã cập nhật mốc giá',
             'data'    => $result,
         ]);
     }
 
-    /** Chức năng: Xóa nguyên một mốc giá khỏi tất cả các sân trong 1 transaction. */
+    /** Chức năng: Xóa một hoặc nhiều mốc giá. */
     public function bulkDestroy(Request $request)
     {
         $validated = $request->validate([
@@ -247,7 +222,6 @@ class CourtPricingController extends Controller
             foreach ($pricings as $pricing) {
                 CourtPriceHistory::create([
                     'court_pricing_id' => $pricing->id,
-                    'court_id'         => $pricing->court_id,
                     'old_price'        => (float) $pricing->price,
                     'new_price'        => null,
                     'action'           => 'delete',
@@ -260,14 +234,13 @@ class CourtPricingController extends Controller
             return $pricings->count();
         });
 
-        return response()->json(['message' => "Đã xóa mốc giá khỏi {$deleted} sân"]);
+        return response()->json(['message' => "Đã xóa {$deleted} mốc giá"]);
     }
 
     /**
-     * Tìm mốc giá đã có bị chồng khung giờ với mốc đang lưu (cùng loại ngày, cùng phạm vi).
-     * Giá thời vụ đè lên giá cố định là chủ đích (giá lễ/Tết) nên KHÔNG tính là chồng;
+     * Tìm mốc giá đã có bị chồng khung giờ với mốc đang lưu.
+     * Giá thời vụ đè lên giá cố định là hợp lệ (giá lễ/Tết);
      * chỉ chặn: cố định chồng cố định, hoặc thời vụ chồng thời vụ có khoảng ngày giao nhau.
-     * Bản ghi trùng khóa hoàn toàn (chính là mục tiêu upsert) và các entry đang sửa được bỏ qua.
      */
     private function findOverlappingGroup(array $validated, array $entryIds): ?CourtPricing
     {
@@ -279,7 +252,6 @@ class CourtPricingController extends Controller
         $query = CourtPricing::where('day_type', $validated['day_type'])
             ->where('start_time', '<', $newEnd)
             ->where('end_time', '>', $newStart)
-            // Bỏ qua bản ghi trùng khóa hoàn toàn — đó là mục tiêu được upsert, không phải xung đột
             ->whereNot(function ($q) use ($newStart, $newEnd, $from, $to) {
                 $q->where('start_time', $newStart)->where('end_time', $newEnd);
                 $from ? $q->where('effective_from', $from) : $q->whereNull('effective_from');
@@ -305,7 +277,7 @@ class CourtPricingController extends Controller
         return $query->first();
     }
 
-    /** Cập nhật 1 bản ghi giá trong thao tác gộp: giữ min_booking_minutes cũ nếu không truyền, ghi lịch sử khi giá đổi. */
+    /** Cập nhật 1 bản ghi giá, ghi lịch sử khi giá đổi. */
     private function applyRowUpdate(CourtPricing $pricing, array $validated, ?string $userId, string $note): void
     {
         $oldPrice = (float) $pricing->price;
@@ -323,7 +295,6 @@ class CourtPricingController extends Controller
         if ((float) $validated['price'] !== $oldPrice) {
             CourtPriceHistory::create([
                 'court_pricing_id' => $pricing->id,
-                'court_id'         => $pricing->court_id,
                 'old_price'        => $oldPrice,
                 'new_price'        => (float) $validated['price'],
                 'action'           => 'update',
@@ -333,118 +304,59 @@ class CourtPricingController extends Controller
         }
     }
 
-    /**
-     * Chức năng: Báo cáo lịch sử sửa giá — số lần cập nhật, chênh lệch giá cũ/mới,
-     * người sửa và thời điểm, lọc được theo sân.
-     */
+    /** Chức năng: Lịch sử sửa giá — biến động giá, người sửa, thời điểm. */
     public function priceHistory(Request $request)
     {
-        $query = CourtPriceHistory::with(['court:id,name', 'changedBy:id,full_name'])
-            ->orderByDesc('created_at');
-
-        if ($request->filled('court_id')) {
-            $query->where('court_id', $request->court_id);
-        }
-
-        $histories = $query->limit(200)->get()->map(fn($h) => [
-            'id'          => $h->id,
-            'court_name'  => $h->court?->name ?? '—',
-            'old_price'   => $h->old_price,
-            'new_price'   => $h->new_price,
-            'diff'        => ($h->new_price !== null && $h->old_price !== null) ? $h->new_price - $h->old_price : null,
-            'action'      => $h->action,
-            'note'        => $h->note,
-            'changed_by'  => $h->changedBy?->full_name ?? '—',
-            'created_at'  => $h->created_at?->format('d/m/Y H:i'),
-        ]);
-
-        // Thống kê tổng quan: số lần sửa giá theo sân
-        $summary = CourtPriceHistory::select('court_id', DB::raw('COUNT(*) as change_count'))
-            ->groupBy('court_id')
-            ->with('court:id,name')
+        $histories = CourtPriceHistory::with(['changedBy:id,full_name'])
+            ->orderByDesc('created_at')
+            ->limit(200)
             ->get()
-            ->map(fn($s) => [
-                'court_name'   => $s->court?->name ?? '—',
-                'change_count' => (int) $s->change_count,
+            ->map(fn($h) => [
+                'id'         => $h->id,
+                'old_price'  => $h->old_price,
+                'new_price'  => $h->new_price,
+                'diff'       => ($h->new_price !== null && $h->old_price !== null) ? $h->new_price - $h->old_price : null,
+                'action'     => $h->action,
+                'note'       => $h->note,
+                'changed_by' => $h->changedBy?->full_name ?? '—',
+                'created_at' => $h->created_at?->format('d/m/Y H:i'),
             ]);
+
+        $totalChanges = CourtPriceHistory::count();
 
         return response()->json([
             'status'  => 'success',
             'data'    => $histories,
-            'summary' => $summary,
+            'summary' => [['label' => 'Tổng thay đổi', 'change_count' => $totalChanges]],
         ]);
     }
 
-    /** Chức năng: Tính thử giá thuê sân theo sân, ngày và khung giờ khách chọn. */
+    /** Chức năng: Tính thử giá theo ngày và khung giờ khách chọn. */
     public function calculatePrice(Request $request)
     {
         $validated = $request->validate([
-            'court_id'   => ['required', 'exists:courts,id'],
             'date'       => ['required', 'date'],
             'start_time' => ['required', 'date_format:H:i'],
             'end_time'   => ['required', 'date_format:H:i', 'after:start_time'],
         ]);
 
-        $bookingDate = $validated['date'];
-        $dayOfWeek   = date('N', strtotime($bookingDate));
-        $dayType     = ($dayOfWeek >= 6) ? 'weekend' : 'weekday';
-
-        $pricings = CourtPricing::where('court_id', $validated['court_id'])
-            ->where('day_type', $dayType)
-            ->where(function ($q) use ($bookingDate) {
-                $q->whereNull('effective_from')->orWhere('effective_from', '<=', $bookingDate);
-            })
-            ->where(function ($q) use ($bookingDate) {
-                $q->whereNull('effective_to')->orWhere('effective_to', '>=', $bookingDate);
-            })
-            ->orderByRaw('effective_from DESC')
-            ->get();
-
-        $totalPrice  = 0;
-        $details     = [];
-        $filledSlots = [];
-
-        foreach ($pricings as $pricing) {
-            $dbStart = substr($pricing->start_time, 0, 5);
-            $dbEnd   = substr($pricing->end_time, 0, 5);
-
-            $overlapStart = max($validated['start_time'], $dbStart);
-            $overlapEnd   = min($validated['end_time'], $dbEnd);
-
-            if ($overlapStart >= $overlapEnd) {
-                continue;
-            }
-
-            $slotKey = $overlapStart . '-' . $overlapEnd;
-
-            if (isset($filledSlots[$slotKey])) {
-                continue;
-            }
-
-            $minutes     = (strtotime($overlapEnd) - strtotime($overlapStart)) / 60;
-            $amount      = ($minutes / 60) * $pricing->price;
-            $totalPrice += $amount;
-
-            $details[]         = [
-                'khung_gia'  => "$dbStart - $dbEnd",
-                'loai_gia'   => $pricing->effective_from ? 'Giá thời vụ' : 'Giá mặc định',
-                'thanh_tien' => round($amount, 2),
-            ];
-            $filledSlots[$slotKey] = true;
-        }
+        $calculation = $this->pricingResolver->calculate(
+            $validated['date'],
+            $validated['start_time'],
+            $validated['end_time']
+        );
 
         return response()->json([
             'status'      => 'success',
-            'total_price' => round($totalPrice, 2),
-            'details'     => $details,
+            'total_price' => $calculation['total_price'],
+            'details'     => $calculation['details'],
         ]);
     }
 
-    /** Chức năng: Trả bảng giá public của một sân cho frontend khách hàng. */
-    public function getPublicPricing($courtId)
+    /** Chức năng: Trả bảng giá public (dùng cho trang chi tiết sân). */
+    public function getPublicPricing($courtId = null)
     {
-        $pricings = CourtPricing::where('court_id', $courtId)
-            ->orderBy('day_type')
+        $pricings = CourtPricing::orderBy('day_type')
             ->orderBy('start_time')
             ->get();
 
@@ -452,14 +364,12 @@ class CourtPricingController extends Controller
     }
 
     /**
-     * Chức năng: Trả về bảng giá tổng hợp cho trang chủ.
-     * Gom nhóm theo day_type + khung giờ, lấy giá cao nhất trong nhóm (đại diện cho tất cả sân).
+     * Chức năng: Bảng giá tổng hợp cho trang chủ.
      * Kết quả: { weekday: [...slots], weekend: [...slots], holiday: [...slots] }
      */
     public function getPublicAllPricings()
     {
-        $rows = CourtPricing::selectRaw('day_type, start_time, end_time, MAX(price) as price')
-            ->groupBy('day_type', 'start_time', 'end_time')
+        $rows = CourtPricing::whereNull('effective_from')
             ->orderBy('day_type')
             ->orderBy('start_time')
             ->get();

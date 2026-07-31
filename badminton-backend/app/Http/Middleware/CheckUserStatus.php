@@ -4,14 +4,15 @@ namespace App\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 class CheckUserStatus
 {
     public function handle(Request $request, Closure $next)
     {
-        $user = $request->user();
+        $user = $request->user() ?? Auth::guard('sanctum')->user();
 
-        if ($user && $user->status === 'blocked') {
+        if ($user && $user->status !== 'active') {
             $user->tokens()->delete();
 
             return response()->json([

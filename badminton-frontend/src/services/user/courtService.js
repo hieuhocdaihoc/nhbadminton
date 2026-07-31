@@ -1,7 +1,7 @@
 import axiosClient from '../axiosClient';
 
 export const courtService = {
-    // Lấy danh sách sân
+    // Lấy danh sách sân — backend tự detect thẻ thành viên từ token (auth optionally)
     getPublicCourts: () => axiosClient.get('/courts'),
 
     // Lấy chi tiết sân (Dùng cho BookingPage)

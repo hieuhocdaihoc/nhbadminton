@@ -24,7 +24,7 @@ return new class extends Migration
             $table->string('membership_level', 20)->default('bronze');
             $table->integer('points')->default(0);
             $table->decimal('total_spent', 15, 2)->default(0);
-            $table->enum('status', ['active', 'inactive', 'banned'])->default('active');
+            $table->enum('status', ['active', 'blocked'])->default('active');
             $table->timestamps();
         });
 
@@ -162,7 +162,7 @@ return new class extends Migration
             $table->dateTime('check_in_at')->nullable();
             $table->dateTime('check_out_at')->nullable();
             $table->enum('status', ['confirmed', 'completed', 'cancelled', 'playing'])->default('confirmed');
-            $table->enum('payment_status', ['unpaid', 'partial', 'paid'])->default('unpaid');
+            $table->enum('payment_status', ['unpaid', 'partially_paid', 'paid'])->default('unpaid');
             $table->dateTime('points_awarded_at')->nullable();
 
             $table->foreign('user_id')->references('id')->on('users')->nullOnDelete();
@@ -225,7 +225,7 @@ return new class extends Migration
             $table->string('payment_method', 50)->nullable();
             $table->decimal('amount', 12, 2)->default(0);
             $table->dateTime('paid_at')->nullable();
-            $table->enum('status', ['pending', 'completed', 'failed', 'refunded'])->default('pending');
+            $table->enum('status', ['pending', 'success', 'completed', 'failed', 'refunded'])->default('pending');
             $table->string('sepay_transaction_id', 100)->nullable();
             $table->string('bank_gateway', 50)->nullable();
             $table->string('reference_code', 100)->nullable();
@@ -244,7 +244,7 @@ return new class extends Migration
             $table->string('refund_method', 30)->default('cash');
             $table->string('refund_info', 255)->nullable();
             $table->char('processed_by', 36)->nullable();
-            $table->enum('status', ['pending', 'completed', 'rejected'])->default('pending');
+            $table->enum('status', ['recorded', 'pending', 'completed', 'rejected'])->default('recorded');
             $table->timestamp('created_at')->useCurrent();
 
             $table->foreign('payment_id')->references('id')->on('payments')->nullOnDelete();
@@ -318,6 +318,7 @@ return new class extends Migration
             $table->index('court_pricing_id');
 
             $table->foreign('court_id')->references('id')->on('courts')->nullOnDelete();
+            $table->foreign('court_pricing_id')->references('id')->on('court_pricing')->nullOnDelete();
             $table->foreign('changed_by')->references('id')->on('users')->nullOnDelete();
         });
 
@@ -361,7 +362,7 @@ return new class extends Migration
             $table->char('supplier_id', 36)->nullable();
             $table->string('purchase_code', 30)->unique();
             $table->decimal('total_amount', 12, 2)->default(0);
-            $table->enum('status', ['draft', 'confirmed', 'received', 'cancelled'])->default('draft');
+            $table->enum('status', ['completed'])->default('completed');
             $table->char('created_by', 36)->nullable();
             $table->timestamp('created_at')->useCurrent();
 
@@ -382,20 +383,6 @@ return new class extends Migration
             $table->foreign('product_id')->references('id')->on('products')->nullOnDelete();
         });
 
-        // 25. user_addresses
-        Schema::create('user_addresses', function (Blueprint $table) {
-            $table->char('id', 36)->primary();
-            $table->char('user_id', 36)->nullable();
-            $table->string('province', 100)->nullable();
-            $table->string('district', 100)->nullable();
-            $table->string('ward', 100)->nullable();
-            $table->string('address_line', 255)->nullable();
-            $table->string('address_type', 30)->default('home');
-            $table->boolean('is_default')->default(false);
-
-            $table->foreign('user_id')->references('id')->on('users')->cascadeOnDelete();
-        });
-
         Schema::enableForeignKeyConstraints();
     }
 
@@ -403,7 +390,6 @@ return new class extends Migration
     {
         Schema::disableForeignKeyConstraints();
 
-        Schema::dropIfExists('user_addresses');
         Schema::dropIfExists('purchase_order_details');
         Schema::dropIfExists('purchase_orders');
         Schema::dropIfExists('inventory_transactions');

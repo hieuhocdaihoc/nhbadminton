@@ -14,7 +14,6 @@ class CourtPriceHistory extends Model
 
     protected $fillable = [
         'court_pricing_id',
-        'court_id',
         'old_price',
         'new_price',
         'action',
@@ -28,12 +27,6 @@ class CourtPriceHistory extends Model
         'new_price'  => 'float',
         'created_at' => 'datetime',
     ];
-
-    /** Quan hệ: Lịch sử giá thuộc về một sân */
-    public function court()
-    {
-        return $this->belongsTo(Court::class, 'court_id', 'id');
-    }
 
     /** Quan hệ: Người thực hiện thay đổi giá */
     public function changedBy()

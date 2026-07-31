@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import AuthModal from './AuthModal';
 import { authService } from '../../services/auth/authService';
+import { getMembershipTier } from '../../utils/membershipTier';
 
 const Header = () => {
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -20,6 +21,7 @@ const Header = () => {
     const [userDropdownOpen, setUserDropdownOpen] = useState(false);
     const [authModalOpen, setAuthModalOpen] = useState(false);
     const [authMode, setAuthMode] = useState('login');
+    const membershipTier = getMembershipTier(currentUser?.points);
 
     // PERSIST SESSION
     useEffect(() => {
@@ -197,12 +199,12 @@ const Header = () => {
                                                     </div>
                                                     <div className="rounded-lg bg-zinc-800 border border-zinc-600 px-2.5 py-2">
                                                         <p className="text-[10px] font-bold uppercase text-zinc-400">Hạng</p>
-                                                        <p className="text-sm font-black text-white">{currentUser.membership_level || 'Đồng'}</p>
+                                                        <p className="text-sm font-black text-white">{membershipTier.label}</p>
                                                     </div>
                                                 </div>
-                                                {(currentUser.points || 0) >= 1000 && (
+                                                {membershipTier.hourlyDiscount > 0 && (
                                                     <p className="mt-2 rounded-lg border border-lime-400/30 bg-lime-400/10 px-2.5 py-2 text-[11px] font-semibold text-lime-300">
-                                                        Ưu đãi: giảm 5.000đ mỗi giờ chơi
+                                                        Ưu đãi: giảm {membershipTier.hourlyDiscount.toLocaleString('vi-VN')}đ mỗi giờ chơi
                                                     </p>
                                                 )}
                                             </div>

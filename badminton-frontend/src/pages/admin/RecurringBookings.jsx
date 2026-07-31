@@ -1,4 +1,5 @@
 import { Fragment, useState, useEffect, useMemo, useCallback } from "react";
+import { toast } from "../../utils/toast";
 import { useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { adminBookingService } from "../../services/admin/bookingService";
@@ -8,6 +9,16 @@ import {
   relativeDayLabel,
   relativeDayStyle,
 } from "../../utils/bookingDateGroups";
+
+const formatBookingTimeRange = (details) => {
+  if (!details || details.length === 0) return "—";
+  const starts = details.map((d) => d.start_time).filter(Boolean).sort();
+  const ends = details.map((d) => d.end_time).filter(Boolean).sort();
+  if (starts.length === 0 || ends.length === 0) return "—";
+  const earliest = starts[0].slice(0, 5);
+  const latest = ends[ends.length - 1].slice(0, 5);
+  return `${earliest} – ${latest}`;
+};
 
 const RecurringBookings = () => {
   const location = useLocation();
@@ -230,7 +241,7 @@ const RecurringBookings = () => {
         handleSelectMaster(selectedMaster);
       }
     } catch (e) {
-      alert(e.response?.data?.message || "Lỗi hệ thống!");
+      toast.error(e.response?.data?.message || "Lỗi hệ thống!");
     } finally {
       setIsProcessing(false);
       setTimeout(() => setMessage({ type: "", text: "" }), 2500);
@@ -240,7 +251,7 @@ const RecurringBookings = () => {
   // --- RESCHEDULE ---
   const openRescheduleModal = (sessionBooking) => {
     const detail = sessionBooking.details?.[0];
-    if (!detail) return alert("Không tìm thấy chi tiết ca chơi!");
+    if (!detail) return toast.error("Không tìm thấy chi tiết ca chơi!");
     setRescheduleForm({
       court_id: detail.court_id,
       booking_date: detail.booking_date,
@@ -266,7 +277,7 @@ const RecurringBookings = () => {
       setRescheduleModal({ isOpen: false, detailId: null, booking: null });
       if (selectedMaster) handleSelectMaster(selectedMaster);
     } catch (error) {
-      alert(error.response?.data?.message || "Có lỗi xảy ra!");
+      toast.error(error.response?.data?.message || "Có lỗi xảy ra!");
     } finally {
       setIsProcessing(false);
       setTimeout(() => setMessage({ type: "", text: "" }), 2500);
@@ -519,7 +530,7 @@ const RecurringBookings = () => {
                                 {s.details?.[0]?.booking_date ? formatVN(s.details[0].booking_date) : "—"}
                               </p>
                               <p className="text-[11px] font-mono text-zinc-500 mt-0.5">
-                                {s.details?.[0]?.start_time?.slice(0,5)} – {s.details?.[0]?.end_time?.slice(0,5)}
+                                {formatBookingTimeRange(s.details)}
                               </p>
                               {s.details?.[0]?.booking_date && (
                                 <span className={`inline-block mt-1 px-1.5 py-0.5 rounded text-[9px] font-medium ${relativeDayStyle(s.details[0].booking_date)}`}>
@@ -532,6 +543,11 @@ const RecurringBookings = () => {
                             <div className="w-28 shrink-0">
                               <p className="text-[10px] text-zinc-400 mb-0.5">Mã ca</p>
                               <p className="text-[11px] font-mono text-zinc-600">{s.booking_code}</p>
+                              {s.staff?.full_name && (
+                                <span className="inline-block mt-0.5 px-1 py-0.5 rounded text-[8px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                                  NV: {s.staff.full_name}
+                                </span>
+                              )}
                             </div>
 
                             {/* Sân */}

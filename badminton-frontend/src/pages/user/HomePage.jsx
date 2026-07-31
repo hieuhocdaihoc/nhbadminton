@@ -1,8 +1,10 @@
-import { useState, useEffect } from "react";
+﻿import { useState, useEffect } from "react";
+import { toast } from "../../utils/toast";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { courtService } from "../../services/user/courtService";
 import { reviewService } from "../../services/user/reviewService";
+import { API_ORIGIN } from "../../services/axiosClient";
 
 /* ═══════════════════════════════════════════════════════════
    DỮ LIỆU TĨNH - GIỮ NGUYÊN TỪ BẢN GỐC
@@ -74,10 +76,6 @@ const floatAnimation = {
   rotate: [0, 3, -3, 0],
   transition: { duration: 5, repeat: Infinity, ease: "easeInOut" },
 };
-const floatSlow = {
-  y: [0, -18, 0],
-  transition: { duration: 7, repeat: Infinity, ease: "easeInOut" },
-};
 
 /* ═══════════════════════════════════════════════════════════
    HOMEPAGE COMPONENT
@@ -87,7 +85,11 @@ const HomePage = () => {
   // ─── STATES GIỮ NGUYÊN ───
   const [publicCourts, setPublicCourts] = useState([]);
   const [publicReviews, setPublicReviews] = useState([]);
-  const [pricings, setPricings] = useState({ weekday: [], weekend: [], holiday: [] });
+  const [pricings, setPricings] = useState({
+    weekday: [],
+    weekend: [],
+    holiday: [],
+  });
   const [reviewSummary, setReviewSummary] = useState({
     average_rating: 0,
     total_reviews: 0,
@@ -148,15 +150,20 @@ const HomePage = () => {
   }, []);
 
   useEffect(() => {
-    courtService.getPublicPricings()
-      .then((res) => setPricings(res.data?.data || { weekday: [], weekend: [], holiday: [] }))
+    courtService
+      .getPublicPricings()
+      .then((res) =>
+        setPricings(
+          res.data?.data || { weekday: [], weekend: [], holiday: [] },
+        ),
+      )
       .catch(() => {});
   }, []);
 
   // ─── ĐIỀU HƯỚNG CHỌN SÂN ───
   const handleSelectCourtToBook = (court) => {
     if (!searchDate) {
-      alert("Vui lòng chọn ngày thi đấu trước!");
+      toast.warn("Vui lòng chọn ngày thi đấu trước!");
       return;
     }
     navigate(`/booking-page?courtId=${court.id}&date=${searchDate}`);
@@ -257,19 +264,24 @@ const HomePage = () => {
                 </motion.a>
               </motion.div>
 
-              {/* Thống kê nhỏ */}
+              {/* Thống kê nhỏ — có đường chia dọc, số căn cột tabular-nums */}
               <motion.div
                 variants={fadeSlideUp}
-                className="mt-12 flex items-center gap-8 justify-center lg:justify-start"
+                className="mt-12 flex items-stretch justify-center lg:justify-start divide-x divide-zinc-800"
               >
                 {[
                   { val: "5+", label: "Sân thi đấu" },
                   { val: "18h", label: "Hoạt động/ngày" },
                   { val: "100%", label: "Thảm BWF" },
-                ].map((s) => (
-                  <div key={s.label} className="text-center">
-                    <p className="text-2xl font-black text-lime-500">{s.val}</p>
-                    <p className="text-[11px] text-zinc-500 font-semibold uppercase tracking-wider mt-0.5">
+                ].map((s, i) => (
+                  <div
+                    key={s.label}
+                    className={`text-center lg:text-left ${i === 0 ? "pr-8" : "px-8"}`}
+                  >
+                    <p className="text-3xl font-black text-lime-500 leading-none [font-variant-numeric:tabular-nums]">
+                      {s.val}
+                    </p>
+                    <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-[0.14em] mt-1.5">
                       {s.label}
                     </p>
                   </div>
@@ -277,59 +289,57 @@ const HomePage = () => {
               </motion.div>
             </motion.div>
 
-            {/* ── PHẢI: HÌNH ẢNH TRỪU TƯỢNG NỔI ── */}
-            <div className="relative h-[420px] lg:h-[520px] hidden lg:block">
-              {/* Vòng tròn lớn */}
-              <motion.div
-                animate={floatSlow}
-                className="absolute top-8 right-8 w-72 h-72 rounded-full border-2 border-lime-400/15 bg-gradient-to-br from-lime-400/5 to-transparent"
+            {/* ── PHẢI: QUẢ CẦU TRONG VÒNG RADAR — gợi định vị giờ trống trên sân ── */}
+            <div className="relative h-[420px] lg:h-[520px] hidden lg:flex items-center justify-center">
+              {/* Ba vòng radar đồng tâm, giãn nở nhẹ */}
+              {[0, 1, 2].map((ring) => (
+                <motion.div
+                  key={ring}
+                  aria-hidden
+                  animate={{ scale: [1, 1.06, 1], opacity: [0.5, 0.8, 0.5] }}
+                  transition={{
+                    duration: 4,
+                    repeat: Infinity,
+                    ease: "easeInOut",
+                    delay: ring * 0.6,
+                  }}
+                  className="absolute rounded-full border border-lime-400/20"
+                  style={{
+                    width: `${180 + ring * 110}px`,
+                    height: `${180 + ring * 110}px`,
+                  }}
+                />
+              ))}
+
+              {/* Đường sân dọc/ngang mảnh cắt qua tâm */}
+              <div
+                aria-hidden
+                className="absolute w-[400px] h-px bg-gradient-to-r from-transparent via-lime-400/20 to-transparent"
+              />
+              <div
+                aria-hidden
+                className="absolute h-[400px] w-px bg-gradient-to-b from-transparent via-lime-400/20 to-transparent"
               />
 
-              {/* Hình quả cầu lông */}
+              {/* Đĩa lõi phát sáng + quả cầu */}
               <motion.div
                 animate={floatAnimation}
-                className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-[120px] drop-shadow-[0_0_30px_rgba(163,230,53,0.25)] select-none z-10"
+                className="relative z-10 w-40 h-40 rounded-full bg-gradient-to-br from-lime-400/15 to-teal-500/5 border border-lime-400/30 flex items-center justify-center backdrop-blur-sm"
               >
-                🏸
+                <span className="text-[88px] drop-shadow-[0_0_28px_rgba(163,230,53,0.35)] select-none leading-none">
+                  🏸
+                </span>
               </motion.div>
 
-              {/* Hình học */}
+              {/* Chấm định vị chạy trên vòng ngoài */}
               <motion.div
-                animate={{
-                  ...floatAnimation,
-                  transition: { ...floatAnimation.transition, delay: 0.5 },
-                }}
-                className="absolute top-16 left-12 w-20 h-20 bg-lime-400/10 rounded-2xl border border-lime-400/30 rotate-12"
-              />
-
-              <motion.div
-                animate={{
-                  ...floatAnimation,
-                  transition: { ...floatAnimation.transition, delay: 1.2 },
-                }}
-                className="absolute bottom-20 right-16 w-16 h-16 bg-teal-400/10 rounded-full border border-teal-400/30"
-              />
-
-              <motion.div
-                animate={{
-                  ...floatAnimation,
-                  transition: { ...floatAnimation.transition, delay: 0.8 },
-                }}
-                className="absolute top-24 right-20 w-24 h-1 bg-gradient-to-r from-lime-400/60 to-transparent rounded-full"
-              />
-
-              <motion.div
-                animate={{
-                  ...floatAnimation,
-                  transition: { ...floatAnimation.transition, delay: 1.5 },
-                }}
-                className="absolute bottom-32 left-20 w-14 h-14 border-2 border-lime-400/15 rounded-xl rotate-45"
-              />
-
-              {/* Đường chéo */}
-              <div className="absolute top-0 right-0 w-[300px] h-[300px] opacity-10">
-                <div className="absolute inset-0 bg-[repeating-linear-gradient(45deg,transparent,transparent_20px,rgba(163,230,53,0.15)_20px,rgba(163,230,53,0.15)_21px)]" />
-              </div>
+                aria-hidden
+                animate={{ rotate: 360 }}
+                transition={{ duration: 14, repeat: Infinity, ease: "linear" }}
+                className="absolute w-[400px] h-[400px]"
+              >
+                <span className="absolute top-0 left-1/2 -translate-x-1/2 w-3 h-3 rounded-full bg-lime-400 shadow-[0_0_14px_4px_rgba(163,230,53,0.5)]" />
+              </motion.div>
             </div>
           </div>
         </div>
@@ -559,7 +569,7 @@ const HomePage = () => {
                     : null;
                   const imageUrl =
                     rawUrl && rawUrl.startsWith("/")
-                      ? `http://127.0.0.1:8000${rawUrl}`
+                      ? `${API_ORIGIN}${rawUrl}`
                       : rawUrl;
                   return (
                     <>
@@ -768,13 +778,30 @@ const HomePage = () => {
           {/* BẢNG GIÁ */}
           {(() => {
             const fmtPrice = (p) => Number(p).toLocaleString("vi-VN");
-            const FEATURES = ["Thảm BWF tiêu chuẩn", "Ánh sáng tiêu chuẩn", "Miễn phí giữ xe"];
+            const FEATURES = [
+              "Thảm BWF tiêu chuẩn",
+              "Ánh sáng tiêu chuẩn",
+              "Miễn phí giữ xe",
+            ];
             const DAY_GROUPS = [
-              { key: "weekday", label: "Ngày trong tuần", sub: "Thứ 2 – Thứ 6", icon: "calendar_today" },
-              { key: "weekend", label: "Cuối tuần",        sub: "Thứ 7 & Chủ nhật", icon: "weekend" },
+              {
+                key: "weekday",
+                label: "Ngày trong tuần",
+                sub: "Thứ 2 – Thứ 6",
+                icon: "calendar_today",
+              },
+              {
+                key: "weekend",
+                label: "Cuối tuần",
+                sub: "Thứ 7 & Chủ nhật",
+                icon: "weekend",
+              },
             ];
             return (
-              <div id="pricing" className="max-w-5xl mx-auto mt-12 scroll-mt-24">
+              <div
+                id="pricing"
+                className="max-w-5xl mx-auto mt-12 scroll-mt-24"
+              >
                 <div className="text-center mb-8">
                   <p className="text-xs font-bold text-lime-500 uppercase tracking-widest mb-1">
                     [ Bảng Niêm Yết Chi Phí ]
@@ -783,14 +810,14 @@ const HomePage = () => {
                     Áp dụng chung tất cả sân
                   </h3>
                   <p className="text-xs text-zinc-500 mt-1">
-                    Không phụ phí, không phí ẩn. Giá thuê tính theo block tối thiểu 60 phút.
+                    Không phụ phí, không phí ẩn. Giá thuê tính theo block tối
+                    thiểu 60 phút.
                   </p>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {DAY_GROUPS.map(({ key, label, sub, icon }, gi) => {
                     const slots = pricings[key] || [];
-                    const maxPrice = slots.length ? Math.max(...slots.map((s) => s.price)) : 0;
                     return (
                       <motion.div
                         key={key}
@@ -803,10 +830,14 @@ const HomePage = () => {
                         {/* Header của card lớn */}
                         <div className="flex items-center gap-3 pb-4 border-b border-zinc-800">
                           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-zinc-800">
-                            <span className="material-symbols-outlined text-[22px] text-lime-400">{icon}</span>
+                            <span className="material-symbols-outlined text-[22px] text-lime-400">
+                              {icon}
+                            </span>
                           </div>
                           <div>
-                            <h4 className="text-sm font-extrabold text-white">{label}</h4>
+                            <h4 className="text-sm font-extrabold text-white">
+                              {label}
+                            </h4>
                             <p className="text-[11px] text-zinc-500">{sub}</p>
                           </div>
                           {key === "weekend" && (
@@ -818,25 +849,35 @@ const HomePage = () => {
 
                         {/* Ô nhỏ mỗi khung giờ */}
                         {slots.length === 0 ? (
-                          <p className="text-xs text-zinc-600 text-center py-4">Chưa có giá niêm yết</p>
+                          <p className="text-xs text-zinc-600 text-center py-4">
+                            Chưa có giá niêm yết
+                          </p>
                         ) : (
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             {slots.map((slot, si) => {
-                              const isPeak = slots.length > 1 && si === slots.length - 1;
+                              const isPeak =
+                                slots.length > 1 && si === slots.length - 1;
                               return (
                                 <div
                                   key={si}
                                   className={`rounded-xl p-4 border ${isPeak ? "border-lime-500/40 bg-lime-500/5" : "border-zinc-800 bg-zinc-900/60"}`}
                                 >
-                                  <p className={`text-[10px] font-bold uppercase tracking-widest mb-1 ${isPeak ? "text-lime-500" : "text-zinc-500"}`}>
+                                  <p
+                                    className={`text-[10px] font-bold uppercase tracking-widest mb-1 ${isPeak ? "text-lime-500" : "text-zinc-500"}`}
+                                  >
                                     {isPeak ? "Giờ cao điểm" : "Giờ thường"}
                                   </p>
                                   <p className="text-xs font-mono text-zinc-400 mb-3">
                                     {slot.start_time} – {slot.end_time}
                                   </p>
-                                  <p className={`text-2xl font-black ${isPeak ? "text-lime-400" : "text-white"}`}>
+                                  <p
+                                    className={`text-2xl font-black ${isPeak ? "text-lime-400" : "text-white"}`}
+                                  >
                                     {fmtPrice(slot.price)}
-                                    <span className="text-sm font-semibold text-zinc-500"> đ/h</span>
+                                    <span className="text-sm font-semibold text-zinc-500">
+                                      {" "}
+                                      đ/h
+                                    </span>
                                   </p>
                                 </div>
                               );
@@ -847,8 +888,13 @@ const HomePage = () => {
                         {/* Tiện ích đi kèm */}
                         <ul className="space-y-1.5 pt-1 border-t border-zinc-800">
                           {FEATURES.map((f) => (
-                            <li key={f} className="flex items-center gap-2 text-xs text-zinc-400">
-                              <span className="material-symbols-outlined text-lime-500 text-[16px]">check</span>
+                            <li
+                              key={f}
+                              className="flex items-center gap-2 text-xs text-zinc-400"
+                            >
+                              <span className="material-symbols-outlined text-lime-500 text-[16px]">
+                                check
+                              </span>
                               {f}
                             </li>
                           ))}

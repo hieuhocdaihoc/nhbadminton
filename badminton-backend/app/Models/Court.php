@@ -21,7 +21,14 @@ class Court extends Model
         'capacity',
         'location_note',
         'is_maintenance',
+        'is_contract_only',
         'status',
+    ];
+
+    protected $casts = [
+        'is_maintenance'   => 'boolean',
+        'is_contract_only' => 'boolean',
+        'has_lighting'     => 'boolean',
     ];
 
     // Relationships
@@ -45,12 +52,6 @@ class Court extends Model
     {
         return $this->hasMany(Review::class, 'target_id', 'id')
             ->where('target_type', 'court');
-    }
-
-    /** Quan hệ: Sân có nhiều mức giá */
-    public function pricing()
-    {
-        return $this->hasMany(CourtPricing::class, 'court_id', 'id');
     }
 
     /** Quan hệ: Sân có nhiều lịch đặt định kỳ */

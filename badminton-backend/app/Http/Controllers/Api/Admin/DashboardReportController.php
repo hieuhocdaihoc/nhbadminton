@@ -41,9 +41,21 @@ class DashboardReportController extends Controller
         $paymentQuery = Payment::where('status', 'success')
             ->whereBetween('paid_at', [$fromDate, $toDate]);
 
-        $totalRevenue = (clone $paymentQuery)->sum('amount');
+        // Tổng tiền đã hoàn cho khách (chỉ tính phiếu đã hoàn xong) — trừ khỏi lợi nhuận
+        $refundAmount = \App\Models\Refund::where('status', 'completed')
+            ->whereBetween('created_at', [$fromDate, $toDate])
+            ->sum('amount');
+
+        // Doanh thu thực nhận = tổng mọi giao dịch thành công (không lọc theo payment_method,
+        // vì các luồng mua thẻ hiện ghi payment_method khác nhau tùy đường vào) trừ tiền đã hoàn.
+        // Cùng công thức với trang Quản lý doanh thu (PaymentManagementController::summary).
+        $grossRevenue = (clone $paymentQuery)->sum('amount');
+        $totalRevenue = $grossRevenue - $refundAmount;
+        $totalTransactions = (clone $paymentQuery)->count();
         $cashRevenue = (clone $paymentQuery)->where('payment_method', 'cash')->sum('amount');
-        $bankRevenue = (clone $paymentQuery)->whereIn('payment_method', self::BANK_METHODS)->sum('amount');
+        $bankRevenue = (clone $paymentQuery)->whereIn('payment_method', self::BANK_METHODS)->whereNotNull('booking_id')->sum('amount');
+        $membershipRevenue = (clone $paymentQuery)->whereIn('payment_method', self::BANK_METHODS)->whereNull('booking_id')->sum('amount');
+        $cardCreditUsage = (clone $paymentQuery)->where('payment_method', 'membership_card')->sum('amount');
 
         $bookingRevenueQuery = Booking::where('status', '!=', 'cancelled')
             ->whereHas('details', fn($q) => $q->whereBetween('booking_date', [$fromDateOnly, $toDateOnly]));
@@ -161,7 +173,12 @@ class DashboardReportController extends Controller
                     'service_revenue' => (float) $serviceRevenue,
                     'cash_revenue' => (float) $cashRevenue,
                     'bank_revenue' => (float) $bankRevenue,
+                    'membership_revenue' => (float) $membershipRevenue,
+                    'card_credit_usage' => (float) $cardCreditUsage,
+                    'net_revenue' => (float) $totalRevenue - (float) $refundAmount,
                     'purchase_amount' => (float) $purchaseAmount,
+                    'refund_amount' => (float) $refundAmount,
+                    'total_transactions' => (int) $totalTransactions,
                     'total_bookings' => (int) $totalBookings,
                     'new_customers' => (int) $newCustomers,
                     'occupancy_rate' => (float) $occupancyRate,

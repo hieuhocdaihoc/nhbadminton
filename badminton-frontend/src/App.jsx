@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import {
   BrowserRouter as Router,
   Routes,
@@ -9,61 +10,40 @@ import {
 import UserLayout from "./layouts/UserLayout";
 import AdminLayout from "./layouts/AdminLayout";
 
-// User Pages
-import HomePage from "./pages/user/HomePage";
-import UserProfile from "./pages/user/UserProfile";
-import BookingHistory from "./pages/user/BookingHistory";
-import BookingPage from "./pages/user/BookingPage";
-import GuestBookingLookup from "./pages/user/GuestBookingLookup";
+import ToastContainer from "./components/ToastContainer";
+import {
+  ADMIN_HOME_BY_ROLE,
+  canAccessAdminPath,
+  readStoredUser,
+} from "./utils/accessControl";
 
-// Admin Pages
-import DashboardReport from "./pages/admin/DashboardReport";
-import CourtManager from "./pages/admin/CourtManager";
-import ProductManager from "./pages/admin/ProductManager";
-import CustomerManager from "./pages/admin/CustomerManager";
-import StaffManager from "./pages/admin/StaffManager";
-import StaffShiftManager from "./pages/admin/StaffShiftManager";
-import PricingManager from "./pages/admin/PricingManager";
-import TodayBookings from "./pages/admin/TodayBookings";
-import SingleBookings from "./pages/admin/SingleBookings";
-import RecurringBookings from "./pages/admin/RecurringBookings";
-import LongTermBookings from "./pages/admin/LongTermBookings";
-import CreateBooking from "./pages/admin/CreateBooking";
-import AdditionalServiceManager from "./pages/admin/Services";
-import SupplierManager from "./pages/admin/SupplierManager";
-import InventoryManager from "./pages/admin/InventoryManager";
-import RevenueManager from "./pages/admin/RevenueManager";
-import PromotionManager from "./pages/admin/PromotionManager";
-import SystemSettings from "./pages/admin/SystemSettings";
-import ReviewManager from "./pages/admin/ReviewManager";
+const HomePage = lazy(() => import("./pages/user/HomePage"));
+const UserProfile = lazy(() => import("./pages/user/UserProfile"));
+const BookingHistory = lazy(() => import("./pages/user/BookingHistory"));
+const BookingPage = lazy(() => import("./pages/user/BookingPage"));
+const GuestBookingLookup = lazy(() => import("./pages/user/GuestBookingLookup"));
 
-const ADMIN_HOME_BY_ROLE = {
-  admin: "/admin/dashboard",
-  staff: "/admin/bookings/today",
-};
-
-const canAccessAdminPath = (role, allowedRoles) => {
-  if (!["admin", "staff"].includes(role)) return false;
-  if (!allowedRoles?.length) return true;
-  return allowedRoles.includes(role);
-};
-
-const readStoredUser = () => {
-  const storedUser = localStorage.getItem("current_user");
-  const storedRole = localStorage.getItem("current_role");
-  if (!storedUser) return null;
-
-  try {
-    const user = JSON.parse(storedUser);
-    return {
-      ...user,
-      role: user.role || storedRole,
-    };
-  } catch (err) {
-    console.error(err);
-    return null;
-  }
-};
+const MembershipManager = lazy(() => import("./pages/admin/MembershipManager"));
+const DashboardReport = lazy(() => import("./pages/admin/DashboardReport"));
+const CourtManager = lazy(() => import("./pages/admin/CourtManager"));
+const ProductManager = lazy(() => import("./pages/admin/ProductManager"));
+const CustomerManager = lazy(() => import("./pages/admin/CustomerManager"));
+const StaffManager = lazy(() => import("./pages/admin/StaffManager"));
+const StaffShiftManager = lazy(() => import("./pages/admin/StaffShiftManager"));
+const PricingManager = lazy(() => import("./pages/admin/PricingManager"));
+const TodayBookings = lazy(() => import("./pages/admin/TodayBookings"));
+const SingleBookings = lazy(() => import("./pages/admin/SingleBookings"));
+const RecurringBookings = lazy(() => import("./pages/admin/RecurringBookings"));
+const LongTermBookings = lazy(() => import("./pages/admin/LongTermBookings"));
+const CreateBooking = lazy(() => import("./pages/admin/CreateBooking"));
+const AdditionalServiceManager = lazy(() => import("./pages/admin/Services"));
+const SupplierManager = lazy(() => import("./pages/admin/SupplierManager"));
+const InventoryManager = lazy(() => import("./pages/admin/InventoryManager"));
+const RevenueManager = lazy(() => import("./pages/admin/RevenueManager"));
+const RefundManager = lazy(() => import("./pages/admin/RefundManager"));
+const PromotionManager = lazy(() => import("./pages/admin/PromotionManager"));
+const SystemSettings = lazy(() => import("./pages/admin/SystemSettings"));
+const ReviewManager = lazy(() => import("./pages/admin/ReviewManager"));
 
 // RÀO CẢN BẢO VỆ GIAO DIỆN ADMIN
 const AdminRoute = ({ children, allowedRoles = ["admin", "staff"] }) => {
@@ -85,6 +65,20 @@ const ProtectedAdminPage = ({ children, allowedRoles }) => (
   </AdminRoute>
 );
 
+/**
+ * Trang dành cho khách. Nếu phiên đang đăng nhập là admin/staff (VD: mở lại tab
+ * sau khi tắt trình duyệt, localStorage còn token) thì đưa thẳng về khu quản trị,
+ * tránh trạng thái lẫn lộn: header hiện "Admin" nhưng đang xem giao diện khách.
+ */
+const CustomerPage = ({ children }) => {
+  const user = readStoredUser();
+  const adminHome = user ? ADMIN_HOME_BY_ROLE[user.role] : null;
+
+  if (adminHome) return <Navigate to={adminHome} replace />;
+
+  return <UserLayout>{children}</UserLayout>;
+};
+
 const AdminEntryRedirect = () => {
   const user = readStoredUser();
   if (!user) return <Navigate to="/" replace />;
@@ -92,49 +86,57 @@ const AdminEntryRedirect = () => {
   return <Navigate to={ADMIN_HOME_BY_ROLE[user.role] || "/"} replace />;
 };
 
+const RouteLoading = () => (
+  <div className="flex min-h-screen items-center justify-center bg-zinc-50" role="status">
+    <span className="h-8 w-8 animate-spin rounded-full border-2 border-zinc-300 border-t-emerald-600" />
+    <span className="sr-only">Đang tải</span>
+  </div>
+);
+
 function App() {
   return (
     <Router>
+      <Suspense fallback={<RouteLoading />}>
       <Routes>
         {/* LUỒNG KHÁCH HÀNG */}
         <Route
           path="/"
           element={
-            <UserLayout>
+            <CustomerPage>
               <HomePage />
-            </UserLayout>
+            </CustomerPage>
           }
         />
         <Route
           path="/profile"
           element={
-            <UserLayout>
+            <CustomerPage>
               <UserProfile />
-            </UserLayout>
+            </CustomerPage>
           }
         />
         <Route
           path="/booking-history"
           element={
-            <UserLayout>
+            <CustomerPage>
               <BookingHistory />
-            </UserLayout>
+            </CustomerPage>
           }
         />
         <Route
           path="/booking-page"
           element={
-            <UserLayout>
+            <CustomerPage>
               <BookingPage />
-            </UserLayout>
+            </CustomerPage>
           }
         />
         <Route
           path="/guest-booking-lookup"
           element={
-            <UserLayout>
+            <CustomerPage>
               <GuestBookingLookup />
-            </UserLayout>
+            </CustomerPage>
           }
         />
 
@@ -155,7 +157,7 @@ function App() {
         <Route
           path="/admin/courts"
           element={
-            <ProtectedAdminPage allowedRoles={["admin", "staff"]}>
+            <ProtectedAdminPage allowedRoles={["admin"]}>
               <CourtManager />
             </ProtectedAdminPage>
           }
@@ -195,7 +197,7 @@ function App() {
         <Route
           path="/admin/pricings"
           element={
-            <ProtectedAdminPage allowedRoles={["admin", "staff"]}>
+            <ProtectedAdminPage allowedRoles={["admin"]}>
               <PricingManager />
             </ProtectedAdminPage>
           }
@@ -273,9 +275,17 @@ function App() {
           }
         />
         <Route
-          path="/admin/promotions"
+          path="/admin/refunds"
           element={
             <ProtectedAdminPage allowedRoles={["admin", "staff"]}>
+              <RefundManager />
+            </ProtectedAdminPage>
+          }
+        />
+        <Route
+          path="/admin/promotions"
+          element={
+            <ProtectedAdminPage allowedRoles={["admin"]}>
               <PromotionManager />
             </ProtectedAdminPage>
           }
@@ -297,9 +307,20 @@ function App() {
           }
         />
 
+        <Route
+          path="/admin/membership"
+          element={
+            <ProtectedAdminPage allowedRoles={["admin"]}>
+              <MembershipManager />
+            </ProtectedAdminPage>
+          }
+        />
+
         {/* Xử lý bẻ lái ngoại lệ 404 */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      </Suspense>
+      <ToastContainer />
     </Router>
   );
 }

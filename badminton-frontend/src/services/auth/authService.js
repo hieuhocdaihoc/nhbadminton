@@ -55,31 +55,5 @@ export const authService = {
             // Bỏ Content-Type mặc định (application/json) để trình duyệt tự thêm boundary cho multipart
             headers: { 'Content-Type': undefined }
         });
-    },
-
-    // ==========================================
-    // 3. NHÓM QUẢN LÝ ĐỊA CHỈ
-    // ==========================================
-    addAddress: (addressData) => {
-        return axiosClient.post('/addresses', {
-            province: addressData.province,
-            district: addressData.district,
-            ward: addressData.ward,
-            address_line: addressData.addressLine,
-            address_type: addressData.addressType,
-            is_default: addressData.isDefault
-        });
-    },
-
-    updateAddress: (id, addressData) => {
-        // Nếu backend dùng POST cho update, bạn có thể đổi put -> post ở đây
-        return axiosClient.put(`/addresses/${id}`, {
-            province: addressData.province,
-            district: addressData.district,
-            ward: addressData.ward,
-            address_line: addressData.addressLine,
-            address_type: addressData.addressType,
-            is_default: addressData.isDefault
-        });
     }
 };

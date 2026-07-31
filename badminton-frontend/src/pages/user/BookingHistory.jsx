@@ -39,11 +39,11 @@ const BOOKING_STATUS = {
 
 const PAYMENT_STATUS = {
     paid:    { label: 'Đã thanh toán',   dot: 'bg-lime-400', text: 'text-lime-300' },
-    partial: { label: 'Đã đặt cọc',      dot: 'bg-amber-400',   text: 'text-amber-300'  },
+    partially_paid: { label: 'Đã đặt cọc', dot: 'bg-amber-400', text: 'text-amber-300' },
     unpaid:  { label: 'Chưa thanh toán', dot: 'bg-zinc-300',    text: 'text-zinc-500'   },
 };
 
-const StatusBadge = ({ status, size = 'sm' }) => {
+const StatusBadge = ({ status }) => {
     const s = BOOKING_STATUS[status] ?? BOOKING_STATUS.confirmed;
     return (
         <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md border text-[11px] font-semibold ${s.text} ${s.bg} ${s.border}`}>
@@ -127,11 +127,20 @@ const SingleCard = ({ item, index, onReview, onRebook, onRequest }) => (
             </div>
             <div className="flex items-center gap-2">
                 {REQUESTABLE_STATUSES.has(item.status) && (
-                    <button
-                        onClick={() => onRequest({ booking_code: item.booking_code })}
-                        className="flex items-center gap-1 text-[11px] font-bold text-amber-300 hover:text-amber-300 border border-amber-400/30 hover:border-amber-300 px-3 py-1 rounded-lg transition-colors">
-                        <span className="material-symbols-outlined text-[13px]">edit_calendar</span> Yêu cầu đổi/hủy
-                    </button>
+                    item.request_locked_by_time ? (
+                        <span
+                            title="Chỉ được yêu cầu hủy/đổi trước giờ chơi ít nhất 1 ngày."
+                            className="flex items-center gap-1 text-[10px] italic text-zinc-500 border border-zinc-700 px-3 py-1 rounded-lg cursor-not-allowed max-w-[210px] leading-tight">
+                            <span className="material-symbols-outlined text-[13px]">lock_clock</span>
+                            Chỉ được yêu cầu hủy/đổi trước giờ chơi ít nhất 1 ngày
+                        </span>
+                    ) : (
+                        <button
+                            onClick={() => onRequest({ booking_code: item.booking_code })}
+                            className="flex items-center gap-1 text-[11px] font-bold text-amber-300 hover:text-amber-300 border border-amber-400/30 hover:border-amber-300 px-3 py-1 rounded-lg transition-colors">
+                            <span className="material-symbols-outlined text-[13px]">edit_calendar</span> Yêu cầu đổi/hủy
+                        </button>
+                    )
                 )}
                 {(item.status === 'completed' || item.status === 'cancelled') && item.summary?.court_id && (
                     <button
@@ -292,11 +301,20 @@ const GroupCard = ({ item, index, onReview, onRequest }) => {
             <div className="border-t border-zinc-700 bg-zinc-900/60">
                 {REQUESTABLE_STATUSES.has(item.status) && (
                     <div className="px-5 pt-2.5 pb-0">
-                        <button
-                            onClick={() => onRequest({ booking_code: item.recurring_code, isContract: true })}
-                            className="flex items-center gap-1.5 text-[11px] font-bold text-amber-300 hover:text-amber-300 border border-amber-400/30 hover:border-amber-300 px-3 py-1.5 rounded-lg transition-colors">
-                            <span className="material-symbols-outlined text-[13px]">edit_calendar</span> Yêu cầu đổi/hủy cả hợp đồng
-                        </button>
+                        {item.request_locked_by_time ? (
+                            <span
+                                title="Chỉ được yêu cầu hủy/đổi trước giờ chơi ít nhất 1 ngày."
+                                className="flex items-center gap-1.5 text-[10px] italic text-zinc-500 border border-zinc-700 px-3 py-1.5 rounded-lg cursor-not-allowed leading-tight">
+                                <span className="material-symbols-outlined text-[13px]">lock_clock</span>
+                                Chỉ được yêu cầu hủy/đổi trước giờ chơi ít nhất 1 ngày
+                            </span>
+                        ) : (
+                            <button
+                                onClick={() => onRequest({ booking_code: item.recurring_code, isContract: true })}
+                                className="flex items-center gap-1.5 text-[11px] font-bold text-amber-300 hover:text-amber-300 border border-amber-400/30 hover:border-amber-300 px-3 py-1.5 rounded-lg transition-colors">
+                                <span className="material-symbols-outlined text-[13px]">edit_calendar</span> Yêu cầu đổi/hủy cả hợp đồng
+                            </button>
+                        )}
                     </div>
                 )}
                 <button
@@ -421,8 +439,8 @@ const RequestModal = ({ modal, setModal, onSubmit }) => {
                 <p className="text-[11px] text-zinc-500 mb-1 font-mono">{modal.booking_code}</p>
                 {modal.isContract && (
                     <p className="text-[10px] text-amber-300 mb-4 font-semibold leading-relaxed">
-                        Yêu cầu cho cả hợp đồng sẽ được gửi tới nhân viên hỗ trợ. Để tự đổi
-                        một buổi, hãy mở danh sách buổi và bấm “Đổi lịch” ở buổi đó.
+                        Yêu cầu cho cả hợp đồng sẽ được gửi tới nhân viên hỗ trợ để xử lý.
+                        Bạn cũng có thể mở danh sách buổi để gửi yêu cầu cho riêng một buổi.
                     </p>
                 )}
                 {!modal.isContract && <div className="mb-4" />}
@@ -451,55 +469,7 @@ const RequestModal = ({ modal, setModal, onSubmit }) => {
                     </div>
                 </div>
 
-                {modal.type === 'change' && !modal.isContract ? (
-                  <div className="mb-5 space-y-3">
-                        <p className="text-[10px] text-zinc-400 leading-relaxed bg-zinc-900/60 border border-zinc-700/60 rounded-xl px-3 py-2">
-                            Báo <b className="text-lime-500">trước giờ chơi</b>: nếu giờ mới trống sẽ đổi ngay.
-                            Báo <b className="text-red-300">sau giờ chơi</b>: buổi bị mất theo chính sách.
-                        </p>
-                        <div>
-                            <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-zinc-500">Ngày mới</p>
-                            <input type="date" value={modal.new_date}
-                                min={new Date().toISOString().slice(0, 10)}
-                                onChange={(e) => setModal((p) => ({ ...p, new_date: e.target.value, freeSlots: null }))}
-                                className="user-input py-2.5" />
-                        </div>
-                        <div className="grid grid-cols-2 gap-2">
-                            <div>
-                                <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-zinc-500">Giờ bắt đầu</p>
-                                <input type="time" value={modal.new_start}
-                                    onChange={(e) => setModal((p) => ({ ...p, new_start: e.target.value, freeSlots: null }))}
-                                    className="user-input py-2.5" />
-                            </div>
-                            <div>
-                                <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-zinc-500">Giờ kết thúc</p>
-                                <input type="time" value={modal.new_end}
-                                    onChange={(e) => setModal((p) => ({ ...p, new_end: e.target.value, freeSlots: null }))}
-                                    className="user-input py-2.5" />
-                            </div>
-                        </div>
-                        {modal.freeSlots && (
-                            <div>
-                                <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-amber-300">
-                                    Giờ bạn chọn đã bận — giờ rảnh của sân ngày này:
-                                </p>
-                                {modal.freeSlots.length === 0 ? (
-                                    <p className="text-xs text-red-300 font-semibold">Sân kín cả ngày, vui lòng chọn ngày khác.</p>
-                                ) : (
-                                    <div className="flex flex-wrap gap-1.5">
-                                        {modal.freeSlots.map((s) => (
-                                            <button key={s.start} type="button"
-                                                onClick={() => setModal((p) => ({ ...p, new_start: s.start, new_end: s.end, freeSlots: null }))}
-                                                className="px-2.5 py-1 rounded-lg border border-lime-400/30 text-lime-500 text-[11px] font-mono font-bold hover:bg-lime-400/10 transition-colors">
-                                                {s.start}–{s.end}
-                                            </button>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                        )}
-                    </div>
-                ) : (
+                {(
                     <div className="mb-5">
                         <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-zinc-500">Lý do / chi tiết</p>
                         <textarea
@@ -524,21 +494,26 @@ const RequestModal = ({ modal, setModal, onSubmit }) => {
                     </div>
                 )}
 
+                {modal.error && (
+                    <div className="mb-3 px-3 py-2 rounded-lg bg-red-500/10 border border-red-400/40 text-red-300 text-xs font-medium flex items-start gap-1.5">
+                        <span className="material-symbols-outlined text-[14px] mt-0.5">error</span>
+                        <span>{modal.error}</span>
+                    </div>
+                )}
+
                 <div className="flex justify-end gap-2">
                     <button type="button" onClick={() => setModal((p) => ({ ...p, isOpen: false }))}
                         className="px-4 py-2 text-sm font-semibold text-zinc-500 hover:text-white hover:bg-zinc-800 rounded-xl transition-colors">
                         Đóng
                     </button>
                     <button type="button" onClick={onSubmit}
-                        disabled={modal.isSubmitting || ((modal.type === 'cancel' || modal.isContract)
-                            ? modal.message.trim().length < 10
-                            : !(modal.new_date && modal.new_start && modal.new_end))}
+                        disabled={modal.isSubmitting || modal.message.trim().length < 10}
                         className={`px-5 py-2 text-sm font-extrabold rounded-xl transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
                             modal.type === 'cancel'
                                 ? 'text-white bg-red-600 hover:bg-red-400 shadow-sm'
                                 : 'text-white bg-amber-600 hover:bg-amber-400 shadow-sm'
                         }`}>
-                        {modal.isSubmitting ? 'Đang xử lý...' : (modal.type === 'change' && !modal.isContract) ? 'Đổi lịch ngay' : 'Gửi yêu cầu'}
+                        {modal.isSubmitting ? 'Đang xử lý...' : 'Gửi yêu cầu'}
                     </button>
                 </div>
             </motion.div>
@@ -582,7 +557,7 @@ const BookingHistory = () => {
     });
     const [requestModal, setRequestModal] = useState({
         isOpen: false, booking_code: '', type: 'change', message: '', isSubmitting: false,
-        new_date: '', new_start: '', new_end: '', freeSlots: null, isContract: false,
+        new_date: '', new_start: '', new_end: '', freeSlots: null, isContract: false, error: '',
     });
     const [myStats, setMyStats] = useState(null);
 
@@ -612,6 +587,8 @@ const BookingHistory = () => {
         }
     };
 
+    // fetchData nhận tab hiện tại trực tiếp và không phụ thuộc state khác.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     useEffect(() => { fetchData(activeTab, 1); }, [activeTab]);
 
     // Thống kê số buổi của tài khoản (đã đặt / đã chơi / sắp tới / điểm)
@@ -636,56 +613,27 @@ const BookingHistory = () => {
     const openRequest = ({ booking_code, isContract = false }) => {
         setRequestModal({
             isOpen: true, booking_code, type: isContract ? 'cancel' : 'change', message: '', isSubmitting: false,
-            new_date: '', new_start: '', new_end: '', freeSlots: null, isContract,
+            new_date: '', new_start: '', new_end: '', freeSlots: null, isContract, error: '',
         });
     };
 
     const submitRequest = async () => {
-        setRequestModal((p) => ({ ...p, isSubmitting: true }));
+        if (requestModal.message.trim().length < 10) return;
+        setRequestModal((p) => ({ ...p, isSubmitting: true, error: '' }));
         try {
-            // Tự đổi lịch chỉ áp dụng cho 1 buổi cụ thể (có booking_code thật),
-            // không áp dụng cho cả hợp đồng — hợp đồng gửi yêu cầu tới nhân viên.
-            if (requestModal.type === 'change' && !requestModal.isContract) {
-                // Đổi lịch tự động theo chính sách báo trước/báo sau
-                const res = await bookingService.rescheduleSession({
-                    booking_code: requestModal.booking_code,
-                    new_date: requestModal.new_date,
-                    new_start: requestModal.new_start,
-                    new_end: requestModal.new_end,
-                });
-                setRequestModal((p) => ({ ...p, isOpen: false }));
-                showFlash('success', res.data?.message || 'Đổi lịch thành công!');
-                fetchData(activeTab, pagination.current_page);
-            } else {
-                if (requestModal.message.trim().length < 10) {
-                     setRequestModal((p) => ({ ...p, isSubmitting: false }));
-                    return;
-                }
-                await bookingService.sendRequest({
-                    booking_code: requestModal.booking_code,
-                    type: requestModal.type,
-                    message: requestModal.message,
-                });
-                setRequestModal((p) => ({ ...p, isOpen: false }));
-                showFlash('success', 'Đã gửi yêu cầu. Nhân viên sẽ liên hệ bạn sớm nhất!');
-            }
+            // Mọi yêu cầu (đổi hoặc hủy, đơn lẻ hoặc hợp đồng) đều GỬI TỚI NHÂN VIÊN
+            // duyệt — khách không tự sửa lịch trực tiếp để bên quản lý kiểm soát được.
+            await bookingService.sendRequest({
+                booking_code: requestModal.booking_code,
+                type: requestModal.type,
+                message: requestModal.message,
+            });
+            setRequestModal((p) => ({ ...p, isOpen: false }));
+            showFlash('success', 'Đã gửi yêu cầu. Nhân viên sẽ liên hệ bạn sớm nhất!');
         } catch (err) {
             const data = err.response?.data;
-            // Giờ mới bận → hiển thị các khung giờ rảnh của sân để chọn lại
-            if (data?.policy === 'busy') {
-                setRequestModal((p) => ({ ...p, isSubmitting: false, freeSlots: data.free_slots ?? [] }));
-                showFlash('error', data.message);
-                return;
-            }
-            // Báo sau giờ chơi → mất buổi theo chính sách
-            if (data?.policy === 'forfeited') {
-                setRequestModal((p) => ({ ...p, isOpen: false }));
-                showFlash('error', data.message);
-                fetchData(activeTab, pagination.current_page);
-                return;
-            }
-            showFlash('error', data?.message || 'Không thể gửi yêu cầu.');
-            setRequestModal((p) => ({ ...p, isSubmitting: false }));
+            // Lỗi (đơn trong vòng 24h, đã hủy/hoàn thành, không tìm thấy...) → hiện ngay trong modal
+            setRequestModal((p) => ({ ...p, isSubmitting: false, error: data?.message || 'Không thể gửi yêu cầu.' }));
         }
     };
 

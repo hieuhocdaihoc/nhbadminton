@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Booking;
 use App\Models\User;
+use App\Services\MembershipTierService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -110,7 +111,6 @@ class AdminUserController extends Controller
             'role'             => ['required', Rule::in(['staff', 'customer'])],
             'gender'           => ['nullable', Rule::in(['male', 'female', 'other'])],
             'date_of_birth'    => ['nullable', 'date'],
-            'membership_level' => ['nullable', 'string', 'max:50'],
             'status'           => ['nullable', Rule::in(['active', 'blocked'])],
         ], ['phone.regex' => self::PHONE_MESSAGE]);
 
@@ -127,7 +127,7 @@ class AdminUserController extends Controller
             'role'             => $validated['role'],
             'gender'           => $validated['gender'] ?? null,
             'date_of_birth'    => $validated['date_of_birth'] ?? null,
-            'membership_level' => $validated['membership_level'] ?? null,
+            'membership_level' => MembershipTierService::levelForPoints(0),
             'status'           => $validated['status'] ?? 'active',
             // Mã khách hàng chỉ sinh cho role=customer
             'customer_code'    => $validated['role'] === 'customer' ? 'KH' . now()->format('YmdHis') : null,
@@ -179,7 +179,6 @@ class AdminUserController extends Controller
             'phone'            => ['required', 'string', 'regex:' . self::PHONE_REGEX, Rule::unique('users', 'phone')->ignore($user->id)],
             'gender'           => ['nullable', Rule::in(['male', 'female', 'other'])],
             'date_of_birth'    => ['nullable', 'date'],
-            'membership_level' => ['nullable', 'string', 'max:50'],
             'status'           => ['nullable', Rule::in(['active', 'blocked'])],
         ], ['phone.regex' => self::PHONE_MESSAGE]);
 

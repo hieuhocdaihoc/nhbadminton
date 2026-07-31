@@ -184,6 +184,50 @@ const SystemSettings = () => {
               <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-zinc-400 font-bold">%</span>
             </div>
           </div>
+
+          <p className="text-[11px] text-zinc-400 mt-5 mb-4">
+            Khách chỉ được gửi yêu cầu hủy/đổi lịch khi còn cách giờ chơi của buổi
+            sớm nhất ít nhất số giờ dưới đây.
+          </p>
+          <div className="max-w-[200px]">
+            <label className="admin-form-label">
+              Hạn gửi yêu cầu hủy/đổi (giờ)
+            </label>
+            <div className="relative">
+              <input
+                type="number"
+                min="0"
+                step="1"
+                value={settings.cancel_request_min_hours || ""}
+                onChange={(e) => handleChange("cancel_request_min_hours", e.target.value)}
+                placeholder="24"
+                className={inputClass}
+              />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-zinc-400 font-bold">giờ</span>
+            </div>
+          </div>
+
+          <p className="text-[11px] text-zinc-400 mt-5 mb-4">
+            Khi khách chơi quá giờ đã đặt, hệ thống miễn phí số phút dưới đây; quá mức
+            này mới tính phụ trội theo giá/giờ của buổi.
+          </p>
+          <div className="max-w-[200px]">
+            <label className="admin-form-label">
+              Ân hạn quá giờ (phút)
+            </label>
+            <div className="relative">
+              <input
+                type="number"
+                min="0"
+                step="1"
+                value={settings.overtime_grace_minutes || ""}
+                onChange={(e) => handleChange("overtime_grace_minutes", e.target.value)}
+                placeholder="15"
+                className={inputClass}
+              />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-zinc-400 font-bold">phút</span>
+            </div>
+          </div>
         </div>
 
         {/* ═══ KHỐI RIÊNG: HOTLINE + EMAIL ═══ */}

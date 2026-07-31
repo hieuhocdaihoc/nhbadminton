@@ -44,4 +44,19 @@ export const adminPaymentService = {
   getPaymentsByBooking: (bookingId) => {
     return axiosClient.get(`/admin/payments/booking/${bookingId}`);
   },
+
+  // 5. Danh sách phiếu hoàn tiền
+  getRefunds: () => {
+    return axiosClient.get(`/admin/refunds`);
+  },
+
+  // 6. Ghi nhận khoản hoàn tiền đã được nhân viên xử lý thủ công
+  createRefund: (payload) => {
+    return axiosClient.post(`/admin/refunds`, payload);
+  },
+
+  // 7. Cập nhật trạng thái phiếu hoàn tiền (recorded/pending/completed/rejected)
+  updateRefundStatus: (id, status) => {
+    return axiosClient.patch(`/admin/refunds/${id}/status`, { status });
+  },
 };

@@ -7,6 +7,10 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (DB::getDriverName() !== 'mysql') {
+            return;
+        }
+
         // payments.status: code dùng 'success' nhưng migration cũ chỉ có pending/completed/failed/refunded
         DB::statement("ALTER TABLE payments MODIFY status ENUM('pending','success','completed','failed','refunded') NOT NULL DEFAULT 'pending'");
 
@@ -16,6 +20,10 @@ return new class extends Migration
 
     public function down(): void
     {
+        if (DB::getDriverName() !== 'mysql') {
+            return;
+        }
+
         DB::statement("ALTER TABLE payments MODIFY status ENUM('pending','completed','failed','refunded') NOT NULL DEFAULT 'pending'");
         DB::statement("ALTER TABLE bookings MODIFY payment_status ENUM('unpaid','partial','paid') NOT NULL DEFAULT 'unpaid'");
     }

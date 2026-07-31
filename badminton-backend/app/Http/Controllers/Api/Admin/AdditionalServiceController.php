@@ -9,14 +9,14 @@ use Illuminate\Http\Request;
 class AdditionalServiceController extends Controller
 {
     // Danh sach loai dich vu hop le
-    private const SERVICE_TYPES = ['drink', 'rental', 'coaching', 'shuttlecock', 'other'];
+    private const SERVICE_TYPES = ['racket', 'shoe_care', 'other'];
 
     /**
      * Chức năng: Lấy danh sách dịch vụ bổ sung, hỗ trợ lọc theo loại và trạng thái.
      */
     public function index(Request $request)
     {
-        $query = AdditionalService::query();
+        $query = AdditionalService::where('service_type', '!=', 'rental');
 
         if ($request->filled('type')) {
             $query->where('service_type', $request->type);
@@ -33,7 +33,7 @@ class AdditionalServiceController extends Controller
     }
 
     /**
-     * Chức năng: Thêm mới một dịch vụ bổ sung (nước, vợt, huấn luyện, cầu...).
+     * Chức năng: Thêm mới một dịch vụ bổ sung (nước, huấn luyện, cầu...).
      */
     public function store(Request $request)
     {
