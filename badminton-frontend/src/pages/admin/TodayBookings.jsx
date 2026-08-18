@@ -5,6 +5,7 @@ import { adminBookingService } from "../../services/admin/bookingService";
 import { adminProductService } from "../../services/admin/productService";
 import { adminAdditionalService } from "../../services/admin/additionalService";
 import { adminCourtService } from "../../services/admin/courtService";
+import { settingService } from "../../services/settingService";
 
 const emptyItemRow = {
   selected_val: "",
@@ -12,7 +13,7 @@ const emptyItemRow = {
   note: "",
 };
 
-const HOURS = Array.from({ length: 16 }, (_, i) => i + 6); // 06:00 → 21:00
+const HOURS = Array.from({ length: 18 }, (_, i) => i + 5); // 05:00 → 23:00
 
 const statusConfig = {
   confirmed: {
@@ -50,6 +51,7 @@ const TodayBookings = () => {
   const [products, setProducts] = useState([]);
   const [services, setServices] = useState([]);
   const [courts, setCourts] = useState([]);
+  const [graceMinutes, setGraceMinutes] = useState(15);
   const [isLoading, setIsLoading] = useState(true);
   const [message, setMessage] = useState({ type: "", text: "" });
 
@@ -171,11 +173,12 @@ const TodayBookings = () => {
     setIsLoading(true);
 
     try {
-      const [bookingRes, prodRes, servRes, courtRes] = await Promise.all([
+      const [bookingRes, prodRes, servRes, courtRes, settingRes] = await Promise.all([
         adminBookingService.getTodayBookings(),
         adminProductService.getProducts(1, "", ""),
         adminAdditionalService.getServices(),
         adminCourtService.getCourts(),
+        settingService.getPublicSettings().catch(() => null),
       ]);
 
       setBookings(bookingRes.data?.data || []);
@@ -184,6 +187,12 @@ const TodayBookings = () => {
 
       const courtData = courtRes.data?.data?.data || courtRes.data?.data || [];
       setCourts(courtData);
+
+      if (settingRes?.data?.data?.overtime_grace_minutes) {
+        setGraceMinutes(
+          Number(settingRes.data.data.overtime_grace_minutes) || 15,
+        );
+      }
     } catch (error) {
       console.error("Lỗi tải dữ liệu hôm nay:", error);
       setMessage({ type: "error", text: "Không thể tải dữ liệu." });
@@ -368,7 +377,8 @@ const TodayBookings = () => {
       const matchSearch =
         !searchTerm ||
         b.customer_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        b.customer_phone?.includes(searchTerm);
+        b.customer_phone?.includes(searchTerm) ||
+        b.booking_code?.toLowerCase().includes(searchTerm.toLowerCase());
 
       const matchFilter =
         filterStatus === "all" ||
@@ -415,28 +425,111 @@ const TodayBookings = () => {
     { key: "paid", label: "Đã thu", count: paidCount },
   ];
 
-  // Tổng phụ phí quá giờ + số phút lố, cộng dồn từ các buổi chơi (thường chỉ buổi cuối có phụ phí)
-  const sumOvertime = (details) => {
-    const list = details || [];
-    const fee = list.reduce((sum, d) => sum + Number(d.overtime_fee || 0), 0);
-    const minutes = list.reduce((sum, d) => sum + Number(d.overtime_minutes || 0), 0);
-    return { fee, minutes };
+  // Tính phụ phí quá giờ: Đơn completed lấy từ DB; Đơn chưa completed tính tạm tính nếu chơi quá giờ
+  const getBookingOvertime = (booking, grace = 15) => {
+    if (!booking) return { fee: 0, minutes: 0, isEstimated: false };
+
+    const list = booking._groupDetails || booking.details || [];
+    const savedFee = list.reduce(
+      (sum, d) => sum + Number(d.overtime_fee || 0),
+      0,
+    );
+    const savedMinutes = list.reduce(
+      (sum, d) => sum + Number(d.overtime_minutes || 0),
+      0,
+    );
+
+    // Nếu DB đã lưu phí quá giờ (đơn hoàn thành)
+    if (savedFee > 0 || savedMinutes > 0) {
+      return { fee: savedFee, minutes: savedMinutes, isEstimated: false };
+    }
+
+    // Không tính tạm tính cho đơn đã hủy hoặc đã hoàn thành
+    if (booking.status === "cancelled" || booking.status === "completed") {
+      return { fee: 0, minutes: 0, isEstimated: false };
+    }
+
+    if (list.length === 0) return { fee: 0, minutes: 0, isEstimated: false };
+
+    // Tìm detail có giờ kết thúc trễ nhất
+    const sorted = [...list].sort((a, b) => {
+      const dateTimeA = `${String(a.booking_date).slice(0, 10)} ${String(a.end_time).slice(0, 5)}`;
+      const dateTimeB = `${String(b.booking_date).slice(0, 10)} ${String(b.end_time).slice(0, 5)}`;
+      return dateTimeB.localeCompare(dateTimeA);
+    });
+
+    const lastDetail = sorted[0];
+    if (!lastDetail || !lastDetail.booking_date || !lastDetail.end_time) {
+      return { fee: 0, minutes: 0, isEstimated: false };
+    }
+
+    const dateStr = String(lastDetail.booking_date).slice(0, 10);
+    const timeStr = String(lastDetail.end_time).slice(0, 5);
+    const bookedEnd = new Date(`${dateStr}T${timeStr}:00`);
+    const now = new Date();
+
+    const lateMs = now.getTime() - bookedEnd.getTime();
+    if (lateMs <= 0) return { fee: 0, minutes: 0, isEstimated: false };
+
+    const lateMinutes = Math.floor(lateMs / 60000);
+    const billableMinutes = Math.max(0, lateMinutes - grace);
+
+    if (billableMinutes <= 0) return { fee: 0, minutes: 0, isEstimated: false };
+
+    let rate = Number(lastDetail.price_per_hour || 0);
+    if (rate <= 0 && Number(lastDetail.duration_minutes || 0) > 0) {
+      rate =
+        Number(lastDetail.price || 0) /
+        (Number(lastDetail.duration_minutes) / 60);
+    }
+    if (rate <= 0) {
+      rate = Number(lastDetail.price || 0);
+    }
+
+    const estimatedFee = Math.round((billableMinutes / 60) * rate);
+
+    return {
+      fee: estimatedFee,
+      minutes: billableMinutes,
+      isEstimated: true,
+    };
   };
 
   // --- Số liệu chi tiết cho ca đang mở trong drawer ---
   const rowFinance = (b) => {
-    // Tiền sân GỐC (chưa gồm phụ phí quá giờ), lấy tổng price của từng buổi
+    const {
+      fee: overtimeFee,
+      minutes: overtimeMinutes,
+      isEstimated,
+    } = getBookingOvertime(b, graceMinutes);
+
     const courtAmount = Number(b._groupPrice || b.subtotal_court || 0);
     const serviceAmount = Number(b.subtotal_service || 0);
-    const totalAmount = Number(b.total_price || 0);
-    const remainingAmount = Number(b.remaining_amount || 0);
+    const baseTotal = Number(b.total_price || 0);
+    const baseRemaining = Number(b.remaining_amount || 0);
+
+    const totalAmount = isEstimated ? baseTotal + overtimeFee : baseTotal;
+    const remainingAmount = isEstimated
+      ? baseRemaining + overtimeFee
+      : baseRemaining;
     const paidAmount = totalAmount - remainingAmount;
-    const { fee: overtimeFee, minutes: overtimeMinutes } = sumOvertime(b._groupDetails || b.details);
+
     const isOnlyProshopDebt =
       serviceAmount > 0 &&
       remainingAmount > 0 &&
-      paidAmount >= Number(b.subtotal_court || 0);
-    return { courtAmount, serviceAmount, totalAmount, remainingAmount, paidAmount, isOnlyProshopDebt, overtimeFee, overtimeMinutes };
+      paidAmount >= courtAmount;
+
+    return {
+      courtAmount,
+      serviceAmount,
+      totalAmount,
+      remainingAmount,
+      paidAmount,
+      isOnlyProshopDebt,
+      overtimeFee,
+      overtimeMinutes,
+      isEstimated,
+    };
   };
 
   return (
@@ -499,7 +592,7 @@ const TodayBookings = () => {
 
               <input
                 type="text"
-                placeholder="Tìm tên hoặc SĐT..."
+                placeholder="Tìm tên, SĐT hoặc mã đơn..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="admin-input pl-10 py-2.5"
@@ -1023,9 +1116,11 @@ const TodayBookings = () => {
 
                 <div className="flex justify-between">
                   <span className="text-zinc-500">Ngày:</span>
-                  <span>{new Date().toLocaleString("vi-VN")}</span>
+                  {/* {fotmat dd/mm/yyyy} */}
+                  <span>
+                    {new Date(selectedBill._groupDetails?.[0]?.booking_date).toLocaleDateString("vi-VN")}
+                  </span>
                 </div>
-
                 <div className="flex justify-between">
                   <span className="text-zinc-500">Khách:</span>
                   <strong className="truncate max-w-[140px] text-right">
@@ -1034,132 +1129,174 @@ const TodayBookings = () => {
                 </div>
               </div>
 
-              <table className="w-full text-[11px] mb-4 text-left">
-                <thead className="border-y border-dashed border-zinc-300">
-                  <tr>
-                    <th className="py-1.5 font-semibold w-1/2">Mô tả</th>
-                    <th className="py-1.5 font-semibold text-center">SL</th>
-                    <th className="py-1.5 font-semibold text-right">
-                      Thành tiền
-                    </th>
-                  </tr>
-                </thead>
-
-                <tbody className="border-b border-dashed border-zinc-300">
-                  {selectedBill.details?.map((detail) => (
-                    <tr key={detail.id}>
-                      <td className="py-2 pr-2">
-                        <strong className="block text-xs">
-                          {detail.court?.name || "Sân thuê"}
-                        </strong>
-
-                        <span className="text-[10px] text-zinc-400">
-                          {detail.start_time?.slice(0, 5)} –{" "}
-                          {detail.end_time?.slice(0, 5)}
-                        </span>
-                      </td>
-
-                      <td className="py-2 text-center align-top text-xs">1</td>
-
-                      <td className="py-2 text-right align-top font-semibold text-xs">
-                        {Number(detail.price || 0).toLocaleString()}
-                      </td>
-                    </tr>
-                  ))}
-
-                  {selectedBill.service_details?.map((item) => (
-                    <tr
-                      key={item.id}
-                      className="border-t border-dotted border-zinc-200"
-                    >
-                      <td className="py-2 pr-2">
-                        <strong className="block text-[11px]">
-                          {item.product?.name ||
-                            item.service?.name ||
-                            "Dịch vụ"}
-                        </strong>
-
-                        {item.note && (
-                          <span className="text-[9px] text-zinc-400 block">
-                            *{item.note}
-                          </span>
-                        )}
-                      </td>
-
-                      <td className="py-2 text-center align-top text-zinc-600">
-                        {item.quantity}
-                      </td>
-
-                      <td className="py-2 text-right align-top font-semibold">
-                        {Number(item.total_price).toLocaleString()}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-
               {(() => {
-                // subtotal_court từ backend đã CỘNG SẴN phụ phí quá giờ (nếu có) — tách
-                // riêng ra để hiển thị đúng "Tiền sân gốc" + "Phụ phí quá giờ" cho rõ ràng.
-                const { fee: billOvertimeFee, minutes: billOvertimeMinutes } = sumOvertime(
-                  selectedBill._groupDetails || selectedBill.details,
+                // Gộp các khung giờ liền nhau trên cùng 1 sân cho đẹp Bill (vd: 16:00-17:00 & 17:00-18:00 => 16:00-18:00)
+                const rawDetails = selectedBill._groupDetails || selectedBill.details || [];
+                const sortedDetails = [...rawDetails].sort((a, b) => {
+                  const dateCompare = String(a.booking_date || '').localeCompare(String(b.booking_date || ''));
+                  if (dateCompare !== 0) return dateCompare;
+                  const courtCompare = String(a.court_id || '').localeCompare(String(b.court_id || ''));
+                  if (courtCompare !== 0) return courtCompare;
+                  return String(a.start_time || '').localeCompare(String(b.start_time || ''));
+                });
+
+                const mergedDetails = [];
+                let currentMerged = null;
+
+                sortedDetails.forEach((item) => {
+                  const price = Number(item.price || 0);
+                  if (!currentMerged) {
+                    currentMerged = {
+                      id: item.id,
+                      courtName: item.court?.name || selectedBill._groupCourtName || "Sân thuê",
+                      courtId: item.court_id,
+                      bookingDate: item.booking_date,
+                      startTime: item.start_time,
+                      endTime: item.end_time,
+                      price: price,
+                    };
+                  } else {
+                    const isSameDate = currentMerged.bookingDate === item.booking_date;
+                    const isSameCourt = currentMerged.courtId === item.court_id;
+                    const isContinuous = currentMerged.endTime === item.start_time;
+
+                    if (isSameDate && isSameCourt && isContinuous) {
+                      currentMerged.endTime = item.end_time;
+                      currentMerged.price += price;
+                    } else {
+                      mergedDetails.push(currentMerged);
+                      currentMerged = {
+                        id: item.id,
+                        courtName: item.court?.name || selectedBill._groupCourtName || "Sân thuê",
+                        courtId: item.court_id,
+                        bookingDate: item.booking_date,
+                        startTime: item.start_time,
+                        endTime: item.end_time,
+                        price: price,
+                      };
+                    }
+                  }
+                });
+                if (currentMerged) mergedDetails.push(currentMerged);
+
+                const { fee: billOvertimeFee, minutes: billOvertimeMinutes } = getBookingOvertime(
+                  selectedBill,
+                  graceMinutes,
                 );
-                const baseCourtAmount = Number(selectedBill.subtotal_court || 0) - billOvertimeFee;
+
+                const courtItemsSum = rawDetails.reduce((sum, d) => sum + Number(d.price || 0), 0);
+                const serviceItemsSum = (selectedBill.service_details || []).reduce(
+                  (sum, item) => sum + Number(item.total_price || 0),
+                  0
+                );
+
+                const discountAmount = Number(selectedBill.discount_amount || 0);
+                const finalTotal = Math.max(
+                  0,
+                  courtItemsSum + serviceItemsSum + (selectedBill.status !== "completed" && billOvertimeFee > 0 ? billOvertimeFee : 0) - discountAmount
+                );
+
+                const remainingAmount = Number(selectedBill.remaining_amount || 0);
+                const paidAmount = selectedBill.payment_status === "paid"
+                  ? finalTotal
+                  : Math.max(0, finalTotal - remainingAmount);
 
                 return (
-                  <div className="space-y-1 text-xs mb-5">
-                    <div className="flex justify-between text-zinc-500">
-                      <span>Tiền sân:</span>
-                      <span>{baseCourtAmount.toLocaleString()}đ</span>
-                    </div>
+                  <>
+                    <table className="w-full text-[11px] mb-4 text-left">
+                      <thead className="border-y border-dashed border-zinc-300">
+                        <tr>
+                          <th className="py-1.5 font-semibold w-1/2">Mô tả</th>
+                          <th className="py-1.5 font-semibold text-center">SL</th>
+                          <th className="py-1.5 font-semibold text-right">
+                            Thành tiền
+                          </th>
+                        </tr>
+                      </thead>
 
-                    <div className="flex justify-between text-zinc-500">
-                      <span>Pro-shop:</span>
-                      <span>
-                        {Number(
-                          selectedBill.subtotal_service || 0,
-                        ).toLocaleString()}
-                        đ
-                      </span>
-                    </div>
+                      <tbody className="border-b border-dashed border-zinc-300">
+                        {mergedDetails.map((detail) => (
+                          <tr key={detail.id}>
+                            <td className="py-2 pr-2">
+                              <strong className="block text-xs">
+                                {detail.courtName}
+                              </strong>
+                              <span className="text-[10px] text-zinc-400">
+                                {detail.startTime?.slice(0, 5)} – {detail.endTime?.slice(0, 5)}
+                              </span>
+                            </td>
 
-                    {billOvertimeFee > 0 && (
-                      <div className="flex justify-between text-amber-600">
-                        <span>Phụ phí quá giờ ({billOvertimeMinutes} phút):</span>
-                        <span>{billOvertimeFee.toLocaleString()}đ</span>
+                            <td className="py-2 text-center align-top text-xs">1</td>
+
+                            <td className="py-2 text-right align-top font-semibold text-xs">
+                              {detail.price.toLocaleString()}
+                            </td>
+                          </tr>
+                        ))}
+
+                        {selectedBill.service_details?.map((item) => (
+                          <tr
+                            key={item.id}
+                            className="border-t border-dotted border-zinc-200"
+                          >
+                            <td className="py-2 pr-2">
+                              <strong className="block text-[11px]">
+                                {item.product?.name || item.service?.name || "Dịch vụ"}
+                              </strong>
+                              {item.note && (
+                                <span className="text-[9px] text-zinc-400 block">
+                                  *{item.note}
+                                </span>
+                              )}
+                            </td>
+
+                            <td className="py-2 text-center align-top text-zinc-600">
+                              {item.quantity}
+                            </td>
+
+                            <td className="py-2 text-right align-top font-semibold">
+                              {Number(item.total_price).toLocaleString()}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+
+                    <div className="space-y-1 text-xs mb-5">
+                      {billOvertimeFee > 0 && (
+                        <div className="flex justify-between text-amber-600">
+                          <span>Phụ phí quá giờ ({billOvertimeMinutes} phút):</span>
+                          <span>{billOvertimeFee.toLocaleString()}đ</span>
+                        </div>
+                      )}
+
+                      {discountAmount > 0 && (
+                        <div className="flex justify-between text-emerald-600 font-medium">
+                          <span>Giảm giá / Ưu đãi:</span>
+                          <span>-{discountAmount.toLocaleString()}đ</span>
+                        </div>
+                      )}
+
+                      <div className="flex justify-between text-zinc-500">
+                        <span>Đã thu:</span>
+                        <span>{paidAmount.toLocaleString()}đ</span>
                       </div>
-                    )}
 
-                <div className="flex justify-between text-zinc-500">
-                  <span>Đã thu:</span>
-                  <span>
-                    {Number(selectedBill.deposit_amount || 0).toLocaleString()}đ
-                  </span>
-                </div>
+                      {remainingAmount > 0 && (
+                        <div className="flex justify-between text-zinc-500">
+                          <span>Còn thu:</span>
+                          <span className="text-amber-600 font-bold">
+                            {remainingAmount.toLocaleString()}đ
+                          </span>
+                        </div>
+                      )}
 
-                <div className="flex justify-between text-zinc-500">
-                  <span>Còn thu:</span>
-                  <span
-                    className={
-                      Number(selectedBill.remaining_amount || 0) > 0
-                        ? "text-amber-600 font-bold"
-                        : ""
-                    }
-                  >
-                    {Number(
-                      selectedBill.remaining_amount || 0,
-                    ).toLocaleString()}
-                    đ
-                  </span>
-                </div>
-
-                <div className="flex justify-between text-sm mt-2 pt-2 border-t-2 border-zinc-800 font-bold">
-                  <span>TỔNG BILL:</span>
-                  <span>
-                    {Number(selectedBill.total_price || 0).toLocaleString()}đ
-                  </span>
-                </div>
-                  </div>
+                      <div className="flex justify-between text-sm mt-2 pt-2 border-t-2 border-zinc-800 font-bold">
+                        <span>TỔNG BILL:</span>
+                        <span>{finalTotal.toLocaleString()}đ</span>
+                      </div>
+                    </div>
+                  </>
                 );
               })()}
 

@@ -365,6 +365,12 @@ class BookingController extends Controller
                 $billableMinutes = max(0, $lateMinutes - $graceMinutes);
                 if ($billableMinutes > 0) {
                     $rate = (float) $lastDetail->price_per_hour;
+                    if ($rate <= 0 && (float) $lastDetail->duration_minutes > 0) {
+                        $rate = (float) $lastDetail->price / ((float) $lastDetail->duration_minutes / 60);
+                    }
+                    if ($rate <= 0) {
+                        $rate = (float) $lastDetail->price;
+                    }
                     $overtimeFee = (int) round($billableMinutes / 60 * $rate);
                     if ($overtimeFee > 0) {
                         $lastDetail->update([
@@ -557,38 +563,101 @@ class BookingController extends Controller
                 ], 422);
             }
 
-            // Kiểm tra trùng lịch — bỏ qua chính buổi đang đổi
-            $isBusy = BookingDetail::where('court_id', $validated['court_id'])
-                ->where('booking_date', $validated['booking_date'])
-                ->where('id', '!=', $detailId)
-                ->where(
-                    fn($q) => $q
-                        ->where('start_time', '<', $validated['end_time'] . ':00')
-                        ->where('end_time', '>', $validated['start_time'] . ':00')
-                )
-                ->whereHas('booking', fn($q) => $q->where('status', '!=', 'cancelled'))
-                ->exists();
+            $details = $booking->details->sortBy('start_time')->values();
+            $detailIds = $details->pluck('id')->all();
 
-            if ($isBusy) {
-                return response()->json([
-                    'status' => 'error',
-                    'message' => 'Lịch mới đã có người đặt, vui lòng chọn giờ/sân khác.',
-                ], 400);
+            // Nếu đơn có nhiều ca chơi (multi-slot), dời toàn bộ khối ca chơi tương ứng theo offset
+            if ($details->count() > 1) {
+                $firstDetail = $details->first();
+                $origBlockStart = strtotime($firstDetail->start_time);
+                $newBlockStart = strtotime($validated['start_time'] . ':00');
+
+                $updatedItems = $details->map(function ($d) use ($origBlockStart, $newBlockStart) {
+                    $offsetSec = strtotime($d->start_time) - $origBlockStart;
+                    $durationSec = strtotime($d->end_time) - strtotime($d->start_time);
+                    $newStart = date('H:i:s', $newBlockStart + $offsetSec);
+                    $newEnd = date('H:i:s', $newBlockStart + $offsetSec + $durationSec);
+
+                    return [
+                        'detail' => $d,
+                        'new_start' => $newStart,
+                        'new_end' => $newEnd,
+                        'duration' => $durationSec / 60,
+                    ];
+                });
+
+                $overallStart = $updatedItems->first()['new_start'];
+                $overallEnd = $updatedItems->last()['new_end'];
+
+                // Kiểm tra trùng lịch toàn bộ khung giờ mới (bỏ qua các detail thuộc chính đơn này)
+                $isBusy = BookingDetail::where('court_id', $validated['court_id'])
+                    ->where('booking_date', $validated['booking_date'])
+                    ->whereNotIn('id', $detailIds)
+                    ->where(
+                        fn($q) => $q
+                            ->where('start_time', '<', $overallEnd)
+                            ->where('end_time', '>', $overallStart)
+                    )
+                    ->whereHas('booking', fn($q) => $q->where('status', '!=', 'cancelled'))
+                    ->exists();
+
+                if ($isBusy) {
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => 'Lịch mới đã có người đặt, vui lòng chọn giờ/sân khác.',
+                    ], 400);
+                }
+
+                foreach ($updatedItems as $item) {
+                    $d = $item['detail'];
+                    $startFormat = substr($item['new_start'], 0, 5);
+                    $endFormat = substr($item['new_end'], 0, 5);
+                    $newPrice = $this->internalCalculatePrice($validated['court_id'], $validated['booking_date'], $startFormat, $endFormat);
+                    $duration = $item['duration'];
+
+                    $d->update([
+                        'court_id' => $validated['court_id'],
+                        'booking_date' => $validated['booking_date'],
+                        'start_time' => $item['new_start'],
+                        'end_time' => $item['new_end'],
+                        'duration_minutes' => $duration,
+                        'price' => $newPrice,
+                        'price_per_hour' => $duration > 0 ? ($newPrice / ($duration / 60)) : 0,
+                    ]);
+                }
+            } else {
+                // Đơn 1 ca duy nhất: kiểm tra trùng lịch & cập nhật ca đó
+                $isBusy = BookingDetail::where('court_id', $validated['court_id'])
+                    ->where('booking_date', $validated['booking_date'])
+                    ->where('id', '!=', $detailId)
+                    ->where(
+                        fn($q) => $q
+                            ->where('start_time', '<', $validated['end_time'] . ':00')
+                            ->where('end_time', '>', $validated['start_time'] . ':00')
+                    )
+                    ->whereHas('booking', fn($q) => $q->where('status', '!=', 'cancelled'))
+                    ->exists();
+
+                if ($isBusy) {
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => 'Lịch mới đã có người đặt, vui lòng chọn giờ/sân khác.',
+                    ], 400);
+                }
+
+                $newPrice = $this->internalCalculatePrice($validated['court_id'], $validated['booking_date'], $validated['start_time'], $validated['end_time']);
+                $newDuration = (strtotime($validated['end_time']) - strtotime($validated['start_time'])) / 60;
+
+                $detail->update([
+                    'court_id' => $validated['court_id'],
+                    'booking_date' => $validated['booking_date'],
+                    'start_time' => $validated['start_time'] . ':00',
+                    'end_time' => $validated['end_time'] . ':00',
+                    'duration_minutes' => $newDuration,
+                    'price' => $newPrice,
+                    'price_per_hour' => $newDuration > 0 ? ($newPrice / ($newDuration / 60)) : 0,
+                ]);
             }
-
-            $newPrice = $this->internalCalculatePrice($validated['court_id'], $validated['booking_date'], $validated['start_time'], $validated['end_time']);
-            $priceDiff = $newPrice - $detail->price;
-            $newDuration = (strtotime($validated['end_time']) - strtotime($validated['start_time'])) / 60;
-
-            $detail->update([
-                'court_id' => $validated['court_id'],
-                'booking_date' => $validated['booking_date'],
-                'start_time' => $validated['start_time'] . ':00',
-                'end_time' => $validated['end_time'] . ':00',
-                'duration_minutes' => $newDuration,
-                'price' => $newPrice,
-                'price_per_hour' => $newDuration > 0 ? ($newPrice / ($newDuration / 60)) : 0,
-            ]);
 
             // ── Tính lại TOÀN BỘ tiền của đơn sau khi đổi lịch ──────────────────
             // Không cộng dồn chênh lệch thô nữa mà tính lại từ đầu để áp đúng

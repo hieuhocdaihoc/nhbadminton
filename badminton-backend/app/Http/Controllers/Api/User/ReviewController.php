@@ -12,9 +12,7 @@ use Illuminate\Support\Str;
 
 class ReviewController extends Controller
 {
-    /**
-     * Chức năng: Lấy danh sách review đã duyệt để hiển thị public trên trang chủ hoặc trang sân.
-     */
+    // lay danh sach review da duyet de hien thi public tren trang chu hoac trang san
     public function index(Request $request)
     {
         $validated = $request->validate([
@@ -54,9 +52,7 @@ class ReviewController extends Controller
         ]);
     }
 
-    /**
-     * Chức năng: Cho khách đã hoàn thành đơn gửi đánh giá sân và đưa review vào trạng thái chờ duyệt.
-     */
+    // cho khach da hoan thanh don gui danh gia san va dua review vao trang thai cho duyet
     public function store(Request $request)
     {
         $user = $request->user();
@@ -131,9 +127,7 @@ class ReviewController extends Controller
         ], 201);
     }
 
-    /**
-     * Chức năng: Tạo thông báo cho admin/staff khi có đánh giá mới cần kiểm duyệt.
-     */
+    // tao thong bao cho admin/staff khi co danh gia moi can kiem duyet
     private function notifyAdminsAboutReview(Review $review): void
     {
         $receiverIds = User::whereIn('role', ['admin', 'staff'])

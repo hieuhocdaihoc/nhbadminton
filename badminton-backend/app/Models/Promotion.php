@@ -31,8 +31,8 @@ class Promotion extends Model
         'discount_value'      => 'float',
         'per_user_limit'      => 'integer',
         'min_points_required' => 'integer',
-        'valid_from'          => 'date',
-        'valid_to'            => 'date',
+        'valid_from'          => 'date:Y-m-d',
+        'valid_to'            => 'date:Y-m-d',
         'auto_apply'          => 'boolean',
     ];
 

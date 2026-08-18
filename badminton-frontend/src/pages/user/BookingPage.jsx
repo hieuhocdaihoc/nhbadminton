@@ -1646,126 +1646,145 @@ const BookingPage = () => {
 
       <AnimatePresence>
         {isPaymentModalOpen && paymentInfo && (
-          <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
             <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-zinc-900 border border-zinc-700 w-full max-w-md rounded-3xl overflow-hidden shadow-xl"
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              className="bg-zinc-900 border border-zinc-700/80 w-full max-w-2xl rounded-3xl overflow-hidden shadow-2xl relative my-auto max-h-[92vh] flex flex-col"
             >
-              <div className="p-6 border-b border-zinc-800">
-                <h3 className="text-lg font-extrabold text-white">
-                  Thanh toán đặt sân
-                </h3>
-                <p className="text-xs text-zinc-500 mt-1">
-                  Quét mã QR hoặc chuyển khoản đúng nội dung bên dưới.
-                </p>
+              {/* Header với nút Đóng X */}
+              <div className="p-4 sm:p-5 border-b border-zinc-800 flex justify-between items-center bg-zinc-900/90 backdrop-blur sticky top-0 z-10">
+                <div>
+                  <h3 className="text-base sm:text-lg font-extrabold text-white flex items-center gap-2">
+                    <span>💳</span> Thanh toán đặt sân
+                  </h3>
+                  <p className="text-xs text-zinc-400 mt-0.5">
+                    Quét mã QR bằng ứng dụng ngân hàng hoặc MoMo
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleClosePaymentModal}
+                  className="w-8 h-8 rounded-full bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white flex items-center justify-center transition-colors text-sm font-bold"
+                  title="Đóng"
+                >
+                  ✕
+                </button>
               </div>
 
-              <div className="p-6 space-y-5">
-                <div className="bg-white rounded-2xl p-4 flex justify-center border border-zinc-800">
-                  <img
-                    src={paymentInfo.qr_url}
-                    alt="QR thanh toán"
-                    className="w-64 h-64 object-contain"
-                  />
-                </div>
-
-                <div className="space-y-3 text-sm">
-                  <div className="flex justify-between gap-4">
-                    <span className="text-zinc-500">Ngân hàng</span>
-                    <span className="font-bold text-white text-right">
-                      {paymentInfo.bank_name}
-                    </span>
-                  </div>
-
-                  <div className="flex justify-between gap-4">
-                    <span className="text-zinc-500">Số tài khoản</span>
-                    <span className="font-bold text-white text-right">
-                      {paymentInfo.bank_account}
-                    </span>
-                  </div>
-
-                  <div className="flex justify-between gap-4">
-                    <span className="text-zinc-500">Chủ tài khoản</span>
-                    <span className="font-bold text-white text-right">
-                      {paymentInfo.account_holder}
-                    </span>
-                  </div>
-
-                  <div className="flex justify-between gap-4">
-                    <span className="text-zinc-500">
-                      {paymentInfo.is_deposit ? "Đặt cọc giữ chỗ" : "Số tiền"}
-                    </span>
-                    <span className="font-extrabold text-lime-500 text-right">
-                      {Number(paymentInfo.amount ?? 0).toLocaleString("vi-VN")}{" "}
-                      VNĐ
-                    </span>
-                  </div>
-
-                  {paymentInfo.is_deposit && (
-                    <div className="flex justify-between gap-4">
-                      <span className="text-zinc-500">
-                        Còn lại thanh toán tại sân
-                      </span>
-                      <span className="font-extrabold text-zinc-300 text-right">
-                        {Number(
-                          paymentInfo.remaining_at_venue ?? 0,
-                        ).toLocaleString("vi-VN")}{" "}
-                        VNĐ
-                      </span>
+              {/* Thân Modal: Khung Ngang (2 cột trên màn hình md+) */}
+              <div className="p-4 sm:p-6 overflow-y-auto space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-5 items-start">
+                  {/* Cột Trái: Mã QR Code */}
+                  <div className="md:col-span-5 flex flex-col items-center bg-zinc-950/70 p-4 rounded-2xl border border-zinc-800">
+                    <div className="bg-white rounded-xl p-3 shadow-inner w-full flex justify-center">
+                      <img
+                        src={paymentInfo.qr_url}
+                        alt="Mã QR thanh toán"
+                        className="w-full max-w-[210px] aspect-square object-contain"
+                      />
                     </div>
-                  )}
-
-                  <div className="bg-amber-400/10 border border-amber-400/30 rounded-2xl p-3">
-                    <p className="text-[11px] text-amber-300 font-bold uppercase mb-1">
-                      Nội dung chuyển khoản
-                    </p>
-                    <p className="text-sm font-extrabold text-amber-200 break-all font-mono">
-                      {paymentInfo.transfer_content}
+                    <p className="text-[11px] text-zinc-400 text-center mt-2.5 font-medium">
+                      Mở App Ngân hàng → Quét mã QR để điền tự động
                     </p>
                   </div>
 
-                  {paymentInfo.is_deposit && (
-                    <div className="bg-amber-400/10 border border-amber-400/30 rounded-2xl p-3">
-                      <p className="text-[11px] text-amber-300 font-semibold leading-relaxed">
-                        Đây là tiền cọc giữ chỗ, <b>không hoàn lại</b> nếu hủy
-                        hoặc không đến. Phần còn lại vui lòng thanh toán tại sân
-                        sau khi chơi xong.
+                  {/* Cột Phải: Thông tin Chuyển khoản */}
+                  <div className="md:col-span-7 space-y-3.5 text-xs sm:text-sm">
+                    <div className="bg-zinc-950/60 rounded-2xl p-3.5 border border-zinc-800 space-y-2">
+                      <div className="flex justify-between items-center gap-2 pb-1.5 border-b border-zinc-800/60">
+                        <span className="text-zinc-400 text-xs">Ngân hàng</span>
+                        <span className="font-bold text-white text-right">
+                          {paymentInfo.bank_name}
+                        </span>
+                      </div>
+
+                      <div className="flex justify-between items-center gap-2 pb-1.5 border-b border-zinc-800/60">
+                        <span className="text-zinc-400 text-xs">Số tài khoản</span>
+                        <span className="font-bold text-white text-right font-mono text-sm tracking-wider">
+                          {paymentInfo.bank_account}
+                        </span>
+                      </div>
+
+                      <div className="flex justify-between items-center gap-2 pb-1.5 border-b border-zinc-800/60">
+                        <span className="text-zinc-400 text-xs">Chủ tài khoản</span>
+                        <span className="font-bold text-white text-right uppercase text-xs">
+                          {paymentInfo.account_holder}
+                        </span>
+                      </div>
+
+                      <div className="flex justify-between items-center gap-2 pt-0.5">
+                        <span className="text-zinc-400 text-xs">
+                          {paymentInfo.is_deposit ? "Cần thanh toán (Cọc)" : "Tổng tiền thanh toán"}
+                        </span>
+                        <span className="font-extrabold text-lime-400 text-base sm:text-lg">
+                          {Number(paymentInfo.amount ?? 0).toLocaleString("vi-VN")} VNĐ
+                        </span>
+                      </div>
+
+                      {paymentInfo.is_deposit && (
+                        <div className="flex justify-between items-center gap-2 pt-1 border-t border-zinc-800/60 text-xs">
+                          <span className="text-zinc-400">Còn nợ tại sân</span>
+                          <span className="font-bold text-amber-400">
+                            {Number(paymentInfo.remaining_at_venue ?? 0).toLocaleString("vi-VN")} VNĐ
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Nội dung chuyển khoản với nút Sao chép */}
+                    <div className="bg-amber-400/10 border border-amber-400/30 rounded-2xl p-3.5 flex items-center justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[10px] text-amber-400 font-bold uppercase tracking-wider mb-0.5">
+                          Nội dung chuyển khoản (bắt buộc đúng)
+                        </p>
+                        <p className="text-xs sm:text-sm font-extrabold text-amber-200 truncate font-mono">
+                          {paymentInfo.transfer_content}
+                        </p>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(paymentInfo.transfer_content || "");
+                          toast.success("Đã sao chép nội dung chuyển khoản!");
+                        }}
+                        className="px-3 py-1.5 rounded-xl bg-amber-400/20 hover:bg-amber-400/30 text-amber-300 text-xs font-bold transition-colors shrink-0"
+                      >
+                        Sao chép
+                      </button>
+                    </div>
+
+                    {/* Cảnh báo cọc & Xác nhận tự động */}
+                    {paymentInfo.is_deposit && (
+                      <div className="bg-amber-400/5 border border-amber-400/20 rounded-xl p-2.5">
+                        <p className="text-[11px] text-amber-300/90 leading-relaxed">
+                          ⚠️ Đây là tiền cọc giữ chỗ. Phần tiền sân còn lại vui lòng thanh toán tại quầy khi đến chơi.
+                        </p>
+                      </div>
+                    )}
+
+                    <div className="bg-lime-400/10 border border-lime-400/25 rounded-xl p-2.5 flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-lime-400 animate-ping shrink-0" />
+                      <p className="text-[11px] text-lime-300 font-medium leading-tight">
+                        Hệ thống tự động kiểm tra & hoàn tất đơn ngay sau khi nhận tiền.
                       </p>
                     </div>
-                  )}
-
-                  <div className="bg-lime-400/10 border border-lime-400/30 rounded-2xl p-3">
-                    <p className="text-[11px] text-lime-300 font-semibold">
-                      Sau khi chuyển khoản thành công, hệ thống sẽ tự xác nhận
-                      và chuyển trang.
-                    </p>
                   </div>
                 </div>
+              </div>
 
-                <div className="flex gap-2 pt-3">
-                  <button
-                    type="button"
-                    onClick={handleClosePaymentModal}
-                    className="flex-1 py-3 rounded-2xl bg-zinc-800 text-zinc-300 text-xs font-bold hover:bg-zinc-200 border border-zinc-700 transition-colors"
-                  >
-                    Tôi đã chuyển khoản
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      navigator.clipboard.writeText(
-                        paymentInfo.transfer_content,
-                      );
-                      toast.success("Đã sao chép nội dung chuyển khoản!");
-                    }}
-                    className="flex-1 py-3 rounded-2xl bg-lime-500 text-white text-xs font-extrabold hover:bg-lime-400 transition-colors"
-                  >
-                    Copy nội dung
-                  </button>
-                </div>
+              {/* Footer nút điều hướng */}
+              <div className="p-4 border-t border-zinc-800 bg-zinc-950/80 flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={handleClosePaymentModal}
+                  className="px-5 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-bold transition-colors"
+                >
+                  Hủy / Đóng
+                </button>
               </div>
             </motion.div>
           </div>

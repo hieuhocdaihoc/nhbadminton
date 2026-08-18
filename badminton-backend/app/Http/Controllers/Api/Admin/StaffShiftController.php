@@ -11,7 +11,7 @@ class StaffShiftController extends Controller
 {
     private const STATUSES = ['scheduled', 'working', 'completed', 'cancelled'];
 
-    /** Chức năng: Lấy danh sách ca làm nhân viên, hỗ trợ lọc theo nhân viên, ngày và trạng thái. */
+    // lay danh sach ca lam nhan vien, ho tro loc theo nhan vien, ngay va trang thai
     public function index(Request $request)
     {
         $query = StaffShift::with(['staff:id,full_name,phone,email,status'])
@@ -35,7 +35,7 @@ class StaffShiftController extends Controller
         return response()->json(['message' => 'Lấy danh sách ca làm thành công', 'data' => $shifts]);
     }
 
-    /** Chức năng: Tạo ca làm mới cho nhân viên sau khi kiểm tra trạng thái và trùng ca. */
+    // tao ca lam moi cho nhan vien sau khi kiem tra trang thai va trung ca
     public function store(Request $request)
     {
         $validated = $this->validatedShift($request);
@@ -61,7 +61,7 @@ class StaffShiftController extends Controller
         ], 201);
     }
 
-    /** Chức năng: Lấy chi tiết một ca làm. */
+    // lay chi tiet mot ca lam
     public function show($id)
     {
         $shift = StaffShift::with('staff:id,full_name,phone,email,status')->findOrFail($id);
@@ -69,7 +69,7 @@ class StaffShiftController extends Controller
         return response()->json(['message' => 'Lấy chi tiết ca làm thành công', 'data' => $shift]);
     }
 
-    /** Chức năng: Cập nhật thông tin ca làm và kiểm tra lại trùng ca nếu đổi lịch. */
+    // cap nhat thong tin ca lam va kiem tra lai trung ca neu doi lich
     public function update(Request $request, $id)
     {
         $shift = StaffShift::findOrFail($id);
@@ -92,7 +92,7 @@ class StaffShiftController extends Controller
         ]);
     }
 
-    /** Chức năng: Xóa ca làm chưa hoặc không cần quản lý nữa. */
+    // xoa ca lam chua hoac khong can quan ly nua
     public function destroy($id)
     {
         $shift = StaffShift::findOrFail($id);
@@ -106,7 +106,7 @@ class StaffShiftController extends Controller
         return response()->json(['message' => 'Xóa ca làm thành công']);
     }
 
-    /** Chức năng: Trả về trạng thái ca làm hiện tại và lịch sắp tới của nhân viên đang đăng nhập. */
+    // tra ve trang thai ca lam hien tai va lich sap toi cua nhan vien dang dang nhap
     public function myShifts(Request $request)
     {
         $staffId = $request->user()->id;
@@ -144,7 +144,7 @@ class StaffShiftController extends Controller
         ]);
     }
 
-    /** Chức năng: Validate dữ liệu đầu vào khi tạo hoặc cập nhật ca làm. */
+    // validate du lieu dau vao khi tao hoac cap nhat ca lam
     private function validatedShift(Request $request, bool $isUpdate = false): array
     {
         $required = $isUpdate ? 'sometimes' : 'required';
@@ -162,7 +162,7 @@ class StaffShiftController extends Controller
         ]);
     }
 
-    /** Chức năng: Tìm ca làm bị chồng thời gian với nhân viên được phân ca. */
+    // tim ca lam bi chong thoi gian voi nhan vien duoc phan ca
     private function findOverlappingShift(
         string $staffId,
         string $shiftDate,

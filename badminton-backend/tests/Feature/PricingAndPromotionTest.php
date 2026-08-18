@@ -138,6 +138,23 @@ class PricingAndPromotionTest extends TestCase
         ])->assertOk()->assertJsonPath('data.discount_amount', 30000);
     }
 
+    public function test_promotion_dates_serialization_preserves_exact_date_strings(): void
+    {
+        $admin = \App\Models\User::factory()->create(['role' => 'admin']);
+        $response = $this->actingAs($admin)->postJson('/api/admin/promotions', [
+            'code' => 'DATEFIX',
+            'name' => 'Date fix test',
+            'discount_type' => 'fixed',
+            'discount_value' => 10000,
+            'valid_from' => '2026-08-16',
+            'valid_to' => '2026-08-18',
+        ]);
+
+        $response->assertCreated()
+            ->assertJsonPath('data.valid_from', '2026-08-16')
+            ->assertJsonPath('data.valid_to', '2026-08-18');
+    }
+
     public function test_expired_or_inactive_promotion_is_rejected(): void
     {
         Promotion::create([

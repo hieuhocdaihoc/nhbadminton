@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\DB;
 
 class MembershipPurchaseService
 {
+    // hoan tat mua the sau khi tien ve: tao the, kich hoat va ghi nhan doanh thu
     public function complete(BookingIntent $intent, array $paymentInfo = []): MembershipCard
     {
         return DB::transaction(function () use ($intent, $paymentInfo) {
@@ -124,6 +125,7 @@ class MembershipPurchaseService
         });
     }
 
+    // sinh ma the theo nam va so thu tu tang dan: CARD-YYYY-NNN
     private function generateCardCode(): string
     {
         $year = now()->year;

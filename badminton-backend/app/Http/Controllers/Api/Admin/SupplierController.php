@@ -8,7 +8,7 @@ use Illuminate\Http\Request;
 
 class SupplierController extends Controller
 {
-    /** Chức năng: Lấy danh sách nhà cung cấp, hỗ trợ tìm kiếm theo tên hoặc số điện thoại. */
+    // lay danh sach nha cung cap, ho tro tim kiem theo ten hoac so dien thoai
     public function index(Request $request)
     {
         $query = Supplier::withCount('purchaseOrders')
@@ -31,7 +31,7 @@ class SupplierController extends Controller
         return response()->json(['status' => 'success', 'data' => $suppliers, 'stats' => $stats]);
     }
 
-    /** Chức năng: Tạo mới thông tin nhà cung cấp. */
+    // tao moi thong tin nha cung cap
     public function store(Request $request)
     {
         $validated = $request->validate([
@@ -51,7 +51,7 @@ class SupplierController extends Controller
         ], 201);
     }
 
-    /** Chức năng: Lấy chi tiết nhà cung cấp. */
+    // lay chi tiet nha cung cap
     public function show($id)
     {
         $supplier = Supplier::findOrFail($id);
@@ -59,7 +59,7 @@ class SupplierController extends Controller
         return response()->json(['status' => 'success', 'data' => $supplier]);
     }
 
-    /** Chức năng: Cập nhật thông tin nhà cung cấp. */
+    // cap nhat thong tin nha cung cap
     public function update(Request $request, $id)
     {
         $supplier = Supplier::findOrFail($id);
@@ -81,7 +81,7 @@ class SupplierController extends Controller
         ]);
     }
 
-    /** Chức năng: Xóa nhà cung cấp, trả lỗi nếu còn phiếu nhập hàng liên kết. */
+    // xoa nha cung cap, tra loi neu con phieu nhap hang lien ket
     public function destroy($id)
     {
         $supplier = Supplier::findOrFail($id);

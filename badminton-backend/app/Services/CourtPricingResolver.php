@@ -8,9 +8,7 @@ use Illuminate\Database\Eloquent\Collection;
 
 class CourtPricingResolver
 {
-    /**
-     * Tìm giá cho ngày
-     */
+    // tim gia cho ngay
     public function effectiveForDate(string $date): Collection
     {
         $dayType = Carbon::parse($date)->isWeekend() ? 'weekend' : 'weekday';
@@ -38,9 +36,7 @@ class CourtPricingResolver
             ->orderBy('start_time')
             ->get();
     }
-    /**
-     * Tính giá cho một khoảng thời gian
-     */
+    // tinh gia cho mot khoang thoi gian
     public function calculate(string $date, string $startTime, string $endTime): array
     {
         $totalPrice = 0.0;

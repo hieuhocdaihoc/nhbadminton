@@ -9,9 +9,7 @@ use Illuminate\Http\Request;
 
 class NotificationController extends Controller
 {
-    /**
-     * Chức năng: Lấy danh sách thông báo của admin/staff hiện tại và số lượng chưa đọc.
-     */
+    // lay danh sach thong bao cua admin/staff hien tai va so luong chua doc
     public function index(Request $request)
     {
         $user = $request->user();
@@ -52,9 +50,7 @@ class NotificationController extends Controller
         return $response;
     }
 
-    /**
-     * Chức năng: Đánh dấu một thông báo cụ thể là đã đọc.
-     */
+    // danh dau mot thong bao cu the la da doc
     public function markAsRead(Request $request, $id)
     {
         $notification = Notification::where('receiver_id', $request->user()->id)
@@ -78,9 +74,7 @@ class NotificationController extends Controller
         ]);
     }
 
-    /**
-     * Chức năng: Đánh dấu toàn bộ thông báo của người dùng hiện tại là đã đọc.
-     */
+    // danh dau toan bo thong bao cua nguoi dung hien tai la da doc
     public function markAllAsRead(Request $request)
     {
         Notification::where('receiver_id', $request->user()->id)

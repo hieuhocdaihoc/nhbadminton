@@ -8,6 +8,7 @@ final class MembershipTierService
     public const LEVEL_BAC = 'Bac';
     public const LEVEL_VANG = 'Vang';
 
+    // xac dinh hang thanh vien (Dong/Bac/Vang) theo diem tich luy
     public static function levelForPoints(int $points): string
     {
         return match (true) {
@@ -17,6 +18,7 @@ final class MembershipTierService
         };
     }
 
+    // so tien duoc giam moi gio choi theo hang thanh vien
     public static function hourlyDiscountForPoints(int $points): int
     {
         return match (true) {
@@ -26,6 +28,7 @@ final class MembershipTierService
         };
     }
 
+    // tong tien duoc giam cho ca don dua theo so phut choi va hang thanh vien
     public static function discountForMinutes(int $points, int|float $minutes): float
     {
         $hours = max(0, $minutes) / 60;

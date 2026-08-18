@@ -13,10 +13,7 @@ class PaymentManagementController extends Controller
 {
     private const BANK_METHODS = ['bank_transfer', 'sepay', 'online'];
 
-    /**
-     * Chức năng: Ghi nhận thông tin hoàn tiền. Hệ thống CHỈ lưu lại thông tin —
-     * việc chuyển tiền thực tế do cá nhân thực hiện (tiền mặt hoặc banking cá nhân).
-     */
+    // ghi nhan thong tin hoan tien
     public function storeRefund(Request $request)
     {
         $validated = $request->validate([
@@ -78,11 +75,7 @@ class PaymentManagementController extends Controller
         ], 201);
     }
 
-    /**
-     * Chức năng: Cập nhật trạng thái phiếu hoàn tiền (nhân viên đã hoàn tiền mặt
-     * ngoài đời thì đánh dấu "đã hoàn"; hoặc từ chối phiếu). Chỉ phiếu "đã hoàn"
-     * mới được trừ khỏi doanh thu trong báo cáo thống kê.
-     */
+    // cap nhat trang thai phieu hoan tien (nhan vien da hoan tien mat
     public function updateRefundStatus(Request $request, $id)
     {
         $validated = $request->validate([
@@ -122,7 +115,7 @@ class PaymentManagementController extends Controller
         ]);
     }
 
-    /** Chức năng: Danh sách các lần hoàn tiền đã ghi nhận. */
+    // danh sach cac lan hoan tien da ghi nhan
     public function refunds(Request $request)
     {
         $refunds = Refund::with([
@@ -136,7 +129,7 @@ class PaymentManagementController extends Controller
         return response()->json(['status' => 'success', 'data' => $refunds]);
     }
 
-    /** Chức năng: Lấy danh sách giao dịch thanh toán để quản trị đối soát doanh thu. */
+    // lay danh sach giao dich thanh toan de quan tri doi soat doanh thu
     public function index(Request $request)
     {
         $query = $this->withRefundTotals(
@@ -178,7 +171,7 @@ class PaymentManagementController extends Controller
         ]);
     }
 
-    /** Chức năng: Lấy chi tiết một giao dịch thanh toán. */
+    // lay chi tiet mot giao dich thanh toan
     public function show($id)
     {
         $payment = $this->withRefundTotals(
@@ -193,7 +186,7 @@ class PaymentManagementController extends Controller
         ]);
     }
 
-    /** Chức năng: Tổng hợp doanh thu thanh toán theo thời gian, phương thức và trạng thái. */
+    // tong hop doanh thu thanh toan theo thoi gian, phuong thuc va trang thai
     public function summary(Request $request)
     {
         $query = Payment::where('status', 'success');
@@ -240,7 +233,7 @@ class PaymentManagementController extends Controller
         ]);
     }
 
-    /** Chức năng: Lấy toàn bộ giao dịch thanh toán thuộc một đơn đặt sân. */
+    // lay toan bo giao dich thanh toan thuoc mot don dat san
     public function paymentsByBooking($bookingId)
     {
         $payments = Payment::with(['user:id,full_name,email,phone'])
@@ -255,6 +248,7 @@ class PaymentManagementController extends Controller
         ]);
     }
 
+    // gan them tong tien da hoan va tong tien dang giu cho hoan vao query thanh toan
     private function withRefundTotals($query)
     {
         return $query
@@ -266,6 +260,7 @@ class PaymentManagementController extends Controller
             ], 'amount');
     }
 
+    // tinh so tien con co the hoan cua mot giao dich roi gan vao ket qua tra ve
     private function appendRefundableAmount(Payment $payment): Payment
     {
         $refundedAmount = (float) ($payment->refunded_amount ?? 0);

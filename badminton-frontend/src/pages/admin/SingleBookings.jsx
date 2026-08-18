@@ -34,6 +34,7 @@ const SingleBookings = () => {
   const [message, setMessage] = useState({ type: "", text: "" });
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
+  const [selectedDetailBooking, setSelectedDetailBooking] = useState(null);
 
   // MODAL XÁC NHẬN CƠ BẢN (Duyệt, Thu tiền, Hủy)
   const [confirmModal, setConfirmModal] = useState({
@@ -197,15 +198,20 @@ const SingleBookings = () => {
 
   // --- LOGIC ĐỔI LỊCH ---
   const openRescheduleModal = (booking) => {
-    const detail = booking.details?.[0];
-    if (!detail) return toast.error("Không tìm thấy chi tiết ca chơi!");
+    const details = booking.details || [];
+    if (details.length === 0) return toast.error("Không tìm thấy chi tiết ca chơi!");
+
+    const sorted = [...details].sort((a, b) => a.start_time.localeCompare(b.start_time));
+    const first = sorted[0];
+    const last = sorted[sorted.length - 1];
+
     setRescheduleForm({
-      court_id: detail.court_id,
-      booking_date: detail.booking_date,
-      start_time: detail.start_time.slice(0, 5),
-      end_time: detail.end_time.slice(0, 5),
+      court_id: first.court_id,
+      booking_date: first.booking_date,
+      start_time: first.start_time.slice(0, 5),
+      end_time: last.end_time.slice(0, 5),
     });
-    setRescheduleModal({ isOpen: true, detailId: detail.id, booking });
+    setRescheduleModal({ isOpen: true, detailId: first.id, booking });
   };
 
   const handleRescheduleSubmit = async (e) => {
@@ -476,6 +482,12 @@ const SingleBookings = () => {
                           })()}
                         </div>
                         <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => setSelectedDetailBooking(b)}
+                            className="admin-btn-outline px-2.5 py-1 text-[10px] text-zinc-600 hover:text-blue-600 hover:border-blue-300"
+                          >
+                            Chi tiết
+                          </button>
                           {b.payment_status !== "paid" && !isCancelled && (
                             <button onClick={() => requestAction(b, "pay")} className="admin-btn-primary px-2.5 py-1 text-[10px] font-medium">
                               Thu tiền
@@ -545,14 +557,14 @@ const SingleBookings = () => {
             >
               <div className="admin-modal-header p-6 border-b border-zinc-100">
                 <h3 className="text-sm font-semibold text-zinc-800">
-                  Đổi lịch ca chơi
+                  Đổi lịch ca chơi với khung giờ tương tự
                 </h3>
                 <p className="admin-page-subtitle">
                   Khách:{" "}
                   <span className="text-zinc-600">
                     {rescheduleModal.booking?.customer_name}
                   </span>
-                </p>
+                </p>x
               </div>
               <form onSubmit={handleRescheduleSubmit} className="p-6 space-y-4">
                 <div>
@@ -705,6 +717,162 @@ const SingleBookings = () => {
             </motion.div>
           </div>
         )}
+      </AnimatePresence>
+
+      {/* MODAL XEM CHI TIẾT ĐƠN ĐẶT SÂN */}
+      <AnimatePresence>
+        {selectedDetailBooking && (() => {
+          const b = selectedDetailBooking;
+          const sc = statusConfig[b.status] || statusConfig.confirmed;
+          return (
+            <div className="admin-modal-overlay" onClick={() => setSelectedDetailBooking(null)}>
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                onClick={(e) => e.stopPropagation()}
+                className="admin-modal-content max-w-lg"
+              >
+                <div className="admin-modal-header p-5 border-b border-zinc-100 flex items-start justify-between">
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h4 className="text-sm font-bold text-zinc-800">{b.customer_name}</h4>
+                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium ${sc.bg} ${sc.text}`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${sc.dot}`} /> {sc.label}
+                      </span>
+                    </div>
+                    <p className="text-xs text-zinc-400 font-mono mt-0.5">
+                      Mã đơn: <span className="font-semibold text-zinc-700">{b.booking_code}</span>
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setSelectedDetailBooking(null)}
+                    className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-zinc-100 text-zinc-400 hover:text-zinc-600 transition-colors text-sm"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <div className="p-5 space-y-4 max-h-[75vh] overflow-y-auto text-left">
+                  {/* Thông tin liên hệ & NV */}
+                  <div className="grid grid-cols-2 gap-3 bg-zinc-50 p-3 rounded-xl border border-zinc-100 text-xs">
+                    <div>
+                      <p className="text-[10px] text-zinc-400 uppercase tracking-wider">Số điện thoại</p>
+                      <p className="font-medium text-zinc-800">{b.customer_phone || "—"}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-zinc-400 uppercase tracking-wider">Nhân viên tạo</p>
+                      <p className="font-medium text-zinc-800">{b.staff?.full_name || "Khách tự đặt (Online)"}</p>
+                    </div>
+                  </div>
+
+                  {/* Thông tin ca chơi */}
+                  <div className="border border-zinc-100 rounded-xl p-3 space-y-2">
+                    <p className="text-xs font-bold text-zinc-700 uppercase tracking-wider">Chi tiết ca chơi</p>
+                    {b.details && b.details.length > 0 ? (
+                      b.details.map((d, idx) => (
+                        <div key={idx} className="flex justify-between items-center text-xs py-1 border-b border-zinc-50 last:border-0">
+                          <div>
+                            <span className="font-semibold text-zinc-800">{d.court?.name || `Sân ${d.court_id}`}</span>
+                            <span className="text-zinc-400 ml-2">({d.booking_date})</span>
+                          </div>
+                          <span className="font-mono text-zinc-600 font-medium">
+                            {String(d.start_time).slice(0, 5)} - {String(d.end_time).slice(0, 5)}
+                          </span>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-xs text-zinc-400 italic">Chưa có thông tin ca chơi</p>
+                    )}
+                  </div>
+
+                  {/* Dịch vụ / Pro-shop đi kèm */}
+                  <div className="border border-zinc-100 rounded-xl p-3 space-y-2">
+                    <p className="text-xs font-bold text-zinc-700 uppercase tracking-wider">Dịch vụ & Nước uống đi kèm</p>
+                    {b.serviceDetails && b.serviceDetails.length > 0 ? (
+                      <div className="space-y-1.5">
+                        {b.serviceDetails.map((s, idx) => {
+                          const itemName = s.product?.name || s.service?.name || "Mặt hàng";
+                          const price = Number(s.price || s.unit_price || 0);
+                          const qty = Number(s.quantity || 1);
+                          const subtotal = Number(s.total_price || price * qty);
+                          return (
+                            <div key={idx} className="flex justify-between text-xs py-1 border-b border-zinc-50 last:border-0">
+                              <div>
+                                <span className="font-medium text-zinc-800">{itemName}</span>
+                                <span className="text-zinc-400 ml-1.5">x{qty}</span>
+                              </div>
+                              <span className="font-semibold text-zinc-700">{subtotal.toLocaleString()}₫</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-zinc-400 italic">Không có dịch vụ đi kèm</p>
+                    )}
+                  </div>
+
+                  {/* Chi tiết tài chính */}
+                  <div className="bg-zinc-50 rounded-xl border border-zinc-100 p-4 space-y-2 text-xs">
+                    <p className="font-bold text-zinc-700 uppercase tracking-wider mb-1">Tổng quan tài chính</p>
+                    <div className="flex justify-between text-zinc-600">
+                      <span>Tiền sân gốc</span>
+                      <span>{Number(b.subtotal_court || 0).toLocaleString()}₫</span>
+                    </div>
+                    {(() => {
+                      const totalOvertimeFee = (b.details || []).reduce(
+                        (sum, d) => sum + Number(d.overtime_fee || 0),
+                        0
+                      );
+                      const totalOvertimeMinutes = (b.details || []).reduce(
+                        (sum, d) => sum + Number(d.overtime_minutes || 0),
+                        0
+                      );
+                      return totalOvertimeFee > 0 ? (
+                        <div className="flex justify-between text-amber-600 font-medium">
+                          <span>Phụ thu quá giờ {totalOvertimeMinutes > 0 ? `(${totalOvertimeMinutes} phút)` : ""}</span>
+                          <span>+{totalOvertimeFee.toLocaleString()}₫</span>
+                        </div>
+                      ) : null;
+                    })()}
+                    {Number(b.subtotal_service || 0) > 0 && (
+                      <div className="flex justify-between text-zinc-600">
+                        <span>Tiền dịch vụ / Pro-shop</span>
+                        <span>+{Number(b.subtotal_service).toLocaleString()}₫</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between text-sm font-bold text-zinc-800 pt-1 border-t border-zinc-200">
+                      <span>Tổng cộng</span>
+                      <span className="text-emerald-600">{Number(b.total_price || 0).toLocaleString()}₫</span>
+                    </div>
+                    <div className="flex justify-between text-xs text-zinc-500 pt-1">
+                      <span>Trạng thái thanh toán</span>
+                      <span className={`font-semibold ${b.payment_status === 'paid' ? 'text-emerald-600' : b.payment_status === 'partially_paid' ? 'text-amber-600' : 'text-red-500'}`}>
+                        {b.payment_status === 'paid' ? 'Đã thanh toán đủ' : b.payment_status === 'partially_paid' ? 'Đã cọc một phần' : 'Chưa thanh toán'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {b.note && (
+                    <div className="bg-amber-50 border border-amber-100 rounded-xl p-3 text-xs">
+                      <span className="font-bold text-amber-800">Ghi chú: </span>
+                      <span className="text-amber-700">{b.note}</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="p-4 border-t border-zinc-100 bg-zinc-50/50 rounded-b-xl flex justify-end">
+                  <button
+                    onClick={() => setSelectedDetailBooking(null)}
+                    className="admin-btn-outline px-4 py-2 text-xs font-medium"
+                  >
+                    Đóng
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          );
+        })()}
       </AnimatePresence>
 
     </div>

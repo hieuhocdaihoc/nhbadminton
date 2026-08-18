@@ -18,7 +18,7 @@ class CourtPricingController extends Controller
     {
     }
 
-    /** Chức năng: Lấy danh sách bảng giá chung (áp dụng cho tất cả sân). */
+    // lay danh sach bang gia chung (ap dung cho tat ca san)
     public function index()
     {
         $pricings = CourtPricing::orderBy('day_type')
@@ -31,7 +31,7 @@ class CourtPricingController extends Controller
         ]);
     }
 
-    /** Chức năng: Tạo mới một khung giá chung. */
+    // tao moi mot khung gia chung
     public function store(Request $request)
     {
         $validated = $request->validate([
@@ -61,13 +61,13 @@ class CourtPricingController extends Controller
         ], 201);
     }
 
-    /** Chức năng: Lấy chi tiết một cấu hình giá. */
+    // lay chi tiet mot cau hinh gia
     public function show($id)
     {
         return response()->json(['data' => CourtPricing::findOrFail($id)]);
     }
 
-    /** Chức năng: Cập nhật một khung giá chung. */
+    // cap nhat mot khung gia chung
     public function update(Request $request, $id)
     {
         $pricing = CourtPricing::findOrFail($id);
@@ -102,7 +102,7 @@ class CourtPricingController extends Controller
         ]);
     }
 
-    /** Chức năng: Xóa một khung giá. */
+    // xoa mot khung gia
     public function destroy($id)
     {
         $pricing = CourtPricing::findOrFail($id);
@@ -121,10 +121,7 @@ class CourtPricingController extends Controller
         return response()->json(['message' => 'Đã xóa cấu hình giá khỏi hệ thống']);
     }
 
-    /**
-     * Chức năng: Tạo hoặc cập nhật một mốc giá chung trong 1 transaction.
-     * Nếu truyền entry_ids thì cập nhật bản ghi đó; ngược lại tìm bản ghi trùng khóa để upsert.
-     */
+    // tao hoac cap nhat mot moc gia chung trong 1 transaction
     public function bulkUpsert(Request $request)
     {
         $validated = $request->validate([
@@ -206,7 +203,7 @@ class CourtPricingController extends Controller
         ]);
     }
 
-    /** Chức năng: Xóa một hoặc nhiều mốc giá. */
+    // xoa mot hoac nhieu moc gia
     public function bulkDestroy(Request $request)
     {
         $validated = $request->validate([
@@ -237,11 +234,7 @@ class CourtPricingController extends Controller
         return response()->json(['message' => "Đã xóa {$deleted} mốc giá"]);
     }
 
-    /**
-     * Tìm mốc giá đã có bị chồng khung giờ với mốc đang lưu.
-     * Giá thời vụ đè lên giá cố định là hợp lệ (giá lễ/Tết);
-     * chỉ chặn: cố định chồng cố định, hoặc thời vụ chồng thời vụ có khoảng ngày giao nhau.
-     */
+    // tim moc gia da co bi chong khung gio voi moc dang luu
     private function findOverlappingGroup(array $validated, array $entryIds): ?CourtPricing
     {
         $newStart = $validated['start_time'] . ':00';
@@ -277,7 +270,7 @@ class CourtPricingController extends Controller
         return $query->first();
     }
 
-    /** Cập nhật 1 bản ghi giá, ghi lịch sử khi giá đổi. */
+    // cap nhat 1 ban ghi gia, ghi lich su khi gia doi
     private function applyRowUpdate(CourtPricing $pricing, array $validated, ?string $userId, string $note): void
     {
         $oldPrice = (float) $pricing->price;
@@ -304,7 +297,7 @@ class CourtPricingController extends Controller
         }
     }
 
-    /** Chức năng: Lịch sử sửa giá — biến động giá, người sửa, thời điểm. */
+    // lich su sua gia — bien dong gia, nguoi sua, thoi diem
     public function priceHistory(Request $request)
     {
         $histories = CourtPriceHistory::with(['changedBy:id,full_name'])
@@ -331,7 +324,7 @@ class CourtPricingController extends Controller
         ]);
     }
 
-    /** Chức năng: Tính thử giá theo ngày và khung giờ khách chọn. */
+    // tinh thu gia theo ngay va khung gio khach chon
     public function calculatePrice(Request $request)
     {
         $validated = $request->validate([
@@ -353,7 +346,7 @@ class CourtPricingController extends Controller
         ]);
     }
 
-    /** Chức năng: Trả bảng giá public (dùng cho trang chi tiết sân). */
+    // tra bang gia public (dung cho trang chi tiet san)
     public function getPublicPricing($courtId = null)
     {
         $pricings = CourtPricing::orderBy('day_type')
@@ -363,10 +356,7 @@ class CourtPricingController extends Controller
         return response()->json(['status' => 'success', 'data' => $pricings]);
     }
 
-    /**
-     * Chức năng: Bảng giá tổng hợp cho trang chủ.
-     * Kết quả: { weekday: [...slots], weekend: [...slots], holiday: [...slots] }
-     */
+    // bang gia tong hop cho trang chu
     public function getPublicAllPricings()
     {
         $rows = CourtPricing::whereNull('effective_from')

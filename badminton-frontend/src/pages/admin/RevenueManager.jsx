@@ -41,9 +41,9 @@ const getPaymentMethodLabel = (method) => {
   const labels = {
     cash: "Tiền mặt",
     bank_transfer: "Chuyển khoản",
-    sepay: "SePay",
-    online: "Online",
-    membership_card: "Admin kích hoạt thẻ",
+    sepay: "Chuyển khoản",
+    online: "Chuyển khoản",
+    membership_card: "Thẻ thành viên",
   };
 
   return labels[method] || method || "Không rõ";
@@ -414,8 +414,6 @@ const RevenueManager = () => {
               <option value="">Tất cả</option>
               <option value="cash">Tiền mặt</option>
               <option value="bank_transfer">Chuyển khoản</option>
-              <option value="sepay">SePay</option>
-              <option value="online">Online</option>
             </select>
           </div>
 

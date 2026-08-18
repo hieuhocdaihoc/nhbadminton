@@ -28,7 +28,7 @@ class SystemSettingController extends Controller
         'overtime_grace_minutes',
     ];
 
-    /** Chức năng: Lấy toàn bộ cấu hình hệ thống cho admin xem/sửa. */
+    // lay toan bo cau hinh he thong cho admin xem/sua
     public function index()
     {
         return response()->json([
@@ -37,7 +37,7 @@ class SystemSettingController extends Controller
         ]);
     }
 
-    /** Chức năng: Cập nhật hàng loạt cấu hình hệ thống (địa chỉ, SĐT, email, giờ hoạt động, mạng xã hội...). */
+    // cap nhat hang loat cau hinh he thong (dia chi, sdt, email, gio hoat dong, mang xa hoi
     public function update(Request $request)
     {
         $validated = $request->validate([

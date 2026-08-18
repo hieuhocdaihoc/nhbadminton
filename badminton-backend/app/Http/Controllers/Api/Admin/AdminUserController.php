@@ -13,41 +13,32 @@ use Illuminate\Validation\Rule;
 
 class AdminUserController extends Controller
 {
-    // Các trạng thái đơn được coi là "chưa hoàn thành" khi kiểm tra trước khi khóa tài khoản
+    // trang thai don chua hoan thanh
     private const ACTIVE_BOOKING_STATUSES = ['confirmed', 'playing'];
 
-    // Rule validate số điện thoại Việt Nam (10 số, bắt đầu 03/05/07/08/09)
+    // dinh dang so dien thoai viet nam
     private const PHONE_REGEX = '/^0[35789][0-9]{8}$/';
     private const PHONE_MESSAGE = 'Số điện thoại không hợp lệ. Vui lòng nhập số điện thoại Việt Nam 10 số (bắt đầu bằng 03, 05, 07, 08 hoặc 09).';
 
-    /**
-     * Chức năng: Kiểm tra người đang thao tác có phải staff không để giới hạn các quyền nhạy cảm.
-     */
+    // kiem tra nguoi dang thao tac co phai staff khong
     private function isStaff(Request $request): bool
     {
         return $request->user()?->role === 'staff';
     }
 
-    /**
-     * Chức năng: Trả về lỗi 403 khi staff cố thao tác lên tài khoản không phải khách hàng.
-     */
+    // bao loi khi staff thao tac ngoai quyen
     private function staffForbiddenResponse()
     {
         return response()->json(['message' => 'Nhân viên chỉ được quản lý tài khoản khách hàng.'], 403);
     }
 
-    /**
-     * Chức năng: Kiểm tra xem staff có đang cố thao tác lên tài khoản ngoài phạm vi quyền không.
-     */
+    // staff chi duoc quan ly tai khoan khach hang
     private function staffCannotManageUser(Request $request, User $user): bool
     {
         return $this->isStaff($request) && $user->role !== 'customer';
     }
 
-    /**
-     * Chức năng: Lấy danh sách tài khoản, hỗ trợ lọc theo vai trò, trạng thái và tìm kiếm theo tên/email/SĐT/mã KH.
-     * Staff chỉ thấy danh sách khách hàng, admin thấy tất cả.
-     */
+    // lay danh sach tai khoan
     public function index(Request $request)
     {
         $query = User::query()->with('avatar');
@@ -64,15 +55,16 @@ class AdminUserController extends Controller
 
         if ($request->filled('search')) {
             $search = $request->search;
-            $query->where(fn($q) => $q
-                ->where('full_name',     'like', "%{$search}%")
-                ->orWhere('email',       'like', "%{$search}%")
-                ->orWhere('phone',       'like', "%{$search}%")
-                ->orWhere('customer_code','like', "%{$search}%")
+            $query->where(
+                fn($q) => $q
+                    ->where('full_name', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%")
+                    ->orWhere('phone', 'like', "%{$search}%")
+                    ->orWhere('customer_code', 'like', "%{$search}%")
             );
         }
 
-        // Meta counts (ignore status filter — always reflect full scope)
+        // dem tong so tai khoan (khong loc theo trang thai)
         $metaBase = User::query();
         if ($this->isStaff($request)) {
             $metaBase->where('role', 'customer');
@@ -81,37 +73,36 @@ class AdminUserController extends Controller
         }
         if ($request->filled('search')) {
             $search = $request->search;
-            $metaBase->where(fn($q) => $q
-                ->where('full_name',     'like', "%{$search}%")
-                ->orWhere('email',       'like', "%{$search}%")
-                ->orWhere('phone',       'like', "%{$search}%")
-                ->orWhere('customer_code','like', "%{$search}%")
+            $metaBase->where(
+                fn($q) => $q
+                    ->where('full_name', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%")
+                    ->orWhere('phone', 'like', "%{$search}%")
+                    ->orWhere('customer_code', 'like', "%{$search}%")
             );
         }
-        $metaTotal  = (clone $metaBase)->count();
+        $metaTotal = (clone $metaBase)->count();
         $metaActive = (clone $metaBase)->where('status', 'active')->count();
 
         return response()->json([
             'message' => 'Lấy danh sách tài khoản thành công',
-            'data'    => $query->orderByDesc('created_at')->paginate($request->integer('per_page', 10)),
-            'meta'    => ['total' => $metaTotal, 'active' => $metaActive],
+            'data' => $query->orderByDesc('created_at')->paginate($request->integer('per_page', 10)),
+            'meta' => ['total' => $metaTotal, 'active' => $metaActive],
         ]);
     }
 
-    /**
-     * Chức năng: Tạo tài khoản mới (staff hoặc khách hàng). Staff chỉ được tạo tài khoản khách hàng.
-     */
+    // tao tai khoan moi
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'full_name'        => ['required', 'string', 'max:100'],
-            'email'            => ['nullable', 'email', 'max:100', 'unique:users,email'],
-            'phone'            => ['required', 'string', 'regex:' . self::PHONE_REGEX, 'unique:users,phone'],
-            'password'         => ['required', 'string', 'min:6', 'max:128'],
-            'role'             => ['required', Rule::in(['staff', 'customer'])],
-            'gender'           => ['nullable', Rule::in(['male', 'female', 'other'])],
-            'date_of_birth'    => ['nullable', 'date'],
-            'status'           => ['nullable', Rule::in(['active', 'blocked'])],
+            'full_name' => ['required', 'string', 'max:100'],
+            'email' => ['nullable', 'email', 'max:100', 'unique:users,email'],
+            'phone' => ['required', 'string', 'regex:' . self::PHONE_REGEX, 'unique:users,phone'],
+            'password' => ['required', 'string', 'min:6', 'max:128'],
+            'role' => ['required', Rule::in(['staff', 'customer'])],
+            'gender' => ['nullable', Rule::in(['male', 'female', 'other'])],
+            'date_of_birth' => ['nullable', 'date'],
+            'status' => ['nullable', Rule::in(['active', 'blocked'])],
         ], ['phone.regex' => self::PHONE_MESSAGE]);
 
         if ($this->isStaff($request) && $validated['role'] !== 'customer') {
@@ -119,31 +110,29 @@ class AdminUserController extends Controller
         }
 
         $user = User::create([
-            'id'               => (string) Str::uuid(),
-            'full_name'        => $validated['full_name'],
-            'email'            => $validated['email'] ?? null,
-            'phone'            => $validated['phone'],
-            'password_hash'    => Hash::make($validated['password']),
-            'role'             => $validated['role'],
-            'gender'           => $validated['gender'] ?? null,
-            'date_of_birth'    => $validated['date_of_birth'] ?? null,
+            'id' => (string) Str::uuid(),
+            'full_name' => $validated['full_name'],
+            'email' => $validated['email'] ?? null,
+            'phone' => $validated['phone'],
+            'password_hash' => Hash::make($validated['password']),
+            'role' => $validated['role'],
+            'gender' => $validated['gender'] ?? null,
+            'date_of_birth' => $validated['date_of_birth'] ?? null,
             'membership_level' => MembershipTierService::levelForPoints(0),
-            'status'           => $validated['status'] ?? 'active',
-            // Mã khách hàng chỉ sinh cho role=customer
-            'customer_code'    => $validated['role'] === 'customer' ? 'KH' . now()->format('YmdHis') : null,
-            'points'           => 0,
-            'total_spent'      => 0,
+            'status' => $validated['status'] ?? 'active',
+            // ma khach hang chi sinh cho role customer
+            'customer_code' => $validated['role'] === 'customer' ? 'KH' . now()->format('YmdHis') : null,
+            'points' => 0,
+            'total_spent' => 0,
         ]);
 
         return response()->json([
             'message' => 'Tạo tài khoản thành công',
-            'data'    => $user,
+            'data' => $user,
         ], 201);
     }
 
-    /**
-     * Chức năng: Xem chi tiết một tài khoản. Staff không được xem tài khoản admin/staff khác.
-     */
+    // xem chi tiet tai khoan
     public function show(Request $request, $id)
     {
         $user = User::with('avatar')->findOrFail($id);
@@ -154,13 +143,11 @@ class AdminUserController extends Controller
 
         return response()->json([
             'message' => 'Lấy chi tiết tài khoản thành công',
-            'data'    => $user,
+            'data' => $user,
         ]);
     }
 
-    /**
-     * Chức năng: Cập nhật thông tin cá nhân của tài khoản. Không cho phép sửa tài khoản admin.
-     */
+    // cap nhat thong tin tai khoan
     public function update(Request $request, $id)
     {
         $user = User::findOrFail($id);
@@ -174,25 +161,23 @@ class AdminUserController extends Controller
         }
 
         $validated = $request->validate([
-            'full_name'        => ['required', 'string', 'max:100'],
-            'email'            => ['nullable', 'email', 'max:100', Rule::unique('users', 'email')->ignore($user->id)],
-            'phone'            => ['required', 'string', 'regex:' . self::PHONE_REGEX, Rule::unique('users', 'phone')->ignore($user->id)],
-            'gender'           => ['nullable', Rule::in(['male', 'female', 'other'])],
-            'date_of_birth'    => ['nullable', 'date'],
-            'status'           => ['nullable', Rule::in(['active', 'blocked'])],
+            'full_name' => ['required', 'string', 'max:100'],
+            'email' => ['nullable', 'email', 'max:100', Rule::unique('users', 'email')->ignore($user->id)],
+            'phone' => ['required', 'string', 'regex:' . self::PHONE_REGEX, Rule::unique('users', 'phone')->ignore($user->id)],
+            'gender' => ['nullable', Rule::in(['male', 'female', 'other'])],
+            'date_of_birth' => ['nullable', 'date'],
+            'status' => ['nullable', Rule::in(['active', 'blocked'])],
         ], ['phone.regex' => self::PHONE_MESSAGE]);
 
         $user->update($validated);
 
         return response()->json([
             'message' => 'Cập nhật tài khoản thành công',
-            'data'    => $user,
+            'data' => $user,
         ]);
     }
 
-    /**
-     * Chức năng: Khóa hoặc mở khóa tài khoản. Kèm cảnh báo nếu tài khoản đang có đơn chưa hoàn thành.
-     */
+    // khoa hoac mo khoa tai khoan
     public function updateStatus(Request $request, $id)
     {
         $user = User::findOrFail($id);
@@ -209,7 +194,7 @@ class AdminUserController extends Controller
             'status' => ['required', Rule::in(['active', 'blocked'])],
         ]);
 
-        // Cảnh báo khi khóa tài khoản đang có đơn chưa hoàn thành (admin tự quyết có tiếp tục không)
+        // canh bao neu tai khoan con don chua hoan thanh
         $warning = null;
         if ($validated['status'] === 'blocked' && $user->status === 'active') {
             $activeCount = Booking::where('user_id', $user->id)
@@ -225,14 +210,12 @@ class AdminUserController extends Controller
 
         return response()->json([
             'message' => 'Cập nhật trạng thái tài khoản thành công',
-            'data'    => $user,
+            'data' => $user,
             'warning' => $warning,
         ]);
     }
 
-    /**
-     * Chức năng: Đặt lại mật khẩu cho tài khoản staff hoặc khách hàng. Không cho phép đổi mật khẩu admin.
-     */
+    // dat lai mat khau cho tai khoan
     public function resetPassword(Request $request, $id)
     {
         $user = User::findOrFail($id);
@@ -254,9 +237,7 @@ class AdminUserController extends Controller
         return response()->json(['message' => 'Đặt lại mật khẩu thành công.']);
     }
 
-    /**
-     * Chức năng: Thống kê số đơn và tổng tiền đặt sân của một tài khoản khách hàng.
-     */
+    // thong ke don dat san cua tai khoan
     public function bookingStats(Request $request, $id)
     {
         $user = User::findOrFail($id);
@@ -267,28 +248,28 @@ class AdminUserController extends Controller
 
         $q = $user->bookings();
 
-        // Đếm số đơn theo từng trạng thái bằng 1 lần groupBy thay vì nhiều lần count riêng
+        // dem so don theo tung trang thai bang 1 lan truy van
         $countByStatus = (clone $q)->selectRaw('status, count(*) as total')
             ->groupBy('status')
             ->pluck('total', 'status');
 
-        $totalBookings    = $countByStatus->sum();
-        $totalAmount      = (clone $q)->where('status', '!=', 'cancelled')->sum('total_price');
-        $totalPaidAmount  = (clone $q)->where('payment_status', 'paid')->where('status', '!=', 'cancelled')->sum('total_price');
-        $paidCount        = (clone $q)->where('payment_status', 'paid')->count();
+        $totalBookings = $countByStatus->sum();
+        $totalAmount = (clone $q)->where('status', '!=', 'cancelled')->sum('total_price');
+        $totalPaidAmount = (clone $q)->where('payment_status', 'paid')->where('status', '!=', 'cancelled')->sum('total_price');
+        $paidCount = (clone $q)->where('payment_status', 'paid')->count();
 
         return response()->json([
             'message' => 'Lấy thống kê đơn đặt sân của tài khoản thành công',
-            'data'    => [
+            'data' => [
                 'user' => $user->only(['id', 'full_name', 'phone', 'email', 'role', 'status']),
                 'booking_stats' => [
-                    'total_bookings'      => $totalBookings,
-                    'confirmed_bookings'  => $countByStatus['confirmed'] ?? 0,
-                    'completed_bookings'  => $countByStatus['completed'] ?? 0,
-                    'cancelled_bookings'  => $countByStatus['cancelled'] ?? 0,
-                    'paid_bookings'       => $paidCount,
-                    'total_booking_amount'=> $totalAmount,
-                    'total_paid_amount'   => $totalPaidAmount,
+                    'total_bookings' => $totalBookings,
+                    'confirmed_bookings' => $countByStatus['confirmed'] ?? 0,
+                    'completed_bookings' => $countByStatus['completed'] ?? 0,
+                    'cancelled_bookings' => $countByStatus['cancelled'] ?? 0,
+                    'paid_bookings' => $paidCount,
+                    'total_booking_amount' => $totalAmount,
+                    'total_paid_amount' => $totalPaidAmount,
                 ],
             ],
         ]);

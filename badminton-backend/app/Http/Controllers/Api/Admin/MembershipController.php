@@ -20,7 +20,7 @@ class MembershipController extends Controller
     //  QUẢN LÝ GÓI THÀNH VIÊN
     // ═══════════════════════════════════════════════════════
 
-    /** Danh sách gói thành viên */
+    // danh sach goi thanh vien
     public function indexPackages()
     {
         $packages = MembershipPackage::withCount(['cards as total_cards_sold'])
@@ -30,17 +30,17 @@ class MembershipController extends Controller
         return response()->json(['status' => 'success', 'data' => $packages]);
     }
 
-    /** Tạo gói mới */
+    // tao goi moi
     public function storePackage(Request $request)
     {
         $validated = $request->validate([
-            'name'              => ['required', 'string', 'max:100'],
-            'description'       => ['nullable', 'string'],
-            'total_sessions'    => ['required', 'integer', 'min:1'],
-            'duration_days'     => ['required', 'integer', 'min:1'],
-            'price'             => ['required', 'numeric', 'min:0'],
+            'name' => ['required', 'string', 'max:100'],
+            'description' => ['nullable', 'string'],
+            'total_sessions' => ['required', 'integer', 'min:1'],
+            'duration_days' => ['required', 'integer', 'min:1'],
+            'price' => ['required', 'numeric', 'min:0'],
             'price_per_session' => ['required', 'numeric', 'min:0'],
-            'status'            => ['in:active,inactive'],
+            'status' => ['in:active,inactive'],
         ]);
 
         $package = MembershipPackage::create($validated);
@@ -48,19 +48,19 @@ class MembershipController extends Controller
         return response()->json(['status' => 'success', 'data' => $package], 201);
     }
 
-    /** Cập nhật gói */
+    // cap nhat goi
     public function updatePackage(Request $request, $id)
     {
         $package = MembershipPackage::findOrFail($id);
 
         $validated = $request->validate([
-            'name'              => ['required', 'string', 'max:100'],
-            'description'       => ['nullable', 'string'],
-            'total_sessions'    => ['required', 'integer', 'min:1'],
-            'duration_days'     => ['required', 'integer', 'min:1'],
-            'price'             => ['required', 'numeric', 'min:0'],
+            'name' => ['required', 'string', 'max:100'],
+            'description' => ['nullable', 'string'],
+            'total_sessions' => ['required', 'integer', 'min:1'],
+            'duration_days' => ['required', 'integer', 'min:1'],
+            'price' => ['required', 'numeric', 'min:0'],
             'price_per_session' => ['required', 'numeric', 'min:0'],
-            'status'            => ['in:active,inactive'],
+            'status' => ['in:active,inactive'],
         ]);
 
         $package->update($validated);
@@ -68,7 +68,7 @@ class MembershipController extends Controller
         return response()->json(['status' => 'success', 'data' => $package]);
     }
 
-    /** Xóa gói (chỉ khi chưa có thẻ nào được tạo) */
+    // xoa goi (chi khi chua co the nao duoc tao)
     public function destroyPackage($id)
     {
         $package = MembershipPackage::findOrFail($id);
@@ -76,7 +76,8 @@ class MembershipController extends Controller
             ->where('payload->package_id', $package->id)
             ->where('expires_at', '>', now())
             ->get()
-            ->contains(fn (BookingIntent $intent) =>
+            ->contains(
+                fn(BookingIntent $intent) =>
                 ($intent->payload['membership_status'] ?? 'pending') === 'pending'
             );
 
@@ -98,7 +99,7 @@ class MembershipController extends Controller
     //  QUẢN LÝ THẺ THÀNH VIÊN
     // ═══════════════════════════════════════════════════════
 
-    /** Danh sách tất cả thẻ + tìm kiếm */
+    // danh sach tat ca the + tim kiem
     public function indexCards(Request $request)
     {
         // Đồng bộ thẻ hết hạn theo thời gian trước khi liệt kê
@@ -116,7 +117,7 @@ class MembershipController extends Controller
             $s = $request->search;
             $query->where(function ($q) use ($s) {
                 $q->where('card_code', 'like', "%$s%")
-                  ->orWhereHas('user', fn($u) => $u->where('full_name', 'like', "%$s%")->orWhere('phone', 'like', "%$s%"));
+                    ->orWhereHas('user', fn($u) => $u->where('full_name', 'like', "%$s%")->orWhere('phone', 'like', "%$s%"));
             });
         }
 
@@ -124,17 +125,17 @@ class MembershipController extends Controller
 
         // Thống kê
         $summary = [
-            'total'           => MembershipCard::count(),
-            'active'          => MembershipCard::where('status', 'active')->count(),
-            'expired'         => MembershipCard::where('status', 'expired')->count(),
-            'depleted'        => MembershipCard::where('status', 'depleted')->count(),
+            'total' => MembershipCard::count(),
+            'active' => MembershipCard::where('status', 'active')->count(),
+            'expired' => MembershipCard::where('status', 'expired')->count(),
+            'depleted' => MembershipCard::where('status', 'depleted')->count(),
             'pending_payment' => MembershipCard::where('status', 'pending_payment')->count(),
         ];
 
         return response()->json(['status' => 'success', 'data' => $cards, 'summary' => $summary]);
     }
 
-    /** Chi tiết thẻ + lịch sử dùng ca */
+    // chi tiet the + lich su dung ca
     public function showCard($id)
     {
         $card = MembershipCard::with(['user:id,full_name,phone,email', 'package:id,name', 'usages.booking:id,booking_code'])
@@ -143,18 +144,15 @@ class MembershipController extends Controller
         return response()->json(['status' => 'success', 'data' => $this->formatCard($card, true)]);
     }
 
-    /**
-     * Admin tạo thẻ cho khách (sau khi đã nhận tiền mặt / xác nhận chuyển khoản).
-     * Mỗi khách chỉ được có 1 thẻ active tại 1 thời điểm.
-     */
+    // admin tao the cho khach (sau khi da nhan tien mat / xac nhan chuyen khoan)
     public function storeCard(Request $request)
     {
         $validated = $request->validate([
-            'user_id'         => ['required', 'exists:users,id'],
-            'package_id'      => ['required', 'exists:membership_packages,id'],
+            'user_id' => ['required', 'exists:users,id'],
+            'package_id' => ['required', 'exists:membership_packages,id'],
             'payment_channel' => ['required', 'in:cash,bank_transfer'],
             'payment_confirmed' => ['required', 'accepted'],
-            'note'            => ['nullable', 'string', 'max:1000'],
+            'note' => ['nullable', 'string', 'max:1000'],
         ]);
 
         $adminId = $request->user()?->id;
@@ -189,7 +187,8 @@ class MembershipController extends Controller
                 ->where('expires_at', '>', now())
                 ->lockForUpdate()
                 ->get()
-                ->first(fn (BookingIntent $intent) =>
+                ->first(
+                    fn(BookingIntent $intent) =>
                     ($intent->payload['membership_status'] ?? 'pending') === 'pending'
                 );
 
@@ -201,18 +200,18 @@ class MembershipController extends Controller
             }
 
             $card = MembershipCard::create([
-                'card_code'         => $this->generateCardCode(),
-                'user_id'           => $user->id,
-                'package_id'        => $package->id,
-                'total_sessions'    => $package->total_sessions,
-                'used_sessions'     => 0,
-                'valid_from'        => today(),
-                'valid_to'          => today()->addDays(max(1, $package->duration_days) - 1),
-                'price'             => $package->price,
+                'card_code' => $this->generateCardCode(),
+                'user_id' => $user->id,
+                'package_id' => $package->id,
+                'total_sessions' => $package->total_sessions,
+                'used_sessions' => 0,
+                'valid_from' => today(),
+                'valid_to' => today()->addDays(max(1, $package->duration_days) - 1),
+                'price' => $package->price,
                 'price_per_session' => $package->price_per_session,
-                'status'            => 'active',
-                'created_by'        => $adminId,
-                'note'              => $validated['note'] ?? null,
+                'status' => 'active',
+                'created_by' => $adminId,
+                'note' => $validated['note'] ?? null,
             ]);
 
             $channelLabel = $validated['payment_channel'] === 'cash'
@@ -220,14 +219,14 @@ class MembershipController extends Controller
                 : 'chuyển khoản ngoài hệ thống';
 
             Payment::create([
-                'payment_code'   => 'CARD-' . strtoupper(Str::random(8)),
-                'booking_id'     => null,
-                'user_id'        => $user->id,
+                'payment_code' => 'CARD-' . strtoupper(Str::random(8)),
+                'booking_id' => null,
+                'user_id' => $user->id,
                 'payment_method' => 'membership_card',
-                'amount'         => $package->price,
-                'paid_at'        => now(),
-                'status'         => 'success',
-                'bank_gateway'   => $validated['payment_channel'] === 'cash'
+                'amount' => $package->price,
+                'paid_at' => now(),
+                'status' => 'success',
+                'bank_gateway' => $validated['payment_channel'] === 'cash'
                     ? 'MANUAL_CASH'
                     : 'MANUAL_BANK_TRANSFER',
                 'payment_content' => "Admin xác nhận mua thẻ {$card->card_code} bằng {$channelLabel}"
@@ -238,18 +237,14 @@ class MembershipController extends Controller
         });
 
         return response()->json([
-            'status'  => 'success',
+            'status' => 'success',
             'message' => "Đã tạo và kích hoạt thẻ {$card->card_code}; doanh thu "
                 . number_format($package->price) . 'đ đã được ghi nhận.',
-            'data'    => $this->formatCard($card->load(['user:id,full_name,phone', 'package:id,name'])),
+            'data' => $this->formatCard($card->load(['user:id,full_name,phone', 'package:id,name'])),
         ], 201);
     }
 
-    /**
-     * Kích hoạt thẻ đã thanh toán + ghi doanh thu. Dùng chung cho 2 đường vào:
-     * webhook SePay (khách tự quét QR mua gói) và admin bấm tay (thu tiền mặt tại quầy).
-     * Hạn thẻ tính từ ngày kích hoạt — không phải ngày tạo — để khách không mất ngày chờ.
-     */
+    // kich hoat the da thanh toan + ghi doanh thu
     public static function activatePaidCard(MembershipCard $card, array $paymentInfo = []): void
     {
         DB::transaction(function () use ($card, $paymentInfo) {
@@ -259,30 +254,30 @@ class MembershipController extends Controller
                     : 30);
 
             $card->update([
-                'status'     => 'active',
+                'status' => 'active',
                 'valid_from' => today(),
-                'valid_to'   => today()->addDays($durationDays - 1),
+                'valid_to' => today()->addDays($durationDays - 1),
             ]);
 
             // Doanh thu bán thẻ ghi 1 lần duy nhất tại đây. Method riêng 'membership_card'
             // để dashboard tách được tiền bán thẻ với tiền đặt sân.
             Payment::create([
-                'payment_code'         => 'CARD-' . strtoupper(Str::random(8)),
-                'booking_id'           => null,
-                'user_id'              => $card->user_id,
-                'payment_method'       => 'membership_card',
-                'amount'               => $card->price,
-                'paid_at'              => $paymentInfo['paid_at'] ?? now(),
-                'status'               => 'success',
+                'payment_code' => 'CARD-' . strtoupper(Str::random(8)),
+                'booking_id' => null,
+                'user_id' => $card->user_id,
+                'payment_method' => 'membership_card',
+                'amount' => $card->price,
+                'paid_at' => $paymentInfo['paid_at'] ?? now(),
+                'status' => 'success',
                 'sepay_transaction_id' => $paymentInfo['sepay_transaction_id'] ?? null,
-                'bank_gateway'         => $paymentInfo['bank_gateway'] ?? null,
-                'reference_code'       => $paymentInfo['reference_code'] ?? null,
-                'payment_content'      => $paymentInfo['payment_content'] ?? "Mua thẻ thành viên {$card->card_code}",
+                'bank_gateway' => $paymentInfo['bank_gateway'] ?? null,
+                'reference_code' => $paymentInfo['reference_code'] ?? null,
+                'payment_content' => $paymentInfo['payment_content'] ?? "Mua thẻ thành viên {$card->card_code}",
             ]);
         });
     }
 
-    /** Admin kích hoạt thẻ đang chờ thanh toán (thu tiền mặt tại quầy) */
+    // admin kich hoat the dang cho thanh toan (thu tien mat tai quay)
     public function activateCard(Request $request, $id)
     {
         $card = MembershipCard::findOrFail($id);
@@ -296,7 +291,7 @@ class MembershipController extends Controller
         return response()->json(['status' => 'success', 'message' => "Đã kích hoạt thẻ {$card->card_code} và ghi nhận doanh thu " . number_format($card->price) . "đ."]);
     }
 
-    /** Admin hủy thẻ */
+    // admin huy the
     public function cancelCard(Request $request, $id)
     {
         $card = MembershipCard::findOrFail($id);
@@ -310,20 +305,16 @@ class MembershipController extends Controller
         return response()->json(['status' => 'success', 'message' => "Đã hủy thẻ {$card->card_code}."]);
     }
 
-    /**
-     * Trừ ca khi admin hoàn thành đơn đặt sân có dùng thẻ.
-     * Được gọi từ BookingController khi bấm Hoàn thành.
-     * Trả về thông tin để frontend hiện popup xác nhận.
-     */
+    // tru ca khi admin hoan thanh don dat san co dung the
     public static function deductSessions(MembershipCard $card, string $bookingId, int $sessions, string $note = ''): array
     {
         $card->increment('used_sessions', $sessions);
 
         MembershipCardUsage::create([
-            'card_id'           => $card->id,
-            'booking_id'        => $bookingId,
+            'card_id' => $card->id,
+            'booking_id' => $bookingId,
             'sessions_deducted' => $sessions,
-            'note'              => $note,
+            'note' => $note,
         ]);
 
         // Kiểm tra thẻ đã hết ca chưa
@@ -333,50 +324,50 @@ class MembershipController extends Controller
         }
 
         return [
-            'card_code'          => $card->card_code,
-            'sessions_deducted'  => $sessions,
+            'card_code' => $card->card_code,
+            'sessions_deducted' => $sessions,
             'remaining_sessions' => $card->remainingSessions(),
-            'card_status'        => $card->status,
+            'card_status' => $card->status,
         ];
     }
 
-    /** Format card cho response */
+    // format card cho response
     private function formatCard(MembershipCard $card, bool $withUsages = false): array
     {
         $data = [
-            'id'                 => $card->id,
-            'card_code'          => $card->card_code,
-            'user_name'          => $card->user?->full_name ?? '—',
-            'user_phone'         => $card->user?->phone ?? '—',
-            'package_name'       => $card->package?->name ?? '—',
-            'total_sessions'     => $card->total_sessions,
-            'used_sessions'      => $card->used_sessions,
+            'id' => $card->id,
+            'card_code' => $card->card_code,
+            'user_name' => $card->user?->full_name ?? '—',
+            'user_phone' => $card->user?->phone ?? '—',
+            'package_name' => $card->package?->name ?? '—',
+            'total_sessions' => $card->total_sessions,
+            'used_sessions' => $card->used_sessions,
             'remaining_sessions' => $card->remainingSessions(),
-            'valid_from'         => $card->valid_from?->format('d/m/Y'),
-            'valid_to'           => $card->valid_to?->format('d/m/Y'),
-            'price'              => $card->price,
-            'price_per_session'  => $card->price_per_session,
-            'status'             => $card->status,
-            'note'               => $card->note,
-            'created_at'         => $card->created_at?->format('d/m/Y H:i'),
+            'valid_from' => $card->valid_from?->format('d/m/Y'),
+            'valid_to' => $card->valid_to?->format('d/m/Y'),
+            'price' => $card->price,
+            'price_per_session' => $card->price_per_session,
+            'status' => $card->status,
+            'note' => $card->note,
+            'created_at' => $card->created_at?->format('d/m/Y H:i'),
         ];
 
         if ($withUsages) {
             $data['usages'] = $card->usages->map(fn($u) => [
-                'booking_code'      => $u->booking?->booking_code ?? '—',
+                'booking_code' => $u->booking?->booking_code ?? '—',
                 'sessions_deducted' => $u->sessions_deducted,
-                'used_at'           => $u->used_at?->format('d/m/Y H:i'),
-                'note'              => $u->note,
+                'used_at' => $u->used_at?->format('d/m/Y H:i'),
+                'note' => $u->note,
             ]);
         }
 
         return $data;
     }
 
-    /** Sinh mã thẻ tự động: CARD-YYYY-NNN */
+    // sinh ma the tu dong: CARD-YYYY-NNN
     private function generateCardCode(): string
     {
-        $year  = now()->year;
+        $year = now()->year;
         $count = MembershipCard::whereYear('created_at', $year)->count() + 1;
         return 'CARD-' . $year . '-' . str_pad($count, 3, '0', STR_PAD_LEFT);
     }

@@ -11,7 +11,7 @@ class CategoryController extends Controller
     private const STATUS_VALUES = ['active', 'inactive'];
     private const DEFAULT_STATUS = 'active';
 
-    /** Chức năng: Lấy danh sách danh mục, hỗ trợ lọc theo trạng thái. */
+    // lay danh sach danh muc, ho tro loc theo trang thai
     public function index(Request $request)
     {
         $query = Category::query();
@@ -25,7 +25,7 @@ class CategoryController extends Controller
         return response()->json(['status' => 'success', 'data' => $categories]);
     }
 
-    /** Chức năng: Tạo mới danh mục sản phẩm. */
+    // tao moi danh muc san pham
     public function store(Request $request)
     {
         $validated = $request->validate([
@@ -45,7 +45,7 @@ class CategoryController extends Controller
         ], 201);
     }
 
-    /** Chức năng: Lấy chi tiết một danh mục. */
+    // lay chi tiet mot danh muc
     public function show($id)
     {
         $category = Category::findOrFail($id);
@@ -53,7 +53,7 @@ class CategoryController extends Controller
         return response()->json(['status' => 'success', 'data' => $category]);
     }
 
-    /** Chức năng: Cập nhật tên, mô tả hoặc trạng thái danh mục. */
+    // cap nhat ten, mo ta hoac trang thai danh muc
     public function update(Request $request, $id)
     {
         $category = Category::findOrFail($id);
@@ -73,7 +73,7 @@ class CategoryController extends Controller
         ]);
     }
 
-    /** Chức năng: Tạm ngưng danh mục bằng cách chuyển trạng thái sang inactive. */
+    // tam ngung danh muc bang cach chuyen trang thai sang inactive
     public function destroy($id)
     {
         $category = Category::findOrFail($id);

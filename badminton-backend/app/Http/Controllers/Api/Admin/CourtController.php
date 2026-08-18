@@ -13,7 +13,7 @@ class CourtController extends Controller
     private const ACTIVE_BOOKING_STATUSES = ['confirmed', 'playing'];
     private const COURT_STATUSES = ['active', 'inactive'];
 
-    /** Chức năng: Lấy danh sách sân cho khu vực quản trị. */
+    // lay danh sach san cho khu vuc quan tri
     public function index()
     {
         return response()->json([
@@ -22,7 +22,7 @@ class CourtController extends Controller
         ]);
     }
 
-    /** Chức năng: Tạo mới sân với mã sân, thông tin mặt sân, sức chứa và trạng thái vận hành. */
+    // tao moi san voi ma san, thong tin mat san, suc chua va trang thai van hanh
     public function store(Request $request)
     {
         $validated = $request->validate([
@@ -49,13 +49,13 @@ class CourtController extends Controller
         ], 201);
     }
 
-    /** Chức năng: Lấy chi tiết một sân. */
+    // lay chi tiet mot san
     public function show($id)
     {
         return response()->json(['data' => Court::findOrFail($id)]);
     }
 
-    /** Chức năng: Lấy chi tiết sân công khai, áp dụng cùng quyền truy cập với danh sách sân. */
+    // lay chi tiet san cong khai, ap dung cung quyen truy cap voi danh sach san
     public function showPublic(Request $request, $id)
     {
         $court = Court::where('status', 'active')
@@ -73,7 +73,7 @@ class CourtController extends Controller
         return response()->json(['data' => $court]);
     }
 
-    /** Chức năng: Cập nhật thông tin cấu hình và trạng thái của sân. */
+    // cap nhat thong tin cau hinh va trang thai cua san
     public function update(Request $request, $id)
     {
         $court = Court::findOrFail($id);
@@ -117,11 +117,7 @@ class CourtController extends Controller
         ]);
     }
 
-    /**
-     * Chức năng: Xóa sân. Nếu sân chưa từng phát sinh đơn đặt nào (kể cả lịch sử) thì
-     * xóa hẳn khỏi hệ thống; nếu đã từng có đơn (dù không còn buổi nào sắp tới) thì
-     * chỉ chuyển trạng thái ngưng hoạt động để giữ nguyên vẹn lịch sử đặt sân.
-     */
+    // xoa san
     public function destroy($id)
     {
         $court = Court::findOrFail($id);
@@ -149,10 +145,7 @@ class CourtController extends Controller
         return response()->json(['message' => 'Sân đã từng có lịch sử đặt sân nên chỉ được chuyển sang ngưng hoạt động (không xóa được) để giữ nguyên dữ liệu cũ.']);
     }
 
-    /**
-     * Lấy danh sách sân cho trang đặt lịch công khai.
-     * Sân is_contract_only chỉ hiển thị cho khách có thẻ thành viên đang active.
-     */
+    // lay danh sach san cho trang dat lich cong khai
     public function getPublicCourts(Request $request)
     {
         $query = Court::where('status', 'active')
@@ -174,6 +167,7 @@ class CourtController extends Controller
         ]);
     }
 
+    // kiem tra khach co the thanh vien con hieu luc khong
     private function hasActiveMembershipCard($user): bool
     {
         return $user && \App\Models\MembershipCard::where('user_id', $user->id)
@@ -182,7 +176,7 @@ class CourtController extends Controller
             ->exists();
     }
 
-    /** Chức năng: Đếm tổng số booking sắp tới (đơn lẻ và định kỳ) cho một sân. */
+    // dem tong so booking sap toi (don le va dinh ky) cho mot san
     private function countUpcomingBookings(string $courtId): int
     {
         $singleCount = Booking::whereHas(

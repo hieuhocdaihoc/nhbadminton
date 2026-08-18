@@ -12,7 +12,7 @@ class InventoryTransactionController extends Controller
 {
     private const MANUAL_TYPES = ['export', 'adjustment'];
 
-    /** Chức năng: Lấy lịch sử biến động kho, có hỗ trợ lọc theo sản phẩm và loại giao dịch. */
+    // lay lich su bien dong kho, co ho tro loc theo san pham va loai giao dich
     public function index(Request $request)
     {
         $query = InventoryTransaction::with([
@@ -33,7 +33,7 @@ class InventoryTransactionController extends Controller
         return response()->json(['status' => 'success', 'data' => $history]);
     }
 
-    /** Chức năng: Tạo phiếu điều chỉnh kho thủ công và cập nhật tồn kho sản phẩm. */
+    // tao phieu dieu chinh kho thu cong va cap nhat ton kho san pham
     public function store(Request $request)
     {
         $validated = $request->validate([

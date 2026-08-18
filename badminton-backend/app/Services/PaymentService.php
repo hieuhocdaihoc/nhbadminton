@@ -8,9 +8,7 @@ use Illuminate\Support\Str;
 
 class PaymentService
 {
-    /**
-     * Chức năng: Ghi nhận một giao dịch thanh toán thành công và đồng bộ lại số tiền đã trả/còn lại của booking.
-     */
+    // ghi nhan mot giao dich thanh toan thanh cong va dong bo lai so tien da tra/con lai cua booking
     public function recordSuccessfulPayment(Booking $booking, array $data): Payment
     {
         $amount = (float) ($data['amount'] ?? 0);

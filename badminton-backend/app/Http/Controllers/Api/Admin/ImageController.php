@@ -13,7 +13,7 @@ class ImageController extends Controller
     private const ALLOWED_MIMES        = ['jpeg', 'png', 'jpg', 'webp'];
     private const MAX_FILE_SIZE_KB     = 2048;
 
-    /** Chức năng: Upload và lưu thông tin ảnh gắn với sân, sản phẩm, danh mục, dịch vụ hoặc người dùng. */
+    // upload va luu thong tin anh gan voi san, san pham, danh muc, dich vu hoac nguoi dung
     public function store(Request $request)
     {
         $validated = $request->validate([
@@ -60,7 +60,7 @@ class ImageController extends Controller
         ], 201);
     }
 
-    /** Chức năng: Xóa bản ghi ảnh và file vật lý nếu còn tồn tại trong storage. */
+    // xoa ban ghi anh va file vat ly neu con ton tai trong storage
     public function destroy($id)
     {
         $image = Image::findOrFail($id);

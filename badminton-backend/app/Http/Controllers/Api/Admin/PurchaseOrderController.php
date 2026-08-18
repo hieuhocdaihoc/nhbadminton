@@ -13,7 +13,7 @@ use Illuminate\Support\Str;
 
 class PurchaseOrderController extends Controller
 {
-    /** Chức năng: Lấy danh sách phiếu nhập kho kèm nhà cung cấp và người tạo. */
+    // lay danh sach phieu nhap kho kem nha cung cap va nguoi tao
     public function index()
     {
         $orders = PurchaseOrder::with([
@@ -24,7 +24,7 @@ class PurchaseOrderController extends Controller
         return response()->json(['status' => 'success', 'data' => $orders]);
     }
 
-    /** Chức năng: Lấy chi tiết phiếu nhập kho và các dòng sản phẩm nhập. */
+    // lay chi tiet phieu nhap kho va cac dong san pham nhap
     public function show($id)
     {
         $order = PurchaseOrder::with([
@@ -36,7 +36,7 @@ class PurchaseOrderController extends Controller
         return response()->json(['status' => 'success', 'data' => $order]);
     }
 
-    /** Chức năng: Tạo phiếu nhập kho, tăng tồn sản phẩm và ghi lịch sử biến động kho. */
+    // tao phieu nhap kho, tang ton san pham va ghi lich su bien dong kho
     public function store(Request $request)
     {
         $validated = $request->validate([

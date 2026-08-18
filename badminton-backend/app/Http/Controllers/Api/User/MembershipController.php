@@ -13,7 +13,7 @@ use Illuminate\Support\Str;
 
 class MembershipController extends Controller
 {
-    /** Danh sách gói đang bán để khách xem và chọn mua */
+    // danh sach goi dang ban de khach xem va chon mua
     public function packages()
     {
         $packages = MembershipPackage::where('status', 'active')
@@ -23,7 +23,7 @@ class MembershipController extends Controller
         return response()->json(['status' => 'success', 'data' => $packages]);
     }
 
-    /** Thẻ của khách đang đăng nhập */
+    // the cua khach dang dang nhap
     public function myCard(Request $request)
     {
         $card = MembershipCard::with('package:id,name')
@@ -45,7 +45,7 @@ class MembershipController extends Controller
         ]);
     }
 
-    /** Khách chọn gói: chỉ tạo intent + QR, chưa cấp thẻ thành viên. */
+    // khach chon goi: chi tao intent + QR, chua cap the thanh vien
     public function purchase(Request $request)
     {
         $validated = $request->validate([
@@ -130,7 +130,7 @@ class MembershipController extends Controller
         ], 201);
     }
 
-    /** Frontend hỏi liên tục sau khi hiện QR: intent đã được thanh toán chưa. */
+    // frontend hoi lien tuc sau khi hien QR: intent da duoc thanh toan chua
     public function purchaseStatus(Request $request, $intentCode)
     {
         $intent = BookingIntent::where('booking_type', 'membership')
@@ -161,7 +161,7 @@ class MembershipController extends Controller
         ]);
     }
 
-    /** Khách hủy đơn mua gói khi chưa thanh toán */
+    // khach huy don mua goi khi chua thanh toan
     public function cancelPurchase(Request $request, $intentCode)
     {
         $intent = BookingIntent::where('booking_type', 'membership')
@@ -183,7 +183,7 @@ class MembershipController extends Controller
         return response()->json(['status' => 'success', 'message' => 'Đã đóng phiên thanh toán.']);
     }
 
-    /** Thông tin QR chuyển khoản, nội dung CK là mã intent để webhook nhận diện. */
+    // thong tin QR chuyen khoan, noi dung CK la ma intent de webhook nhan dien
     private function buildIntentQr(BookingIntent $intent): array
     {
         $bankName        = config('services.sepay.bank_name');
@@ -206,6 +206,7 @@ class MembershipController extends Controller
         ];
     }
 
+    // sinh ma phien mua the (MEM...) khong trung voi ma da co
     private function generateIntentCode(): string
     {
         do {
@@ -215,6 +216,7 @@ class MembershipController extends Controller
         return $code;
     }
 
+    // dinh dang thong tin phien mua the de tra ve cho frontend
     private function formatIntent(BookingIntent $intent): array
     {
         return [
@@ -227,17 +229,20 @@ class MembershipController extends Controller
         ];
     }
 
+    // doc trang thai mua the luu trong payload cua phien
     private function intentStatus(BookingIntent $intent): string
     {
         return $intent->payload['membership_status'] ?? 'pending';
     }
 
+    // cap nhat mot phan du lieu payload cua phien mua the
     private function updateIntentPayload(BookingIntent $intent, array $changes): void
     {
         $intent->payload = array_merge($intent->payload ?? [], $changes);
         $intent->save();
     }
 
+    // dinh dang thong tin the (so ca con lai, so ca dang giu cho) de tra ve frontend
     private function formatCard(MembershipCard $card): array
     {
         $remainingSessions = $card->remainingSessions();

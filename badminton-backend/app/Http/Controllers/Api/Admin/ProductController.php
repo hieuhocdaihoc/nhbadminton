@@ -14,7 +14,7 @@ class ProductController extends Controller
     private const DEFAULT_STATUS = 'active';
     private const STATUSES = ['active', 'inactive'];
 
-    /** Chức năng: Lấy danh sách sản phẩm kèm danh mục, có hỗ trợ lọc theo từ khóa và danh mục. */
+    // lay danh sach san pham kem danh muc, co ho tro loc theo tu khoa va danh muc
     public function index(Request $request)
     {
         $query = Product::with([
@@ -48,10 +48,7 @@ class ProductController extends Controller
         return response()->json(['status' => 'success', 'data' => $products, 'stats' => $stats]);
     }
 
-    /**
-     * Chức năng: Báo cáo tồn kho — top bán chạy, sản phẩm cần nhập thêm,
-     * giá trị tồn kho theo từng danh mục.
-     */
+    // bao cao ton kho — top ban chay, san pham can nhap them
     public function report()
     {
         $topSelling = Product::with('category:id,name')
@@ -85,7 +82,7 @@ class ProductController extends Controller
         ]);
     }
 
-    /** Chức năng: Tạo mới sản phẩm với tồn kho ban đầu bằng 0. */
+    // tao moi san pham voi ton kho ban dau bang 0
     public function store(Request $request)
     {
         $validated = $request->validate([
@@ -122,7 +119,7 @@ class ProductController extends Controller
         return response()->json(['status' => 'success', 'message' => 'Tạo sản phẩm thành công!', 'data' => $product], 201);
     }
 
-    /** Chức năng: Lấy chi tiết một sản phẩm kèm danh mục và ảnh. */
+    // lay chi tiet mot san pham kem danh muc va anh
     public function show($id)
     {
         $product = Product::with(['category', 'images'])->findOrFail($id);
@@ -130,7 +127,7 @@ class ProductController extends Controller
         return response()->json(['status' => 'success', 'data' => $product]);
     }
 
-    /** Chức năng: Cập nhật thông tin sản phẩm, không cho phép thay đổi số lượng tồn kho trực tiếp. */
+    // cap nhat thong tin san pham, khong cho phep thay doi so luong ton kho truc tiep
     public function update(Request $request, $id)
     {
         $product = Product::findOrFail($id);
@@ -156,7 +153,7 @@ class ProductController extends Controller
         return response()->json(['status' => 'success', 'message' => 'Cập nhật thông tin thành công!', 'data' => $product]);
     }
 
-    /** Chức năng: Tạm ngưng kinh doanh sản phẩm bằng cách đổi trạng thái sang inactive. */
+    // tam ngung kinh doanh san pham bang cach doi trang thai sang inactive
     public function destroy($id)
     {
         $product = Product::findOrFail($id);

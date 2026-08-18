@@ -20,12 +20,7 @@ use Illuminate\Support\Str;
 
 class SePayController extends Controller
 {
-    /**
-     * Nhận webhook thanh toán từ SePay.
-     */
-    /**
-     * Chức năng: Nhận webhook SePay, dò mã booking, chống giao dịch trùng và ghi nhận thanh toán chuyển khoản.
-     */
+    // nhan webhook SePay, do ma booking, chong giao dich trung va ghi nhan thanh toan
     public function webhook(Request $request)
     {
         $expectedApiKey = trim((string) config('services.sepay.webhook_api_key'));
@@ -637,12 +632,7 @@ class SePayController extends Controller
         });
     }
 
-    /**
-     * Lấy thông tin thanh toán và QR chuyển khoản cho đơn đặt sân.
-     */
-    /**
-     * Chức năng: Trả thông tin số tiền cần thanh toán và QR chuyển khoản cho một đơn đặt sân.
-     */
+    // tra so tien can thanh toan va QR chuyen khoan cho mot don dat san
     public function paymentInfo($bookingId)
     {
         $booking = Booking::with('recurringBooking')->findOrFail($bookingId);
@@ -723,10 +713,7 @@ class SePayController extends Controller
         ]);
     }
 
-    /**
-     * Chức năng: Kiểm tra intent còn tồn tại không (để frontend biết đã được xử lý chưa).
-     * Intent bị xóa sau khi webhook tạo booking xong → trả về paid=true.
-     */
+    // kiem tra intent con ton tai khong (de frontend biet da duoc xu ly chua)
     public function intentStatus($code)
     {
         $intent = BookingIntent::where('intent_code', strtoupper($code))->first();
@@ -761,10 +748,7 @@ class SePayController extends Controller
         return response()->json(['status' => 'success', 'data' => ['paid' => false, 'expires_at' => $intent->expires_at]]);
     }
 
-    /**
-     * Chức năng: Kiểm tra một giao dịch SePay đã được ghi nhận trước đó chưa,
-     * dựa trên referenceCode hoặc transaction id — chống xử lý trùng webhook.
-     */
+    // kiem tra mot giao dich SePay da duoc ghi nhan truoc do chua
     private function isDuplicateTransaction(Request $request): bool
     {
         $query = Payment::query();

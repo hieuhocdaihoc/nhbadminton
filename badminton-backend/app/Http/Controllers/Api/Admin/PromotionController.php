@@ -13,7 +13,7 @@ class PromotionController extends Controller
     private const DISCOUNT_TYPES = ['fixed', 'percent'];
     private const STATUSES = ['active', 'inactive'];
 
-    /** Chức năng: Lấy danh sách voucher/mã giảm giá, có hỗ trợ lọc trạng thái và tìm kiếm. */
+    // lay danh sach voucher/ma giam gia, co ho tro loc trang thai va tim kiem
     public function index(Request $request)
     {
         $query = Promotion::query();
@@ -34,7 +34,7 @@ class PromotionController extends Controller
         ]);
     }
 
-    /** Chức năng: Tạo mới voucher với loại giảm giá, giá trị giảm và điều kiện điểm nếu có. */
+    // tao moi voucher voi loai giam gia, gia tri giam va dieu kien diem neu co
     public function store(Request $request)
     {
         $data = $this->validatedData($request);
@@ -52,7 +52,7 @@ class PromotionController extends Controller
         ], 201);
     }
 
-    /** Chức năng: Lấy chi tiết một voucher. */
+    // lay chi tiet mot voucher
     public function show($id)
     {
         return response()->json([
@@ -61,7 +61,7 @@ class PromotionController extends Controller
         ]);
     }
 
-    /** Chức năng: Cập nhật thông tin voucher và điều kiện áp dụng. */
+    // cap nhat thong tin voucher va dieu kien ap dung
     public function update(Request $request, $id)
     {
         $promotion = Promotion::findOrFail($id);
@@ -81,7 +81,7 @@ class PromotionController extends Controller
         ]);
     }
 
-    /** Chức năng: Ẩn hoặc ngưng áp dụng voucher bằng trạng thái inactive. */
+    // an hoac ngung ap dung voucher bang trang thai inactive
     public function destroy($id)
     {
         $promotion = Promotion::findOrFail($id);
@@ -94,7 +94,7 @@ class PromotionController extends Controller
         ]);
     }
 
-    /** Chức năng: Validate và chuẩn hóa dữ liệu voucher dùng chung cho tạo mới và cập nhật. */
+    // validate va chuan hoa du lieu voucher dung chung cho tao moi va cap nhat
     private function validatedData(Request $request, ?string $ignoreId = null): array
     {
         return $request->validate([

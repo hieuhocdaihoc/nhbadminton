@@ -585,7 +585,7 @@ const LongTermBookings = () => {
               className="admin-modal-content"
             >
               <div className="admin-modal-header p-6 border-b border-zinc-100">
-                <h3 className="text-sm font-semibold text-zinc-800">Đổi lịch ca chơi</h3>
+                <h3 className="text-sm font-semibold text-zinc-800">Đổi lịch ca chơi </h3>
                 <p className="admin-page-subtitle">
                   Ca: <span className="text-zinc-600 font-mono">{rescheduleModal.booking?.booking_code}</span>
                 </p>

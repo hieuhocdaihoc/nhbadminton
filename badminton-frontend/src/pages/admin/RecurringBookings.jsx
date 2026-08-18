@@ -677,7 +677,7 @@ const RecurringBookings = () => {
             >
               <div className="admin-modal-header p-6 border-b border-zinc-100">
                 <h3 className="text-sm font-semibold text-zinc-800">
-                  Đổi lịch ca chơi
+                  Đổi lịch ca chơi 
                 </h3>
                 <p className="admin-page-subtitle">
                   Ca:{" "}

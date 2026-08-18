@@ -24,7 +24,7 @@ class DashboardReportController extends Controller
         ['label' => '18-22h', 'start' => '18:00:00', 'end' => '22:00:00'],
     ];
 
-    /** Chức năng: Tổng hợp KPI dashboard admin như doanh thu, booking, hiệu suất sân và dữ liệu vận hành. */
+    // tong hop kpi dashboard admin nhu doanh thu, booking, hieu suat san va du lieu van hanh
     public function index(Request $request)
     {
         $fromDate = $request->filled('from_date')
@@ -193,7 +193,7 @@ class DashboardReportController extends Controller
         ]);
     }
 
-    /** Chức năng: Trả về hiệu suất từng sân trong khoảng thời gian — dùng cho trang báo cáo hiệu suất sân. */
+    // tra ve hieu suat tung san trong khoang thoi gian — dung cho trang bao cao hieu suat san
     public function courtPerformance(Request $request)
     {
         $fromDate = $request->filled('from_date')
@@ -249,7 +249,7 @@ class DashboardReportController extends Controller
         ]);
     }
 
-    /** Chức năng: Đếm số lượt đặt sân có khung giờ giao nhau với khoảng thời gian chỉ định. */
+    // dem so luot dat san co khung gio giao nhau voi khoang thoi gian chi dinh
     private function countBookingsByTimeRange(string $fromDate, string $toDate, string $start, string $end): int
     {
         return BookingDetail::whereBetween('booking_date', [$fromDate, $toDate])

@@ -14,7 +14,7 @@ class ReviewController extends Controller
         'booking:id,booking_code,status,payment_status',
     ];
 
-    /** Chức năng: Lấy danh sách đánh giá để admin/staff lọc, duyệt, ẩn hoặc phản hồi. */
+    // lay danh sach danh gia de admin/staff loc, duyet, an hoac phan hoi
     public function index(Request $request)
     {
         $query = Review::with([
@@ -62,7 +62,7 @@ class ReviewController extends Controller
         ]);
     }
 
-    /** Chức năng: Lưu phản hồi của trung tâm cho một đánh giá khách hàng. */
+    // luu phan hoi cua trung tam cho mot danh gia khach hang
     public function reply(Request $request, $id)
     {
         $validated = $request->validate([
@@ -80,7 +80,7 @@ class ReviewController extends Controller
         ]);
     }
 
-    /** Chức năng: Cập nhật trạng thái kiểm duyệt review: pending, approved hoặc hidden. */
+    // cap nhat trang thai kiem duyet review: pending, approved hoac hidden
     public function updateStatus(Request $request, $id)
     {
         $validated = $request->validate([
@@ -98,7 +98,7 @@ class ReviewController extends Controller
         ]);
     }
 
-    /** Chức năng: Xóa đánh giá không phù hợp khỏi hệ thống. */
+    // xoa danh gia khong phu hop khoi he thong
     public function destroy($id)
     {
         Review::findOrFail($id)->delete();

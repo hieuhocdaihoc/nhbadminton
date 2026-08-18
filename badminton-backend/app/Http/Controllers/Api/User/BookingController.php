@@ -30,9 +30,7 @@ class BookingController extends Controller
     // =========================================================================
     // 1. API CÔNG KHAI: Xem lịch trống của 1 ngày
     // =========================================================================
-    /**
-     * Chức năng: Tra cứu lịch trống/bận của một sân theo ngày để khách chọn khung giờ đặt.
-     */
+    // tra cuu lich trong/ban cua mot san theo ngay de khach chon khung gio dat
     public function getCourtAvailability(Request $request, $courtId)
     {
         $request->validate([
@@ -131,9 +129,7 @@ class BookingController extends Controller
     // =========================================================================
     // 2. API CHỐT ĐẶT SÂN
     // =========================================================================
-    /**
-     * Chức năng: Chốt đặt sân lẻ hoặc định kỳ, tính giá, giảm giá, chống trùng lịch và tạo booking.
-     */
+    // chot dat san le hoac dinh ky, tinh gia, giam gia, chong trung lich va tao booking
     public function store(Request $request)
     {
         $request->validate([
@@ -829,10 +825,7 @@ class BookingController extends Controller
     // =========================================================================
     // 3. API CHUẨN BỊ THANH TOÁN ONLINE (tạo intent, chưa tạo booking). chuẩn bị thông tin thanh toán
     // =========================================================================
-    /**
-     * Chức năng: Validate params, tính tổng tiền, lưu intent tạm thời.
-     * Booking thật chỉ được tạo sau khi webhook SePay xác nhận tiền vào.
-     */
+    // validate params, tinh tong tien, luu intent tam thoi
     public function preparePayment(Request $request)
     {
         $request->validate([
@@ -1073,10 +1066,7 @@ class BookingController extends Controller
         ]);
     }
 
-    /**
-     * Chức năng: Tính tổng tiền đầy đủ (100%) của đơn theo loại đặt sân, áp dụng
-     * giảm giá thành viên và mã khuyến mãi. Dùng làm cơ sở tính tiền cọc.
-     */
+    // tinh tong tien day du (100%) cua don theo loai dat san, ap dung
     private function calculateFullBookingAmount(Request $request, ?Promotion $promotion, $user): float
     {
         $type = $request->booking_type;
@@ -1139,10 +1129,7 @@ class BookingController extends Controller
     // =========================================================================
     // 4. API LỊCH SỬ CÁ NHÂN (gom nhóm định kỳ / dài hạn)
     // =========================================================================
-    /**
-     * Chức năng: Lấy lịch sử đặt sân của khách hàng.
-     * Đơn lẻ hiển thị riêng; đơn định kỳ/dài hạn được gom thành 1 nhóm có danh sách buổi bên trong.
-     */
+    // lay lich su dat san cua khach hang
     public function getUserBookings(Request $request)
     {
         $user = $request->user('sanctum');
@@ -1318,8 +1305,6 @@ class BookingController extends Controller
                 '_sort' => strtotime($g->start_date) ?? 0,
             ];
         }
-
-        // Sắp xếp mới nhất lên đầu
         usort($items, fn($a, $b) => $b['_sort'] - $a['_sort']);
 
         // Phân trang thủ công
@@ -1348,9 +1333,7 @@ class BookingController extends Controller
     // =========================================================================
     // 4. API CONG KHAI: KHACH VANG LAI TRA CUU DON BANG MA DON + SO DIEN THOAI
     // =========================================================================
-    /**
-     * Chức năng: Cho khách vãng lai tra cứu đơn bằng mã booking và số điện thoại.
-     */
+    // cho khach vang lai tra cuu don bang ma booking va so dien thoai
     public function lookupGuestBooking(Request $request)
     {
         $validated = $request->validate([
@@ -1444,9 +1427,7 @@ class BookingController extends Controller
         ]);
     }
 
-    /**
-     * Chức năng: Kiểm tra mã voucher khi khách nhập trước lúc chốt đặt sân.
-     */
+    // kiem tra ma voucher khi khach nhap truoc luc chot dat san
     public function validatePromotion(Request $request)
     {
         $validated = $request->validate([
@@ -1478,11 +1459,7 @@ class BookingController extends Controller
         ]);
     }
 
-    /**
-     * Lập kế hoạch giá cho đặt lẻ, gồm phần thẻ bao và phần khách phải thanh toán.
-     * Kết quả này được dùng chung ở bước tạo QR và bước ghi booking để hai bước
-     * không thể tính khác số tiền.
-     */
+    // lap ke hoach gia cho dat le, gom phan the bao va phan khach phai thanh toan
     private function buildSingleBookingPlan(
         Request $request,
         ?MembershipCard $card,
@@ -1568,6 +1545,7 @@ class BookingController extends Controller
         ];
     }
 
+    // dung danh sach buoi choi cua don le de tinh the cover duoc bao nhieu ca
     private function buildSingleSessionsForCoverage(Request $request): array
     {
         $sessions = [];
@@ -1590,11 +1568,13 @@ class BookingController extends Controller
         return $sessions;
     }
 
+    // tao khoa dinh danh duy nhat cho 1 khung gio (ngay|gio bat dau|gio ket thuc)
     private function singleSlotCoverageKey(array $slot): string
     {
         return $slot['date'] . '|' . substr($slot['start'], 0, 5) . '|' . substr($slot['end'], 0, 5);
     }
 
+    // kiem tra cac khung gio khach chon co hop le va co bi trung nhau khong
     private function singleSlotsValidationError(array $slots): ?string
     {
         $slotsByDate = [];
@@ -1616,6 +1596,7 @@ class BookingController extends Controller
         return null;
     }
 
+    // kiem tra san co cho dat khong (dang hoat dong, khong bao tri, san hop dong thi phai co the)
     private function courtBookingAccessError(?Court $court, ?User $user): ?string
     {
         if (!$court || $court->status !== 'active' || $court->is_maintenance) {
@@ -1639,9 +1620,7 @@ class BookingController extends Controller
     // =========================================================================
     // HÀM PHỤ: CHIA SLOT ĐẶT LẺ THÀNH CÁC NHÓM LIỀN NHAU
     // =========================================================================
-    /**
-     * Chức năng: Gom các khung giờ liên tiếp thành cùng một hóa đơn và tách khung giờ rời nhau.
-     */
+    // gom cac khung gio lien tiep thanh cung mot hoa don va tach khung gio roi nhau
     private function groupContinuousSlots(array $slots)
     {
         usort($slots, function ($a, $b) {
@@ -1686,9 +1665,7 @@ class BookingController extends Controller
     // =========================================================================
     // HÀM PHỤ: KIỂM TRA TRÙNG LỊCH
     // =========================================================================
-    /**
-     * Chức năng: Kiểm tra một khung giờ có bị trùng với booking chưa hủy hay không.
-     */
+    // kiem tra mot khung gio co bi trung voi booking chua huy hay khong
     private function checkSlotBusy($courtId, $date, $start, $end)
     {
         return BookingDetail::where('court_id', $courtId)
@@ -1703,13 +1680,7 @@ class BookingController extends Controller
             ->exists();
     }
 
-    /**
-     * Chức năng: Lập kế hoạch sân cho từng buổi của chuỗi định kỳ/dài hạn.
-     * Buổi nào sân yêu cầu bị trùng lịch thì tự tìm sân khác đang hoạt động còn trống
-     * cùng khung giờ để thay thế; nếu không còn sân nào trống thì đánh dấu bỏ buổi đó.
-     * Trả về: sessions [ngày => court_id sẽ dùng], moved [các buổi bị đổi sân kèm tên sân],
-     * unavailable [các ngày không còn sân nào trống].
-     */
+    // lap ke hoach san cho tung buoi cua chuoi dinh ky/dai han
     private function planSessionCourts(string $preferredCourtId, array $dates, string $startTime, string $endTime): array
     {
         $courts = \App\Models\Court::where('status', 'active')
@@ -1747,6 +1718,7 @@ class BookingController extends Controller
         return ['sessions' => $sessions, 'moved' => $moved, 'unavailable' => $unavailable];
     }
 
+    // lay danh sach khung gio cua hop dong (nhieu khung hoac 1 khung mac dinh)
     private function contractTimeSlots(Request $request, string $type): array
     {
         $slots = collect((array) $request->input('time_slots', []))
@@ -1771,6 +1743,7 @@ class BookingController extends Controller
         ];
     }
 
+    // tinh tong so phut choi cua tat ca khung gio trong 1 buoi hop dong
     private function contractTotalMinutes(array $timeSlots): int
     {
         return (int) array_sum(array_map(
@@ -1779,6 +1752,7 @@ class BookingController extends Controller
         ));
     }
 
+    // lap ke hoach san cho tung buoi: buoi nao trung lich thi tu tim san khac con trong
     private function planContractSlotCourts(string $preferredCourtId, array $dates, array $timeSlots): array
     {
         $courts = \App\Models\Court::where('status', 'active')
@@ -1834,10 +1808,7 @@ class BookingController extends Controller
         return ['sessions' => $sessions, 'moved' => $moved, 'unavailable' => $unavailable];
     }
 
-    /**
-     * Chức năng: Trả phản hồi HTTP 409 kèm kế hoạch điều chỉnh (buổi đổi sân / buổi bị bỏ)
-     * để frontend hiển thị cho người dùng xác nhận trước khi gửi lại với accept_adjustments=true.
-     */
+    // tra phan hoi http 409 kem ke hoach dieu chinh (buoi doi san / buoi bi bo)
     private function adjustmentsRequiredResponse(array $plan)
     {
         return response()->json([
@@ -1854,9 +1825,7 @@ class BookingController extends Controller
     // =========================================================================
     // HÀM PHỤ: TÍNH ƯU ĐÃI ĐIỂM THÀNH VIÊN
     // =========================================================================
-    /**
-     * Chức năng: Tính giảm giá theo điểm thành viên dựa trên số phút khách đặt sân.
-     */
+    // tinh giam gia theo diem thanh vien dua tren so phut khach dat san
     private function calculateLoyaltyDiscount(?User $user, int|float $totalMinutes): float
     {
         if (!$user || $user->role !== 'customer') {
@@ -1866,12 +1835,7 @@ class BookingController extends Controller
         return MembershipTierService::discountForMinutes((int) $user->points, $totalMinutes);
     }
 
-    /**
-     * Chức năng: Áp tiền trả trước (lễ tân ghi nhận tại quầy) vào 1 booking cụ thể,
-     * trừ dần từ ngân sách còn lại ($prepaidRemaining, truyền theo tham chiếu để dùng
-     * chung cho nhiều booking liên tiếp trong cùng 1 đơn/hợp đồng). Trả về đủ 4 field
-     * cần cho Booking::insert: deposit_amount, remaining_amount, status, payment_status.
-     */
+    // ap tien tra truoc (le tan ghi nhan tai quay) vao 1 booking cu the
     private function applyPrepayment(float $payableTotal, float &$prepaidRemaining, bool $forceFullyPaid = false): array
     {
         // Đơn miễn phí hoàn toàn (giảm giá 100%) — không cần thu tiền, xác nhận ngay.
@@ -1910,10 +1874,7 @@ class BookingController extends Controller
         ];
     }
 
-    /**
-     * Chức năng: Tìm mã giảm giá ngày đặc biệt (auto_apply) còn hạn để tự động áp dụng.
-     * Vẫn tôn trọng giới hạn lượt dùng và điểm tối thiểu; không đủ điều kiện thì bỏ qua.
-     */
+    // tim ma giam gia ngay dac biet (auto_apply) con han de tu dong ap dung
     private function resolveAutoPromotion(?User $user, ?string $customerPhone): ?Promotion
     {
         $promotion = Promotion::currentlyValid()
@@ -1951,10 +1912,7 @@ class BookingController extends Controller
         return $promotion;
     }
 
-    /**
-     * Chức năng: API công khai trả về mã giảm giá ngày đặc biệt đang hiệu lực (nếu có)
-     * để trang đặt sân hiển thị banner "hôm nay được tự động giảm giá".
-     */
+    // API cong khai tra ve ma giam gia ngay dac biet dang hieu luc (neu co)
     public function autoPromotion()
     {
         $promotion = Promotion::currentlyValid()
@@ -1975,9 +1933,7 @@ class BookingController extends Controller
         ]);
     }
 
-    /**
-     * Chức năng: Tìm và kiểm tra điều kiện voucher theo mã, tài khoản hoặc số điện thoại khách.
-     */
+    // tim va kiem tra dieu kien voucher theo ma, tai khoan hoac so dien thoai khach
     private function resolvePromotionForBooking(?string $code, ?User $user, ?string $customerPhone): ?Promotion
     {
         $code = strtoupper(trim((string) $code));
@@ -1999,9 +1955,11 @@ class BookingController extends Controller
 
         // Kiểm tra hạn sử dụng của mã
         $today = now()->toDateString();
+        $validFromStr = $promotion->valid_from ? \Carbon\Carbon::parse($promotion->valid_from)->toDateString() : null;
+        $validToStr = $promotion->valid_to ? \Carbon\Carbon::parse($promotion->valid_to)->toDateString() : null;
         if (
-            ($promotion->valid_from && $today < $promotion->valid_from->toDateString())
-            || ($promotion->valid_to && $today > $promotion->valid_to->toDateString())
+            ($validFromStr && $today < $validFromStr)
+            || ($validToStr && $today > $validToStr)
         ) {
             abort(response()->json([
                 'status' => 'error',
@@ -2040,9 +1998,7 @@ class BookingController extends Controller
         return $promotion;
     }
 
-    /**
-     * Chức năng: Tính số tiền được giảm từ voucher theo loại fixed hoặc percent.
-     */
+    // tinh so tien duoc giam tu voucher theo loai fixed hoac percent
     private function calculatePromotionDiscount(?Promotion $promotion, int|float $baseAmount): float
     {
         if (!$promotion || $baseAmount <= 0) {
@@ -2056,9 +2012,7 @@ class BookingController extends Controller
         return min($baseAmount, (float) $promotion->discount_value);
     }
 
-    /**
-     * Chức năng: Tạo thông báo cho admin/staff khi có đơn đặt sân mới.
-     */
+    // tao thong bao cho admin/staff khi co don dat san moi
     private function notifyAdminsAboutNewBookings(
         array $bookings,
         ?string $customerName,
@@ -2108,14 +2062,7 @@ class BookingController extends Controller
     // =========================================================================
     // HÀM PHỤ: TÍNH GIÁ THEO BẢNG GIÁ
     // =========================================================================
-    /**
-     * Chức năng: Tính giá thuê sân theo bảng giá nội bộ cho khung giờ khách chọn.
-     */
-    /**
-     * Chức năng: Ước tính tổng tiền cho preview trước khi đặt — tính giá theo ĐÚNG
-     * ngày chơi thực tế của từng buổi (ngày thường/cuối tuần), không lấy giá của
-     * ngày đang xem. Dùng cho đặt định kỳ/dài hạn để hiển thị đúng tổng tiền.
-     */
+    // uoc tinh tong tien truoc khi dat, tinh theo dung ngay choi that cua tung buoi
     public function estimatePrice(Request $request)
     {
         $validated = $request->validate([
@@ -2216,9 +2163,7 @@ class BookingController extends Controller
         ]);
     }
 
-    /**
-     * Group continuous time slots into blocks.
-     */
+    // group continuous time slots into blocks
     private function groupContinuousTimeSlots(array $slots): array
     {
         usort($slots, function ($a, $b) {
@@ -2251,6 +2196,7 @@ class BookingController extends Controller
         return $groups;
     }
 
+    // gop cac khung gio lien tiep nhau thanh 1 nhom de tao chung 1 don
     private function groupContinuousSlotPlans(array $slotPlans): array
     {
         usort($slotPlans, function ($a, $b) {
@@ -2283,6 +2229,7 @@ class BookingController extends Controller
         return $groups;
     }
 
+    // tao toan bo don con cho hop dong dinh ky/dai han theo ke hoach san da chot
     private function processContractBookings(
         string $recurringId,
         array $plan,
@@ -2468,6 +2415,7 @@ class BookingController extends Controller
      * @param  array  $sessions  mỗi phần tử: ['key'=>string, 'date'=>'Y-m-d', 'ca'=>int, 'price'=>float]
      * @return array{covered: array<string,bool>, partial_covered: array<string, array>, covered_count: int, covered_ca: int, payable: float}
      */
+    // tinh the thanh vien cover duoc bao nhieu buoi, uu tien tru cho buoi som nhat
     private function computeCardCoverage(?MembershipCard $card, array $sessions): array
     {
         $result = [
@@ -2528,9 +2476,7 @@ class BookingController extends Controller
         return $result;
     }
 
-    /**
-     * Dựng danh sách buổi (ngày, số ca, giá) của hợp đồng định kỳ/dài hạn để tính coverage thẻ.
-     */
+    // dung danh sach buoi (ngay, so ca, gia) cua hop dong dinh ky/dai han de tinh coverage the
     private function buildContractSessionsForCoverage(Request $request): array
     {
         $type = $request->booking_type;
@@ -2579,18 +2525,14 @@ class BookingController extends Controller
         return $sessions;
     }
 
+    // tinh nhanh tien san cho 1 khung gio bang service tinh gia
     private function internalCalculatePrice($courtId, $date, $start, $end)
     {
         return $this->pricingResolver->calculate($date, $start, $end)['total_price'];
     }
 
-    /**
-     * Chức năng: Khách hàng gửi yêu cầu đổi lịch hoặc hủy đơn đến admin/staff.
-     * Tạo thông báo cho toàn bộ admin/staff, nhúng mã đơn vào content để routing tự động.
-     */
-    /**
-     * Giờ bắt đầu (Carbon) của buổi sớm nhất trong một đơn lẻ. Null nếu không có buổi.
-     */
+    // khach hang gui yeu cau doi lich hoac huy don den admin/staff
+    // gio bat dau (carbon) cua buoi som nhat trong mot don le
     private function bookingEarliestStart(Booking $booking): ?Carbon
     {
         $booking->loadMissing('details');
@@ -2601,10 +2543,7 @@ class BookingController extends Controller
         return $starts->isEmpty() ? null : $starts->min();
     }
 
-    /**
-     * Giờ bắt đầu (Carbon) của buổi sớm nhất còn ở tương lai trong một hợp đồng
-     * định kỳ/dài hạn; nếu không còn buổi tương lai thì lấy buổi sớm nhất tổng thể.
-     */
+    // gio bat dau (carbon) cua buoi som nhat con o tuong lai trong mot hop dong
     private function recurringEarliestStart(RecurringBooking $recurring): ?Carbon
     {
         $recurring->loadMissing('bookings.details');
@@ -2622,10 +2561,7 @@ class BookingController extends Controller
 
         return $future->isNotEmpty() ? $future->min() : $starts->min();
     }
-    /**
-     * Kiểm tra xem đơn đặt sân có thuộc về người dùng đang đăng nhập hay không.
-     * Nếu là đơn walk-in (user_id = null) thì so sánh số điện thoại khách.
-     */
+    // kiem tra xem don dat san co thuoc ve nguoi dung dang dang nhap hay khong
     private function userOwnsBookingOrMatchingWalkIn(Booking $booking, User $user): bool
     {
         if ($booking->user_id !== null) {
@@ -2637,10 +2573,7 @@ class BookingController extends Controller
 
         return $bookingPhone !== '' && $bookingPhone === $userPhone;
     }
-    /**
-     * Chức năng: Khách hàng gửi yêu cầu đổi lịch hoặc hủy đơn đến admin/staff.
-     * Tạo thông báo cho toàn bộ admin/staff, nhúng mã đơn vào content để routing tự động.
-     */
+    // khach hang gui yeu cau doi lich hoac huy don den admin/staff
     public function sendRequest(Request $request)
     {
         $validated = $request->validate([
@@ -2738,12 +2671,7 @@ class BookingController extends Controller
     // =========================================================================
     // API ĐỔI LỊCH TỰ ĐỘNG CHO TỪNG BUỔI (kể cả buổi lẻ trong hợp đồng)
     // =========================================================================
-    /**
-     * Chức năng: Khách yêu cầu đổi lịch một buổi cụ thể theo chính sách:
-     * - Báo TRƯỚC giờ chơi + giờ mới trống  → đổi ngay (approved).
-     * - Báo TRƯỚC nhưng giờ mới đã bận      → từ chối kèm danh sách giờ rảnh của sân.
-     * - Báo SAU giờ chơi                     → mất buổi (forfeited), không hoàn tiền.
-     */
+    // khach yeu cau doi lich mot buoi cu the theo chinh sach:
     public function rescheduleSession(Request $request)
     {
         $validated = $request->validate([
@@ -2899,10 +2827,7 @@ class BookingController extends Controller
     // =========================================================================
     // API THỐNG KÊ SỐ BUỔI CỦA TÀI KHOẢN
     // =========================================================================
-    /**
-     * Chức năng: Tổng hợp số buổi của tài khoản: đã đặt, đã chơi, sắp tới, đã hủy,
-     * và tổng chi tiêu — hiển thị ở trang lịch sử đặt sân.
-     */
+    // tong hop so buoi cua tai khoan: da dat, da choi, sap toi, da huy
     public function myBookingStats(Request $request)
     {
         $user = $request->user();
@@ -2940,9 +2865,7 @@ class BookingController extends Controller
         ]);
     }
 
-    /**
-     * Chức năng: Liệt kê các khung giờ 1 tiếng còn trống của sân trong một ngày (06:00–22:00).
-     */
+    // liet ke cac khung gio 1 tieng con trong cua san trong mot ngay (06:00–22:00)
     private function findFreeSlots(string $courtId, string $date, array|string|null $excludeDetailIds = null): array
     {
         $excludeIds = is_array($excludeDetailIds) ? $excludeDetailIds : array_filter([$excludeDetailIds]);

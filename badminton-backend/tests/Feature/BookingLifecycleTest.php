@@ -111,4 +111,57 @@ class BookingLifecycleTest extends TestCase
 
         return $booking;
     }
+
+    public function test_admin_can_reschedule_multi_slot_booking_shifting_all_details(): void
+    {
+        $this->signIn(null, ['role' => 'admin']);
+        $court = $this->createCourt();
+        $court2 = $this->createCourt(['name' => 'Sân 2']);
+        $today = now()->addDays(2)->toDateString();
+
+        $booking = $this->createBooking(null, [
+            'booking_code' => 'MULTISLOT1',
+            'customer_name' => 'Khach Multi Slot',
+            'customer_phone' => '0901234567',
+        ]);
+
+        $detail1 = BookingDetail::create([
+            'booking_id' => $booking->id,
+            'court_id' => $court->id,
+            'booking_date' => $today,
+            'start_time' => '11:00:00',
+            'end_time' => '12:00:00',
+            'duration_minutes' => 60,
+            'price_per_hour' => 100000,
+            'price' => 100000,
+        ]);
+
+        $detail2 = BookingDetail::create([
+            'booking_id' => $booking->id,
+            'court_id' => $court->id,
+            'booking_date' => $today,
+            'start_time' => '12:00:00',
+            'end_time' => '13:00:00',
+            'duration_minutes' => 60,
+            'price_per_hour' => 100000,
+            'price' => 100000,
+        ]);
+
+        $this->patchJson("/api/admin/bookings/details/{$detail1->id}/reschedule", [
+            'court_id' => $court2->id,
+            'booking_date' => $today,
+            'start_time' => '18:00',
+            'end_time' => '20:00',
+        ])->assertOk();
+
+        $d1 = $detail1->fresh();
+        $d2 = $detail2->fresh();
+
+        $this->assertSame($court2->id, $d1->court_id);
+        $this->assertSame($court2->id, $d2->court_id);
+        $this->assertSame('18:00:00', $d1->start_time);
+        $this->assertSame('19:00:00', $d1->end_time);
+        $this->assertSame('19:00:00', $d2->start_time);
+        $this->assertSame('20:00:00', $d2->end_time);
+    }
 }

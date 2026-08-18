@@ -14,7 +14,7 @@ class AuthController extends Controller
     private const PHONE_REGEX = '/^0[35789][0-9]{8}$/';
     private const GENDERS = ['male', 'female', 'other'];
 
-    /** Chức năng: Đăng ký tài khoản khách hàng mới, mã hóa mật khẩu và cấp token đăng nhập. */
+    // dang ky tai khoan khach hang moi, ma hoa mat khau va cap token dang nhap
     public function register(Request $request)
     {
         if ($request->filled('phone')) {
@@ -48,7 +48,7 @@ class AuthController extends Controller
         return response()->json(['message' => 'Đăng ký thành công', 'user' => $user], 201);
     }
 
-    /** Chức năng: Đăng nhập bằng số điện thoại, kiểm tra trạng thái tài khoản và trả về token theo role. */
+    // dang nhap bang so dien thoai, kiem tra trang thai tai khoan va tra ve token theo role
     public function login(Request $request)
     {
         $request->validate([
@@ -79,7 +79,7 @@ class AuthController extends Controller
         ]);
     }
 
-    /** Chức năng: Trả về đường dẫn chuyển hướng sau đăng nhập dựa theo role. */
+    // tra ve duong dan chuyen huong sau dang nhap dua theo role
     private function getRedirectPathForRole(string $role): string
     {
         return match ($role) {
@@ -89,7 +89,7 @@ class AuthController extends Controller
         };
     }
 
-    /** Chức năng: Trả về danh sách quyền tương ứng với role của người dùng. */
+    // tra ve danh sach quyen tuong ung voi role cua nguoi dung
     private function getPermissionsForRole(string $role): array
     {
         return match ($role) {
@@ -99,7 +99,7 @@ class AuthController extends Controller
         };
     }
 
-    /** Chức năng: Cho người dùng đang đăng nhập đổi mật khẩu sau khi xác thực mật khẩu hiện tại. */
+    // cho nguoi dung dang dang nhap doi mat khau sau khi xac thuc mat khau hien tai
     public function changePassword(Request $request)
     {
         $request->validate([
@@ -122,7 +122,7 @@ class AuthController extends Controller
         return response()->json(['message' => 'Đổi mật khẩu thành công']);
     }
 
-    /** Chức năng: Cập nhật thông tin cá nhân của tài khoản đang đăng nhập. */
+    // cap nhat thong tin ca nhan cua tai khoan dang dang nhap
     public function updateProfile(Request $request)
     {
         $user = Auth::user();
@@ -151,7 +151,7 @@ class AuthController extends Controller
         return response()->json(['message' => 'Cập nhật thông tin thành công', 'user' => $user]);
     }
 
-    /** Chức năng: Cho người dùng đang đăng nhập tải lên hoặc thay ảnh đại diện của chính mình. */
+    // cho nguoi dung dang dang nhap tai len hoac thay anh dai dien cua chinh minh
     public function uploadAvatar(Request $request)
     {
         $request->validate([
@@ -178,13 +178,13 @@ class AuthController extends Controller
         return response()->json(['message' => 'Cập nhật ảnh đại diện thành công', 'avatar_url' => $image->url]);
     }
 
-    /** Chức năng: Lấy hồ sơ tài khoản đang đăng nhập kèm dữ liệu cần hiển thị ở frontend. */
+    // lay ho so tai khoan dang dang nhap kem du lieu can hien thi o frontend
     public function getProfile()
     {
         return response()->json(['message' => 'Lấy thông tin tài khoản thành công', 'user' => Auth::user()]);
     }
 
-    /** Chức năng: Đăng xuất thiết bị hiện tại bằng cách xóa token đang sử dụng. */
+    // dang xuat thiet bi hien tai bang cach xoa token dang su dung
     public function logout(Request $request)
     {
         $request->user()->currentAccessToken()->delete();
@@ -192,7 +192,7 @@ class AuthController extends Controller
         return response()->json(['message' => 'Đăng xuất thành công, token đã bị thu hồi']);
     }
 
-    /** Chức năng: Đăng xuất tất cả thiết bị bằng cách xóa toàn bộ token của người dùng. */
+    // dang xuat tat ca thiet bi bang cach xoa toan bo token cua nguoi dung
     public function logoutAllDevices(Request $request)
     {
         $request->user()->tokens()->delete();
