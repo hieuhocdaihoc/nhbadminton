@@ -72,8 +72,14 @@ const TodayBookings = () => {
   const [itemRows, setItemRows] = useState([{ ...emptyItemRow }]);
   const [isAddingItem, setIsAddingItem] = useState(false);
 
-  const [checkInModal, setCheckInModal] = useState({ isOpen: false, booking: null });
-  const [checkInForm, setCheckInForm] = useState({ phone: "", booking_code: "" });
+  const [checkInModal, setCheckInModal] = useState({
+    isOpen: false,
+    booking: null,
+  });
+  const [checkInForm, setCheckInForm] = useState({
+    phone: "",
+    booking_code: "",
+  });
   const [checkInError, setCheckInError] = useState("");
   const [isCheckingIn, setIsCheckingIn] = useState(false);
   const [isCheckingOut, setIsCheckingOut] = useState(false);
@@ -116,7 +122,7 @@ const TodayBookings = () => {
           _groupStart: null,
           _groupEnd: null,
           _groupCourtId: null,
-          _groupCourtName: '—',
+          _groupCourtName: "—",
           _groupPrice: 0,
           _noDetails: true,
         });
@@ -173,13 +179,14 @@ const TodayBookings = () => {
     setIsLoading(true);
 
     try {
-      const [bookingRes, prodRes, servRes, courtRes, settingRes] = await Promise.all([
-        adminBookingService.getTodayBookings(),
-        adminProductService.getProducts(1, "", ""),
-        adminAdditionalService.getServices(),
-        adminCourtService.getCourts(),
-        settingService.getPublicSettings().catch(() => null),
-      ]);
+      const [bookingRes, prodRes, servRes, courtRes, settingRes] =
+        await Promise.all([
+          adminBookingService.getTodayBookings(),
+          adminProductService.getProducts(1, "", ""),
+          adminAdditionalService.getServices(),
+          adminCourtService.getCourts(),
+          settingService.getPublicSettings().catch(() => null),
+        ]);
 
       setBookings(bookingRes.data?.data || []);
       setProducts(prodRes.data?.data?.data || []);
@@ -208,7 +215,9 @@ const TodayBookings = () => {
   // Đồng bộ ca đang mở trong drawer với dữ liệu mới nhất sau mỗi lần fetch lại
   useEffect(() => {
     if (!selectedRow) return;
-    const fresh = buildDisplayRows(bookings).find((b) => b.id === selectedRow.id);
+    const fresh = buildDisplayRows(bookings).find(
+      (b) => b.id === selectedRow.id,
+    );
     setSelectedRow(fresh || null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bookings]);
@@ -218,7 +227,10 @@ const TodayBookings = () => {
     try {
       setMessage({ type: "", text: "" });
       await adminBookingService.updatePayment(id, { payment_status });
-      setMessage({ type: "success", text: "✓ Cập nhật thanh toán thành công!" });
+      setMessage({
+        type: "success",
+        text: "✓ Cập nhật thanh toán thành công!",
+      });
       fetchTodayData();
     } catch (error) {
       toast.error(error.response?.data?.message || "Thao tác thất bại!");
@@ -245,10 +257,15 @@ const TodayBookings = () => {
         booking_code: checkInForm.booking_code.trim(),
       });
       setCheckInModal({ isOpen: false, booking: null });
-      setMessage({ type: "success", text: "✓ Check-in thành công! Khách đã vào sân." });
+      setMessage({
+        type: "success",
+        text: "✓ Check-in thành công! Khách đã vào sân.",
+      });
       fetchTodayData();
     } catch (error) {
-      setCheckInError(error.response?.data?.message || "Check-in thất bại. Vui lòng thử lại.");
+      setCheckInError(
+        error.response?.data?.message || "Check-in thất bại. Vui lòng thử lại.",
+      );
     } finally {
       setIsCheckingIn(false);
     }
@@ -257,7 +274,8 @@ const TodayBookings = () => {
   // Thu tiền cuối ca + hoàn thành trong 1 bước (backend tự tính phần còn thiếu)
   const handleCheckout = async (booking) => {
     const id = typeof booking === "string" ? booking : booking?.id;
-    const actualSessions = booking?.details?.length ?? booking?.card_sessions_planned ?? 0;
+    const actualSessions =
+      booking?.details?.length ?? booking?.card_sessions_planned ?? 0;
 
     let confirmMsg = "Xác nhận thu tiền còn lại và hoàn thành ca chơi này?";
     if (booking?.membership_card_id && actualSessions > 0) {
@@ -271,9 +289,14 @@ const TodayBookings = () => {
       const res = await adminBookingService.checkout(id);
       const deduction = res.data?.card_deduction;
       if (deduction) {
-        toast.success(`✓ Đã hoàn thành và trừ ${deduction.sessions_deducted} ca — còn ${deduction.remaining_sessions} ca.`);
+        toast.success(
+          `✓ Đã hoàn thành và trừ ${deduction.sessions_deducted} ca — còn ${deduction.remaining_sessions} ca.`,
+        );
       } else {
-        setMessage({ type: "success", text: "✓ Đã thu tiền và hoàn thành ca chơi!" });
+        setMessage({
+          type: "success",
+          text: "✓ Đã thu tiền và hoàn thành ca chơi!",
+        });
       }
       setSelectedRow(null);
       fetchTodayData();
@@ -317,7 +340,9 @@ const TodayBookings = () => {
     );
 
     if (hasInvalidRow) {
-      return toast.warn("Vui lòng chọn đầy đủ mặt hàng/dịch vụ và số lượng hợp lệ!");
+      return toast.warn(
+        "Vui lòng chọn đầy đủ mặt hàng/dịch vụ và số lượng hợp lệ!",
+      );
     }
 
     const items = itemRows.map((item) => {
@@ -346,7 +371,9 @@ const TodayBookings = () => {
       handleCloseAddItemModal();
       fetchTodayData();
     } catch (error) {
-      toast.error(error.response?.data?.message || "Có lỗi xảy ra khi thêm món!");
+      toast.error(
+        error.response?.data?.message || "Có lỗi xảy ra khi thêm món!",
+      );
     } finally {
       setIsAddingItem(false);
       setTimeout(() => setMessage({ type: "", text: "" }), 2500);
@@ -362,7 +389,7 @@ const TodayBookings = () => {
   // Hàm gom dòng không đọc state khác; chỉ dữ liệu bookings làm thay đổi kết quả.
   const displayBookings = useMemo(() => {
     return buildDisplayRows(bookings);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bookings]);
 
   const activeCourts = useMemo(() => {
@@ -515,9 +542,7 @@ const TodayBookings = () => {
     const paidAmount = totalAmount - remainingAmount;
 
     const isOnlyProshopDebt =
-      serviceAmount > 0 &&
-      remainingAmount > 0 &&
-      paidAmount >= courtAmount;
+      serviceAmount > 0 && remainingAmount > 0 && paidAmount >= courtAmount;
 
     return {
       courtAmount,
@@ -538,18 +563,24 @@ const TodayBookings = () => {
       <div className="admin-page-header">
         <div>
           <h2 className="admin-page-title">Ca đấu hôm nay</h2>
-          <p className="admin-page-subtitle">{todayFormatted} · Bấm vào 1 ô trên lưới để thao tác</p>
+          <p className="admin-page-subtitle">
+            {todayFormatted} · Bấm vào 1 ô trên lưới để thao tác
+          </p>
         </div>
 
         <div className="flex gap-2.5">
           <div className="admin-stat-badge badge-default">
-            <p className="admin-stat-value val-default">{filteredBookings.length}</p>
+            <p className="admin-stat-value val-default">
+              {filteredBookings.length}
+            </p>
             <p className="admin-stat-label lbl-default">Đang xem</p>
           </div>
 
           {(unpaidCount > 0 || partialCount > 0) && (
             <div className="bg-amber-50 border border-amber-200/60 px-4 py-2 rounded-lg text-center min-w-[70px]">
-              <p className="text-lg font-bold text-amber-600">{unpaidCount + partialCount}</p>
+              <p className="text-lg font-bold text-amber-600">
+                {unpaidCount + partialCount}
+              </p>
               <p className="text-[10px] text-amber-500 uppercase">Cần thu</p>
             </div>
           )}
@@ -647,7 +678,10 @@ const TodayBookings = () => {
       {/* CHÚ THÍCH MÀU */}
       <div className="flex flex-wrap gap-3">
         {Object.entries(statusConfig).map(([key, cfg]) => (
-          <span key={key} className="inline-flex items-center gap-1.5 text-[11px] text-zinc-500">
+          <span
+            key={key}
+            className="inline-flex items-center gap-1.5 text-[11px] text-zinc-500"
+          >
             <span className={`w-2.5 h-2.5 rounded ${cfg.dot}`} /> {cfg.label}
           </span>
         ))}
@@ -662,7 +696,9 @@ const TodayBookings = () => {
       ) : activeCourts.length === 0 ? (
         <div className="admin-card p-16 text-center">
           <p className="text-3xl mb-2 opacity-30">📭</p>
-          <p className="text-sm text-zinc-400">Chưa có sân nào đang hoạt động</p>
+          <p className="text-sm text-zinc-400">
+            Chưa có sân nào đang hoạt động
+          </p>
         </div>
       ) : (
         <div className="admin-card p-4 overflow-x-auto">
@@ -671,7 +707,9 @@ const TodayBookings = () => {
               <tr>
                 <th className="text-left w-28">Sân</th>
                 {HOURS.map((h) => (
-                  <th key={h} className="text-center !p-1 text-[10px]">{h}h</th>
+                  <th key={h} className="text-center !p-1 text-[10px]">
+                    {h}h
+                  </th>
                 ))}
               </tr>
             </thead>
@@ -681,7 +719,9 @@ const TodayBookings = () => {
                   <td className="font-semibold text-sm whitespace-nowrap">
                     {court.name}
                     {court.is_maintenance ? (
-                      <span className="block text-[10px] text-red-500 font-medium">Bảo trì</span>
+                      <span className="block text-[10px] text-red-500 font-medium">
+                        Bảo trì
+                      </span>
                     ) : null}
                   </td>
                   {HOURS.map((h) => {
@@ -697,7 +737,11 @@ const TodayBookings = () => {
                               ? `${cfg.cell} hover:scale-105 cursor-pointer`
                               : "bg-white border-zinc-100 cursor-default"
                           }`}
-                          title={b ? `${b.customer_name}${b.staff?.full_name ? ` (NV: ${b.staff.full_name})` : ''} · ${b.booking_code}` : "Trống"}
+                          title={
+                            b
+                              ? `${b.customer_name}${b.staff?.full_name ? ` (NV: ${b.staff.full_name})` : ""} · ${b.booking_code}`
+                              : "Trống"
+                          }
                         >
                           {b ? b.customer_name?.split(" ").slice(-1)[0] : ""}
                         </button>
@@ -718,175 +762,218 @@ const TodayBookings = () => {
             Đơn chưa có thông tin sân / giờ
           </p>
           <div className="space-y-2">
-            {displayBookings.filter((b) => b._noDetails).map((b) => (
-              <button
-                key={b.id}
-                type="button"
-                onClick={() => setSelectedRow(b)}
-                className="flex w-full items-center justify-between rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-left hover:bg-amber-100"
-              >
-                <div>
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <p className="text-sm font-bold text-slate-900">{b.customer_name || 'Khách vãng lai'}</p>
-                    {b.staff?.full_name && (
-                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-200 text-amber-900 border border-amber-300">
-                        NV: {b.staff.full_name}
-                      </span>
-                    )}
+            {displayBookings
+              .filter((b) => b._noDetails)
+              .map((b) => (
+                <button
+                  key={b.id}
+                  type="button"
+                  onClick={() => setSelectedRow(b)}
+                  className="flex w-full items-center justify-between rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-left hover:bg-amber-100"
+                >
+                  <div>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <p className="text-sm font-bold text-slate-900">
+                        {b.customer_name || "Khách vãng lai"}
+                      </p>
+                      {b.staff?.full_name && (
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-200 text-amber-900 border border-amber-300">
+                          NV: {b.staff.full_name}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-slate-500">
+                      {b.booking_code} · {b.customer_phone}
+                    </p>
                   </div>
-                  <p className="text-xs text-slate-500">{b.booking_code} · {b.customer_phone}</p>
-                </div>
-                <span className={`text-xs font-bold px-2 py-1 rounded-lg ${statusConfig[b.status]?.cell || 'bg-slate-100 text-slate-500'}`}>
-                  {statusConfig[b.status]?.label || b.status}
-                </span>
-              </button>
-            ))}
+                  <span
+                    className={`text-xs font-bold px-2 py-1 rounded-lg ${statusConfig[b.status]?.cell || "bg-slate-100 text-slate-500"}`}
+                  >
+                    {statusConfig[b.status]?.label || b.status}
+                  </span>
+                </button>
+              ))}
           </div>
         </div>
       )}
 
       {/* DRAWER THAO TÁC — MỞ KHI BẤM VÀO 1 Ô */}
       <AnimatePresence>
-        {selectedRow && (() => {
-          const b = selectedRow;
-          const sc = statusConfig[b.status] || statusConfig.confirmed;
-          const isCancelled = b.status === "cancelled";
-          const isCompleted = b.status === "completed";
-          const { courtAmount, serviceAmount, totalAmount, remainingAmount, paidAmount, isOnlyProshopDebt, overtimeFee, overtimeMinutes } = rowFinance(b);
-          const timeStr =
-            b._groupStart && b._groupEnd
-              ? `${b._groupStart.slice(0, 5)} – ${b._groupEnd.slice(0, 5)}`
-              : "—";
+        {selectedRow &&
+          (() => {
+            const b = selectedRow;
+            const sc = statusConfig[b.status] || statusConfig.confirmed;
+            const isCancelled = b.status === "cancelled";
+            const isCompleted = b.status === "completed";
+            const {
+              courtAmount,
+              serviceAmount,
+              totalAmount,
+              remainingAmount,
+              paidAmount,
+              isOnlyProshopDebt,
+              overtimeFee,
+              overtimeMinutes,
+            } = rowFinance(b);
+            const timeStr =
+              b._groupStart && b._groupEnd
+                ? `${b._groupStart.slice(0, 5)} – ${b._groupEnd.slice(0, 5)}`
+                : "—";
 
-          return (
-            <div className="admin-modal-overlay" onClick={() => setSelectedRow(null)}>
-              <motion.div
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                onClick={(e) => e.stopPropagation()}
-                className="admin-modal-content max-w-lg"
+            return (
+              <div
+                className="admin-modal-overlay"
+                onClick={() => setSelectedRow(null)}
               >
-                <div className="admin-modal-header">
-                  <div>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h4 className="text-sm font-semibold text-zinc-800">{b.customer_name}</h4>
-                      {b.staff?.full_name && (
-                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
-                          NV tạo: {b.staff.full_name}
-                        </span>
-                      )}
-                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium ${sc.bg} ${sc.text}`}>
-                        <span className={`w-1.5 h-1.5 rounded-full ${sc.dot}`} /> {sc.label}
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-zinc-400 mt-0.5 font-mono">
-                      {b.customer_phone} · {b._groupCourtName} · {timeStr}
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => setSelectedRow(null)}
-                    className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-zinc-100 text-zinc-400 hover:text-zinc-600 transition-colors text-sm"
-                  >
-                    ✕
-                  </button>
-                </div>
-
-                <div className="p-6 space-y-5">
-                  {/* Tài chính */}
-                  <div className="bg-zinc-50 rounded-xl border border-zinc-100 p-4 space-y-1.5">
-                    <div className="flex justify-between text-xs">
-                      <span className="text-zinc-500">Tiền sân</span>
-                      <span className="font-semibold text-zinc-800">{courtAmount.toLocaleString()}₫</span>
-                    </div>
-                    <div className="flex justify-between text-xs">
-                      <span className="text-zinc-500">Pro-shop</span>
-                      <span className="font-semibold text-violet-600">{serviceAmount.toLocaleString()}₫</span>
-                    </div>
-                    {overtimeFee > 0 && (
-                      <div className="flex justify-between text-xs">
-                        <span className="text-amber-600">
-                          Phụ phí quá giờ ({overtimeMinutes} phút)
-                        </span>
-                        <span className="font-semibold text-amber-600">
-                          {overtimeFee.toLocaleString()}₫
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  onClick={(e) => e.stopPropagation()}
+                  className="admin-modal-content max-w-lg"
+                >
+                  <div className="admin-modal-header">
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h4 className="text-sm font-semibold text-zinc-800">
+                          {b.customer_name}
+                        </h4>
+                        {b.staff?.full_name && (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                            NV tạo: {b.staff.full_name}
+                          </span>
+                        )}
+                        <span
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium ${sc.bg} ${sc.text}`}
+                        >
+                          <span
+                            className={`w-1.5 h-1.5 rounded-full ${sc.dot}`}
+                          />{" "}
+                          {sc.label}
                         </span>
                       </div>
-                    )}
-                    <div className="flex justify-between text-xs">
-                      <span className="text-zinc-500">Đã thu</span>
-                      <span className="font-semibold text-emerald-600">{paidAmount.toLocaleString()}₫</span>
+                      <p className="text-[11px] text-zinc-400 mt-0.5 font-mono">
+                        {b.customer_phone} · {b._groupCourtName} · {timeStr}
+                      </p>
                     </div>
-                    <div className="flex justify-between text-xs">
-                      <span className="text-zinc-500">Còn thu</span>
-                      <span className={`font-bold ${remainingAmount > 0 ? "text-amber-600" : "text-zinc-400"}`}>
-                        {remainingAmount.toLocaleString()}₫
-                      </span>
-                    </div>
-                    <div className="flex justify-between text-sm pt-1.5 border-t border-zinc-200 mt-1.5">
-                      <span className="font-bold text-zinc-900">Tổng bill</span>
-                      <span className="font-bold text-zinc-900">{totalAmount.toLocaleString()}₫</span>
-                    </div>
-                    {isOnlyProshopDebt && (
-                      <div className="admin-debt-alert mt-2"><span>⚠ Nợ Pro-shop</span></div>
-                    )}
-                  </div>
-
-                  {/* Hành động */}
-                  <div className="grid grid-cols-2 gap-2">
                     <button
-                      onClick={() => handleOpenBill(b)}
-                      className="admin-btn-outline py-2.5 text-xs font-medium"
+                      onClick={() => setSelectedRow(null)}
+                      className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-zinc-100 text-zinc-400 hover:text-zinc-600 transition-colors text-sm"
                     >
-                      🧾 Xem Bill
+                      ✕
                     </button>
-
-                    {!isCancelled && !isCompleted && (
-                      <button
-                        onClick={() => openAddItemModal(b)}
-                        className="admin-btn-outline border-dashed py-2.5 text-xs font-medium"
-                      >
-                        + Thêm dịch vụ
-                      </button>
-                    )}
-
-                    {b.status === "confirmed" && (
-                      <button
-                        onClick={() => openCheckInModal(b)}
-                        className="admin-btn-primary py-2.5 text-xs font-medium col-span-2"
-                      >
-                        Check-in
-                      </button>
-                    )}
-
-                    {(b.status === "confirmed" || b.status === "playing") && remainingAmount > 0 && (
-                      <button
-                        onClick={() => handleUpdatePayment(b.id, "paid")}
-                        className="admin-btn-outline py-2.5 text-xs font-medium col-span-2"
-                      >
-                        Ghi nhận đã thu {remainingAmount.toLocaleString()}₫
-                      </button>
-                    )}
-
-                    {(b.status === "confirmed" || b.status === "playing") && (
-                      <button
-                        onClick={() => handleCheckout(b)}
-                        disabled={isCheckingOut}
-                        className="admin-btn-primary py-2.5 text-xs font-medium col-span-2 disabled:opacity-60"
-                      >
-                        {isCheckingOut
-                          ? "Đang xử lý..."
-                          : remainingAmount > 0
-                            ? `Thu ${remainingAmount.toLocaleString()}₫ & Hoàn thành`
-                            : "Hoàn thành ca chơi"}
-                      </button>
-                    )}
                   </div>
-                </div>
-              </motion.div>
-            </div>
-          );
-        })()}
+
+                  <div className="p-6 space-y-5">
+                    {/* Tài chính */}
+                    <div className="bg-zinc-50 rounded-xl border border-zinc-100 p-4 space-y-1.5">
+                      <div className="flex justify-between text-xs">
+                        <span className="text-zinc-500">Tiền sân</span>
+                        <span className="font-semibold text-zinc-800">
+                          {courtAmount.toLocaleString()}₫
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-xs">
+                        <span className="text-zinc-500">Pro-shop</span>
+                        <span className="font-semibold text-violet-600">
+                          {serviceAmount.toLocaleString()}₫
+                        </span>
+                      </div>
+                      {overtimeFee > 0 && (
+                        <div className="flex justify-between text-xs">
+                          <span className="text-amber-600">
+                            Phụ phí quá giờ ({overtimeMinutes} phút)
+                          </span>
+                          <span className="font-semibold text-amber-600">
+                            {overtimeFee.toLocaleString()}₫
+                          </span>
+                        </div>
+                      )}
+                      <div className="flex justify-between text-xs">
+                        <span className="text-zinc-500">Đã thu</span>
+                        <span className="font-semibold text-emerald-600">
+                          {paidAmount.toLocaleString()}₫
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-xs">
+                        <span className="text-zinc-500">Còn thu</span>
+                        <span
+                          className={`font-bold ${remainingAmount > 0 ? "text-amber-600" : "text-zinc-400"}`}
+                        >
+                          {remainingAmount.toLocaleString()}₫
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-sm pt-1.5 border-t border-zinc-200 mt-1.5">
+                        <span className="font-bold text-zinc-900">
+                          Tổng bill
+                        </span>
+                        <span className="font-bold text-zinc-900">
+                          {totalAmount.toLocaleString()}₫
+                        </span>
+                      </div>
+                      {isOnlyProshopDebt && (
+                        <div className="admin-debt-alert mt-2">
+                          <span>⚠ Nợ Pro-shop</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Hành động */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        onClick={() => handleOpenBill(b)}
+                        className="admin-btn-outline py-2.5 text-xs font-medium"
+                      >
+                        🧾 Xem Bill
+                      </button>
+
+                      {!isCancelled && !isCompleted && (
+                        <button
+                          onClick={() => openAddItemModal(b)}
+                          className="admin-btn-outline border-dashed py-2.5 text-xs font-medium"
+                        >
+                          + Thêm dịch vụ
+                        </button>
+                      )}
+
+                      {b.status === "confirmed" && (
+                        <button
+                          onClick={() => openCheckInModal(b)}
+                          className="admin-btn-primary py-2.5 text-xs font-medium col-span-2"
+                        >
+                          Check-in
+                        </button>
+                      )}
+
+                      {(b.status === "confirmed" || b.status === "playing") &&
+                        remainingAmount > 0 && (
+                          <button
+                            onClick={() => handleUpdatePayment(b.id, "paid")}
+                            className="admin-btn-outline py-2.5 text-xs font-medium col-span-2"
+                          >
+                            Ghi nhận đã thu {remainingAmount.toLocaleString()}₫
+                          </button>
+                        )}
+
+                      {(b.status === "confirmed" || b.status === "playing") && (
+                        <button
+                          onClick={() => handleCheckout(b)}
+                          disabled={isCheckingOut}
+                          className="admin-btn-primary py-2.5 text-xs font-medium col-span-2 disabled:opacity-60"
+                        >
+                          {isCheckingOut
+                            ? "Đang xử lý..."
+                            : remainingAmount > 0
+                              ? `Thu ${remainingAmount.toLocaleString()}₫ & Hoàn thành`
+                              : "Hoàn thành ca chơi"}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </motion.div>
+              </div>
+            );
+          })()}
       </AnimatePresence>
 
       {/* MODAL THÊM MÓN */}
@@ -1009,9 +1096,7 @@ const TodayBookings = () => {
 
                       <div className="grid grid-cols-2 gap-3">
                         <div>
-                          <label className="admin-form-label">
-                            Số lượng
-                          </label>
+                          <label className="admin-form-label">Số lượng</label>
 
                           <input
                             type="number"
@@ -1030,9 +1115,7 @@ const TodayBookings = () => {
                         </div>
 
                         <div>
-                          <label className="admin-form-label">
-                            Ghi chú
-                          </label>
+                          <label className="admin-form-label">Ghi chú</label>
 
                           <input
                             type="text"
@@ -1118,7 +1201,9 @@ const TodayBookings = () => {
                   <span className="text-zinc-500">Ngày:</span>
                   {/* {fotmat dd/mm/yyyy} */}
                   <span>
-                    {new Date(selectedBill._groupDetails?.[0]?.booking_date).toLocaleDateString("vi-VN")}
+                    {new Date(
+                      selectedBill._groupDetails?.[0]?.booking_date,
+                    ).toLocaleDateString("vi-VN")}
                   </span>
                 </div>
                 <div className="flex justify-between">
@@ -1131,13 +1216,20 @@ const TodayBookings = () => {
 
               {(() => {
                 // Gộp các khung giờ liền nhau trên cùng 1 sân cho đẹp Bill (vd: 16:00-17:00 & 17:00-18:00 => 16:00-18:00)
-                const rawDetails = selectedBill._groupDetails || selectedBill.details || [];
+                const rawDetails =
+                  selectedBill._groupDetails || selectedBill.details || [];
                 const sortedDetails = [...rawDetails].sort((a, b) => {
-                  const dateCompare = String(a.booking_date || '').localeCompare(String(b.booking_date || ''));
+                  const dateCompare = String(
+                    a.booking_date || "",
+                  ).localeCompare(String(b.booking_date || ""));
                   if (dateCompare !== 0) return dateCompare;
-                  const courtCompare = String(a.court_id || '').localeCompare(String(b.court_id || ''));
+                  const courtCompare = String(a.court_id || "").localeCompare(
+                    String(b.court_id || ""),
+                  );
                   if (courtCompare !== 0) return courtCompare;
-                  return String(a.start_time || '').localeCompare(String(b.start_time || ''));
+                  return String(a.start_time || "").localeCompare(
+                    String(b.start_time || ""),
+                  );
                 });
 
                 const mergedDetails = [];
@@ -1148,7 +1240,10 @@ const TodayBookings = () => {
                   if (!currentMerged) {
                     currentMerged = {
                       id: item.id,
-                      courtName: item.court?.name || selectedBill._groupCourtName || "Sân thuê",
+                      courtName:
+                        item.court?.name ||
+                        selectedBill._groupCourtName ||
+                        "Sân thuê",
                       courtId: item.court_id,
                       bookingDate: item.booking_date,
                       startTime: item.start_time,
@@ -1156,9 +1251,11 @@ const TodayBookings = () => {
                       price: price,
                     };
                   } else {
-                    const isSameDate = currentMerged.bookingDate === item.booking_date;
+                    const isSameDate =
+                      currentMerged.bookingDate === item.booking_date;
                     const isSameCourt = currentMerged.courtId === item.court_id;
-                    const isContinuous = currentMerged.endTime === item.start_time;
+                    const isContinuous =
+                      currentMerged.endTime === item.start_time;
 
                     if (isSameDate && isSameCourt && isContinuous) {
                       currentMerged.endTime = item.end_time;
@@ -1167,7 +1264,10 @@ const TodayBookings = () => {
                       mergedDetails.push(currentMerged);
                       currentMerged = {
                         id: item.id,
-                        courtName: item.court?.name || selectedBill._groupCourtName || "Sân thuê",
+                        courtName:
+                          item.court?.name ||
+                          selectedBill._groupCourtName ||
+                          "Sân thuê",
                         courtId: item.court_id,
                         bookingDate: item.booking_date,
                         startTime: item.start_time,
@@ -1179,27 +1279,37 @@ const TodayBookings = () => {
                 });
                 if (currentMerged) mergedDetails.push(currentMerged);
 
-                const { fee: billOvertimeFee, minutes: billOvertimeMinutes } = getBookingOvertime(
-                  selectedBill,
-                  graceMinutes,
-                );
+                const { fee: billOvertimeFee, minutes: billOvertimeMinutes } =
+                  getBookingOvertime(selectedBill, graceMinutes);
 
-                const courtItemsSum = rawDetails.reduce((sum, d) => sum + Number(d.price || 0), 0);
-                const serviceItemsSum = (selectedBill.service_details || []).reduce(
-                  (sum, item) => sum + Number(item.total_price || 0),
-                  0
+                const courtItemsSum = rawDetails.reduce(
+                  (sum, d) => sum + Number(d.price || 0),
+                  0,
                 );
+                const serviceItemsSum = (
+                  selectedBill.service_details || []
+                ).reduce((sum, item) => sum + Number(item.total_price || 0), 0);
 
-                const discountAmount = Number(selectedBill.discount_amount || 0);
+                const discountAmount = Number(
+                  selectedBill.discount_amount || 0,
+                );
                 const finalTotal = Math.max(
                   0,
-                  courtItemsSum + serviceItemsSum + (selectedBill.status !== "completed" && billOvertimeFee > 0 ? billOvertimeFee : 0) - discountAmount
+                  courtItemsSum +
+                    serviceItemsSum +
+                    (selectedBill.status !== "completed" && billOvertimeFee > 0
+                      ? billOvertimeFee
+                      : 0) -
+                    discountAmount,
                 );
 
-                const remainingAmount = Number(selectedBill.remaining_amount || 0);
-                const paidAmount = selectedBill.payment_status === "paid"
-                  ? finalTotal
-                  : Math.max(0, finalTotal - remainingAmount);
+                const remainingAmount = Number(
+                  selectedBill.remaining_amount || 0,
+                );
+                const paidAmount =
+                  selectedBill.payment_status === "paid"
+                    ? finalTotal
+                    : Math.max(0, finalTotal - remainingAmount);
 
                 return (
                   <>
@@ -1207,7 +1317,9 @@ const TodayBookings = () => {
                       <thead className="border-y border-dashed border-zinc-300">
                         <tr>
                           <th className="py-1.5 font-semibold w-1/2">Mô tả</th>
-                          <th className="py-1.5 font-semibold text-center">SL</th>
+                          <th className="py-1.5 font-semibold text-center">
+                            SL
+                          </th>
                           <th className="py-1.5 font-semibold text-right">
                             Thành tiền
                           </th>
@@ -1222,11 +1334,14 @@ const TodayBookings = () => {
                                 {detail.courtName}
                               </strong>
                               <span className="text-[10px] text-zinc-400">
-                                {detail.startTime?.slice(0, 5)} – {detail.endTime?.slice(0, 5)}
+                                {detail.startTime?.slice(0, 5)} –{" "}
+                                {detail.endTime?.slice(0, 5)}
                               </span>
                             </td>
 
-                            <td className="py-2 text-center align-top text-xs">1</td>
+                            <td className="py-2 text-center align-top text-xs">
+                              1
+                            </td>
 
                             <td className="py-2 text-right align-top font-semibold text-xs">
                               {detail.price.toLocaleString()}
@@ -1241,7 +1356,9 @@ const TodayBookings = () => {
                           >
                             <td className="py-2 pr-2">
                               <strong className="block text-[11px]">
-                                {item.product?.name || item.service?.name || "Dịch vụ"}
+                                {item.product?.name ||
+                                  item.service?.name ||
+                                  "Dịch vụ"}
                               </strong>
                               {item.note && (
                                 <span className="text-[9px] text-zinc-400 block">
@@ -1265,7 +1382,9 @@ const TodayBookings = () => {
                     <div className="space-y-1 text-xs mb-5">
                       {billOvertimeFee > 0 && (
                         <div className="flex justify-between text-amber-600">
-                          <span>Phụ phí quá giờ ({billOvertimeMinutes} phút):</span>
+                          <span>
+                            Phụ phí quá giờ ({billOvertimeMinutes} phút):
+                          </span>
                           <span>{billOvertimeFee.toLocaleString()}đ</span>
                         </div>
                       )}
@@ -1338,13 +1457,28 @@ const TodayBookings = () => {
             >
               <div className="flex items-center gap-3 mb-5">
                 <div className="w-10 h-10 rounded-full bg-violet-100 flex items-center justify-center">
-                  <svg className="w-5 h-5 text-violet-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  <svg
+                    className="w-5 h-5 text-violet-600"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
                   </svg>
                 </div>
                 <div>
-                  <h3 className="font-semibold text-zinc-800 text-sm">Xác nhận Check-in</h3>
-                  <p className="text-xs text-zinc-500">Sân {checkInModal.booking?._groupCourtName} · {checkInModal.booking?.customer_name || "Khách vãng lai"}</p>
+                  <h3 className="font-semibold text-zinc-800 text-sm">
+                    Xác nhận Check-in
+                  </h3>
+                  <p className="text-xs text-zinc-500">
+                    Sân {checkInModal.booking?._groupCourtName} ·{" "}
+                    {checkInModal.booking?.customer_name || "Khách vãng lai"}
+                  </p>
                 </div>
               </div>
 
@@ -1357,7 +1491,9 @@ const TodayBookings = () => {
                     type="tel"
                     placeholder="Nhập SĐT của khách"
                     value={checkInForm.phone}
-                    onChange={(e) => setCheckInForm({ ...checkInForm, phone: e.target.value })}
+                    onChange={(e) =>
+                      setCheckInForm({ ...checkInForm, phone: e.target.value })
+                    }
                     className="admin-input w-full px-3 py-2.5 text-sm"
                     autoFocus
                   />
@@ -1370,7 +1506,12 @@ const TodayBookings = () => {
                     type="text"
                     placeholder="VD: BK-20240624-001"
                     value={checkInForm.booking_code}
-                    onChange={(e) => setCheckInForm({ ...checkInForm, booking_code: e.target.value })}
+                    onChange={(e) =>
+                      setCheckInForm({
+                        ...checkInForm,
+                        booking_code: e.target.value,
+                      })
+                    }
                     className="admin-input w-full px-3 py-2.5 text-sm font-mono"
                   />
                 </div>
@@ -1384,7 +1525,9 @@ const TodayBookings = () => {
                 <div className="flex gap-2 pt-1">
                   <button
                     type="button"
-                    onClick={() => setCheckInModal({ isOpen: false, booking: null })}
+                    onClick={() =>
+                      setCheckInModal({ isOpen: false, booking: null })
+                    }
                     className="admin-btn-outline flex-1 py-2.5 text-sm font-medium"
                   >
                     Hủy

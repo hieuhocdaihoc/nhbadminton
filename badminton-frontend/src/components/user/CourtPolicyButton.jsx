@@ -111,7 +111,7 @@ const CourtPolicyButton = () => {
       content: (
         <p>
           Cung cấp đúng số điện thoại và mã đơn. Có thể check-in từ 30 phút
-          trước giờ chơi đến trước giờ kết thúc ca; nên có mặt sớm 10 phút.
+          trước giờ chơi đến trước giờ kết thúc ca, nên có mặt sớm 10 phút.
         </p>
       ),
     },

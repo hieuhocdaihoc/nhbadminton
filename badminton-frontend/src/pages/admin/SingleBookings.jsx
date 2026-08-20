@@ -14,8 +14,14 @@ import {
 
 const formatBookingTimeRange = (details) => {
   if (!details || details.length === 0) return "—";
-  const starts = details.map((d) => d.start_time).filter(Boolean).sort();
-  const ends = details.map((d) => d.end_time).filter(Boolean).sort();
+  const starts = details
+    .map((d) => d.start_time)
+    .filter(Boolean)
+    .sort();
+  const ends = details
+    .map((d) => d.end_time)
+    .filter(Boolean)
+    .sort();
   if (starts.length === 0 || ends.length === 0) return "—";
   const earliest = starts[0].slice(0, 5);
   const latest = ends[ends.length - 1].slice(0, 5);
@@ -187,21 +193,24 @@ const SingleBookings = () => {
       fetchData(pagination.current_page, searchTerm);
     } catch (error) {
       console.error(error);
-      toast.error(error.response?.data?.message || "Có lỗi xảy ra trong quá trình xử lý!");
+      toast.error(
+        error.response?.data?.message || "Có lỗi xảy ra trong quá trình xử lý!",
+      );
     } finally {
       setIsProcessing(false);
       setTimeout(() => setMessage({ type: "", text: "" }), 2500);
     }
   };
 
-
-
   // --- LOGIC ĐỔI LỊCH ---
   const openRescheduleModal = (booking) => {
     const details = booking.details || [];
-    if (details.length === 0) return toast.error("Không tìm thấy chi tiết ca chơi!");
+    if (details.length === 0)
+      return toast.error("Không tìm thấy chi tiết ca chơi!");
 
-    const sorted = [...details].sort((a, b) => a.start_time.localeCompare(b.start_time));
+    const sorted = [...details].sort((a, b) =>
+      a.start_time.localeCompare(b.start_time),
+    );
     const first = sorted[0];
     const last = sorted[sorted.length - 1];
 
@@ -290,8 +299,7 @@ const SingleBookings = () => {
     },
   ];
 
-  const inputClass =
-    "admin-input placeholder:text-zinc-400";
+  const inputClass = "admin-input placeholder:text-zinc-400";
 
   return (
     <div className="admin-page-container">
@@ -362,7 +370,10 @@ const SingleBookings = () => {
         </div>
       ) : filteredBookings.length === 0 ? (
         <div className="admin-card border-none">
-          <EmptyState icon={ClipboardList} title="Không tìm thấy đơn đặt sân nào" />
+          <EmptyState
+            icon={ClipboardList}
+            title="Không tìm thấy đơn đặt sân nào"
+          />
         </div>
       ) : (
         <div className="space-y-6">
@@ -370,7 +381,9 @@ const SingleBookings = () => {
             <div key={group.key}>
               {/* Group header */}
               <div className="flex items-center gap-2 mb-3 px-1">
-                <span className={`text-[10px] font-bold uppercase tracking-widest ${group.key === "today" ? "text-emerald-600" : group.key === "past" ? "text-zinc-400" : "text-zinc-500"}`}>
+                <span
+                  className={`text-[10px] font-bold uppercase tracking-widest ${group.key === "today" ? "text-emerald-600" : group.key === "past" ? "text-zinc-400" : "text-zinc-500"}`}
+                >
                   {group.label}
                 </span>
                 <span className="text-[10px] text-zinc-400 bg-zinc-100 px-1.5 py-0.5 rounded-full">
@@ -383,22 +396,29 @@ const SingleBookings = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
                 {group.items.map((b) => {
                   const detail = b.details?.[0];
-                  const courtName = detail?.court?.name || `Sân ${detail?.court_id?.slice(-2) || "..."}`;
+                  const courtName =
+                    detail?.court?.name ||
+                    `Sân ${detail?.court_id?.slice(-2) || "..."}`;
                   const dateStr = detail?.booking_date
-                    ? new Date(detail.booking_date).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" })
+                    ? new Date(detail.booking_date).toLocaleDateString(
+                        "vi-VN",
+                        { day: "2-digit", month: "2-digit", year: "numeric" },
+                      )
                     : "—";
                   const timeStr = formatBookingTimeRange(b.details);
                   const sc = statusConfig[b.status] || statusConfig.confirmed;
                   const isCancelled = b.status === "cancelled";
-                  const isNotificationTarget = location.state?.notificationBookingCode === b.booking_code;
+                  const isNotificationTarget =
+                    location.state?.notificationBookingCode === b.booking_code;
 
                   // border-left color per status
-                  const borderAccent = {
-                    confirmed: "border-l-blue-400",
-                    playing: "border-l-violet-500",
-                    completed: "border-l-emerald-500",
-                    cancelled: "border-l-zinc-300",
-                  }[b.status] || "border-l-blue-400";
+                  const borderAccent =
+                    {
+                      confirmed: "border-l-blue-400",
+                      playing: "border-l-violet-500",
+                      completed: "border-l-emerald-500",
+                      cancelled: "border-l-zinc-300",
+                    }[b.status] || "border-l-blue-400";
 
                   return (
                     <div
@@ -408,8 +428,18 @@ const SingleBookings = () => {
                       {/* Card header */}
                       <div className="flex items-start justify-between px-4 pt-4 pb-3">
                         <div className="flex items-center gap-2.5 min-w-0">
-                          <div className={`w-9 h-9 rounded-lg flex items-center justify-center text-white text-xs font-bold shrink-0 ${sc.dot.replace("bg-", "bg-")}`}
-                            style={{ background: b.status === "confirmed" ? "#3b82f6" : b.status === "playing" ? "#8b5cf6" : b.status === "completed" ? "#10b981" : "#a1a1aa" }}
+                          <div
+                            className={`w-9 h-9 rounded-lg flex items-center justify-center text-white text-xs font-bold shrink-0 ${sc.dot.replace("bg-", "bg-")}`}
+                            style={{
+                              background:
+                                b.status === "confirmed"
+                                  ? "#3b82f6"
+                                  : b.status === "playing"
+                                    ? "#8b5cf6"
+                                    : b.status === "completed"
+                                      ? "#10b981"
+                                      : "#a1a1aa",
+                            }}
                           >
                             {b.customer_name?.charAt(0)?.toUpperCase() || "?"}
                           </div>
@@ -429,8 +459,12 @@ const SingleBookings = () => {
                             </p>
                           </div>
                         </div>
-                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium shrink-0 ${sc.bg} ${sc.text}`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${sc.dot}`} />
+                        <span
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium shrink-0 ${sc.bg} ${sc.text}`}
+                        >
+                          <span
+                            className={`w-1.5 h-1.5 rounded-full ${sc.dot}`}
+                          />
                           {sc.label}
                         </span>
                       </div>
@@ -438,25 +472,43 @@ const SingleBookings = () => {
                       {/* Card body */}
                       <div className="px-4 pb-3 grid grid-cols-2 gap-y-2 gap-x-3 border-t border-zinc-100 pt-3">
                         <div>
-                          <p className="text-[9px] text-zinc-400 uppercase tracking-wider mb-0.5">Ngày</p>
-                          <p className="text-xs text-zinc-700 font-medium">{dateStr}</p>
+                          <p className="text-[9px] text-zinc-400 uppercase tracking-wider mb-0.5">
+                            Ngày
+                          </p>
+                          <p className="text-xs text-zinc-700 font-medium">
+                            {dateStr}
+                          </p>
                           {detail?.booking_date && (
-                            <span className={`inline-block mt-0.5 px-1.5 py-0.5 rounded text-[9px] font-medium ${relativeDayStyle(detail.booking_date)}`}>
+                            <span
+                              className={`inline-block mt-0.5 px-1.5 py-0.5 rounded text-[9px] font-medium ${relativeDayStyle(detail.booking_date)}`}
+                            >
                               {relativeDayLabel(detail.booking_date)}
                             </span>
                           )}
                         </div>
                         <div>
-                          <p className="text-[9px] text-zinc-400 uppercase tracking-wider mb-0.5">Giờ</p>
-                          <p className="text-xs text-zinc-700 font-mono font-medium">{timeStr}</p>
+                          <p className="text-[9px] text-zinc-400 uppercase tracking-wider mb-0.5">
+                            Giờ
+                          </p>
+                          <p className="text-xs text-zinc-700 font-mono font-medium">
+                            {timeStr}
+                          </p>
                         </div>
                         <div>
-                          <p className="text-[9px] text-zinc-400 uppercase tracking-wider mb-0.5">Sân</p>
-                          <p className="text-xs text-zinc-700 font-medium">{courtName}</p>
+                          <p className="text-[9px] text-zinc-400 uppercase tracking-wider mb-0.5">
+                            Sân
+                          </p>
+                          <p className="text-xs text-zinc-700 font-medium">
+                            {courtName}
+                          </p>
                         </div>
                         <div>
-                          <p className="text-[9px] text-zinc-400 uppercase tracking-wider mb-0.5">SĐT</p>
-                          <p className="text-xs text-zinc-700">{b.customer_phone || "—"}</p>
+                          <p className="text-[9px] text-zinc-400 uppercase tracking-wider mb-0.5">
+                            SĐT
+                          </p>
+                          <p className="text-xs text-zinc-700">
+                            {b.customer_phone || "—"}
+                          </p>
                         </div>
                       </div>
 
@@ -472,12 +524,18 @@ const SingleBookings = () => {
                             const paid = Math.max(0, total - remaining);
                             return remaining > 0 ? (
                               <p className="text-[10px] leading-tight">
-                                <span className="text-emerald-600">Đã thu {paid.toLocaleString()}₫</span>
+                                <span className="text-emerald-600">
+                                  Đã thu {paid.toLocaleString()}₫
+                                </span>
                                 <span className="text-zinc-300"> · </span>
-                                <span className="text-amber-500 font-semibold">Còn nợ {remaining.toLocaleString()}₫</span>
+                                <span className="text-amber-500 font-semibold">
+                                  Còn nợ {remaining.toLocaleString()}₫
+                                </span>
                               </p>
                             ) : (
-                              <p className="text-[10px] text-emerald-600">✓ Đã thu đủ</p>
+                              <p className="text-[10px] text-emerald-600">
+                                ✓ Đã thu đủ
+                              </p>
                             );
                           })()}
                         </div>
@@ -489,22 +547,38 @@ const SingleBookings = () => {
                             Chi tiết
                           </button>
                           {b.payment_status !== "paid" && !isCancelled && (
-                            <button onClick={() => requestAction(b, "pay")} className="admin-btn-primary px-2.5 py-1 text-[10px] font-medium">
+                            <button
+                              onClick={() => requestAction(b, "pay")}
+                              className="admin-btn-primary px-2.5 py-1 text-[10px] font-medium"
+                            >
                               Thu tiền
                             </button>
                           )}
-                          {["playing", "confirmed"].includes(b.status) && b.payment_status === "paid" && (
-                            <button onClick={() => requestAction(b, "complete")} className="admin-btn-primary px-2.5 py-1 text-[10px] font-medium">
-                              Hoàn thành
-                            </button>
-                          )}
-                          {!isCancelled && !["playing", "completed"].includes(b.status) && (
-                            <button onClick={() => openRescheduleModal(b)} className="admin-btn-outline px-2.5 py-1 text-[10px]">
-                              Đổi lịch
-                            </button>
-                          )}
-                          {!["playing", "cancelled", "completed"].includes(b.status) && (
-                            <button onClick={() => requestAction(b, "cancel")} className="admin-btn-outline px-2.5 py-1 text-[10px] hover:text-red-500 hover:border-red-200">
+                          {["playing", "confirmed"].includes(b.status) &&
+                            b.payment_status === "paid" && (
+                              <button
+                                onClick={() => requestAction(b, "complete")}
+                                className="admin-btn-primary px-2.5 py-1 text-[10px] font-medium"
+                              >
+                                Hoàn thành
+                              </button>
+                            )}
+                          {!isCancelled &&
+                            !["playing", "completed"].includes(b.status) && (
+                              <button
+                                onClick={() => openRescheduleModal(b)}
+                                className="admin-btn-outline px-2.5 py-1 text-[10px]"
+                              >
+                                Đổi lịch
+                              </button>
+                            )}
+                          {!["playing", "cancelled", "completed"].includes(
+                            b.status,
+                          ) && (
+                            <button
+                              onClick={() => requestAction(b, "cancel")}
+                              className="admin-btn-outline px-2.5 py-1 text-[10px] hover:text-red-500 hover:border-red-200"
+                            >
                               Hủy
                             </button>
                           )}
@@ -564,13 +638,12 @@ const SingleBookings = () => {
                   <span className="text-zinc-600">
                     {rescheduleModal.booking?.customer_name}
                   </span>
-                </p>x
+                </p>
+                x
               </div>
               <form onSubmit={handleRescheduleSubmit} className="p-6 space-y-4">
                 <div>
-                  <label className="admin-form-label">
-                    Sân
-                  </label>
+                  <label className="admin-form-label">Sân</label>
                   <select
                     required
                     value={rescheduleForm.court_id}
@@ -593,9 +666,7 @@ const SingleBookings = () => {
                   </select>
                 </div>
                 <div>
-                  <label className="admin-form-label">
-                    Ngày
-                  </label>
+                  <label className="admin-form-label">Ngày</label>
                   <input
                     type="date"
                     required
@@ -611,9 +682,7 @@ const SingleBookings = () => {
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="admin-form-label">
-                      Bắt đầu
-                    </label>
+                    <label className="admin-form-label">Bắt đầu</label>
                     <input
                       type="time"
                       required
@@ -628,9 +697,7 @@ const SingleBookings = () => {
                     />
                   </div>
                   <div>
-                    <label className="admin-form-label">
-                      Kết thúc
-                    </label>
+                    <label className="admin-form-label">Kết thúc</label>
                     <input
                       type="time"
                       required
@@ -721,160 +788,230 @@ const SingleBookings = () => {
 
       {/* MODAL XEM CHI TIẾT ĐƠN ĐẶT SÂN */}
       <AnimatePresence>
-        {selectedDetailBooking && (() => {
-          const b = selectedDetailBooking;
-          const sc = statusConfig[b.status] || statusConfig.confirmed;
-          return (
-            <div className="admin-modal-overlay" onClick={() => setSelectedDetailBooking(null)}>
-              <motion.div
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                onClick={(e) => e.stopPropagation()}
-                className="admin-modal-content max-w-lg"
+        {selectedDetailBooking &&
+          (() => {
+            const b = selectedDetailBooking;
+            const sc = statusConfig[b.status] || statusConfig.confirmed;
+            return (
+              <div
+                className="admin-modal-overlay"
+                onClick={() => setSelectedDetailBooking(null)}
               >
-                <div className="admin-modal-header p-5 border-b border-zinc-100 flex items-start justify-between">
-                  <div>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h4 className="text-sm font-bold text-zinc-800">{b.customer_name}</h4>
-                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium ${sc.bg} ${sc.text}`}>
-                        <span className={`w-1.5 h-1.5 rounded-full ${sc.dot}`} /> {sc.label}
-                      </span>
-                    </div>
-                    <p className="text-xs text-zinc-400 font-mono mt-0.5">
-                      Mã đơn: <span className="font-semibold text-zinc-700">{b.booking_code}</span>
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => setSelectedDetailBooking(null)}
-                    className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-zinc-100 text-zinc-400 hover:text-zinc-600 transition-colors text-sm"
-                  >
-                    ✕
-                  </button>
-                </div>
-
-                <div className="p-5 space-y-4 max-h-[75vh] overflow-y-auto text-left">
-                  {/* Thông tin liên hệ & NV */}
-                  <div className="grid grid-cols-2 gap-3 bg-zinc-50 p-3 rounded-xl border border-zinc-100 text-xs">
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  onClick={(e) => e.stopPropagation()}
+                  className="admin-modal-content max-w-lg"
+                >
+                  <div className="admin-modal-header p-5 border-b border-zinc-100 flex items-start justify-between">
                     <div>
-                      <p className="text-[10px] text-zinc-400 uppercase tracking-wider">Số điện thoại</p>
-                      <p className="font-medium text-zinc-800">{b.customer_phone || "—"}</p>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h4 className="text-sm font-bold text-zinc-800">
+                          {b.customer_name}
+                        </h4>
+                        <span
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium ${sc.bg} ${sc.text}`}
+                        >
+                          <span
+                            className={`w-1.5 h-1.5 rounded-full ${sc.dot}`}
+                          />{" "}
+                          {sc.label}
+                        </span>
+                      </div>
+                      <p className="text-xs text-zinc-400 font-mono mt-0.5">
+                        Mã đơn:{" "}
+                        <span className="font-semibold text-zinc-700">
+                          {b.booking_code}
+                        </span>
+                      </p>
                     </div>
-                    <div>
-                      <p className="text-[10px] text-zinc-400 uppercase tracking-wider">Nhân viên tạo</p>
-                      <p className="font-medium text-zinc-800">{b.staff?.full_name || "Khách tự đặt (Online)"}</p>
-                    </div>
+                    <button
+                      onClick={() => setSelectedDetailBooking(null)}
+                      className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-zinc-100 text-zinc-400 hover:text-zinc-600 transition-colors text-sm"
+                    >
+                      ✕
+                    </button>
                   </div>
 
-                  {/* Thông tin ca chơi */}
-                  <div className="border border-zinc-100 rounded-xl p-3 space-y-2">
-                    <p className="text-xs font-bold text-zinc-700 uppercase tracking-wider">Chi tiết ca chơi</p>
-                    {b.details && b.details.length > 0 ? (
-                      b.details.map((d, idx) => (
-                        <div key={idx} className="flex justify-between items-center text-xs py-1 border-b border-zinc-50 last:border-0">
-                          <div>
-                            <span className="font-semibold text-zinc-800">{d.court?.name || `Sân ${d.court_id}`}</span>
-                            <span className="text-zinc-400 ml-2">({d.booking_date})</span>
+                  <div className="p-5 space-y-4 max-h-[75vh] overflow-y-auto text-left">
+                    {/* Thông tin liên hệ & NV */}
+                    <div className="grid grid-cols-2 gap-3 bg-zinc-50 p-3 rounded-xl border border-zinc-100 text-xs">
+                      <div>
+                        <p className="text-[10px] text-zinc-400 uppercase tracking-wider">
+                          Số điện thoại
+                        </p>
+                        <p className="font-medium text-zinc-800">
+                          {b.customer_phone || "—"}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] text-zinc-400 uppercase tracking-wider">
+                          Nhân viên tạo
+                        </p>
+                        <p className="font-medium text-zinc-800">
+                          {b.staff?.full_name || "Khách tự đặt (Online)"}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Thông tin ca chơi */}
+                    <div className="border border-zinc-100 rounded-xl p-3 space-y-2">
+                      <p className="text-xs font-bold text-zinc-700 uppercase tracking-wider">
+                        Chi tiết ca chơi
+                      </p>
+                      {b.details && b.details.length > 0 ? (
+                        b.details.map((d, idx) => (
+                          <div
+                            key={idx}
+                            className="flex justify-between items-center text-xs py-1 border-b border-zinc-50 last:border-0"
+                          >
+                            <div>
+                              <span className="font-semibold text-zinc-800">
+                                {d.court?.name || `Sân ${d.court_id}`}
+                              </span>
+                              <span className="text-zinc-400 ml-2">
+                                ({d.booking_date})
+                              </span>
+                            </div>
+                            <span className="font-mono text-zinc-600 font-medium">
+                              {String(d.start_time).slice(0, 5)} -{" "}
+                              {String(d.end_time).slice(0, 5)}
+                            </span>
                           </div>
-                          <span className="font-mono text-zinc-600 font-medium">
-                            {String(d.start_time).slice(0, 5)} - {String(d.end_time).slice(0, 5)}
+                        ))
+                      ) : (
+                        <p className="text-xs text-zinc-400 italic">
+                          Chưa có thông tin ca chơi
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Dịch vụ / Pro-shop đi kèm */}
+                    <div className="border border-zinc-100 rounded-xl p-3 space-y-2">
+                      <p className="text-xs font-bold text-zinc-700 uppercase tracking-wider">
+                        Dịch vụ & Nước uống đi kèm
+                      </p>
+                      {b.serviceDetails && b.serviceDetails.length > 0 ? (
+                        <div className="space-y-1.5">
+                          {b.serviceDetails.map((s, idx) => {
+                            const itemName =
+                              s.product?.name || s.service?.name || "Mặt hàng";
+                            const price = Number(s.price || s.unit_price || 0);
+                            const qty = Number(s.quantity || 1);
+                            const subtotal = Number(
+                              s.total_price || price * qty,
+                            );
+                            return (
+                              <div
+                                key={idx}
+                                className="flex justify-between text-xs py-1 border-b border-zinc-50 last:border-0"
+                              >
+                                <div>
+                                  <span className="font-medium text-zinc-800">
+                                    {itemName}
+                                  </span>
+                                  <span className="text-zinc-400 ml-1.5">
+                                    x{qty}
+                                  </span>
+                                </div>
+                                <span className="font-semibold text-zinc-700">
+                                  {subtotal.toLocaleString()}₫
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-zinc-400 italic">
+                          Không có dịch vụ đi kèm
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Chi tiết tài chính */}
+                    <div className="bg-zinc-50 rounded-xl border border-zinc-100 p-4 space-y-2 text-xs">
+                      <p className="font-bold text-zinc-700 uppercase tracking-wider mb-1">
+                        Tổng quan tài chính
+                      </p>
+                      <div className="flex justify-between text-zinc-600">
+                        <span>Tiền sân gốc</span>
+                        <span>
+                          {Number(b.subtotal_court || 0).toLocaleString()}₫
+                        </span>
+                      </div>
+                      {(() => {
+                        const totalOvertimeFee = (b.details || []).reduce(
+                          (sum, d) => sum + Number(d.overtime_fee || 0),
+                          0,
+                        );
+                        const totalOvertimeMinutes = (b.details || []).reduce(
+                          (sum, d) => sum + Number(d.overtime_minutes || 0),
+                          0,
+                        );
+                        return totalOvertimeFee > 0 ? (
+                          <div className="flex justify-between text-amber-600 font-medium">
+                            <span>
+                              Phụ thu quá giờ{" "}
+                              {totalOvertimeMinutes > 0
+                                ? `(${totalOvertimeMinutes} phút)`
+                                : ""}
+                            </span>
+                            <span>+{totalOvertimeFee.toLocaleString()}₫</span>
+                          </div>
+                        ) : null;
+                      })()}
+                      {Number(b.subtotal_service || 0) > 0 && (
+                        <div className="flex justify-between text-zinc-600">
+                          <span>Tiền dịch vụ / Pro-shop</span>
+                          <span>
+                            +{Number(b.subtotal_service).toLocaleString()}₫
                           </span>
                         </div>
-                      ))
-                    ) : (
-                      <p className="text-xs text-zinc-400 italic">Chưa có thông tin ca chơi</p>
-                    )}
-                  </div>
-
-                  {/* Dịch vụ / Pro-shop đi kèm */}
-                  <div className="border border-zinc-100 rounded-xl p-3 space-y-2">
-                    <p className="text-xs font-bold text-zinc-700 uppercase tracking-wider">Dịch vụ & Nước uống đi kèm</p>
-                    {b.serviceDetails && b.serviceDetails.length > 0 ? (
-                      <div className="space-y-1.5">
-                        {b.serviceDetails.map((s, idx) => {
-                          const itemName = s.product?.name || s.service?.name || "Mặt hàng";
-                          const price = Number(s.price || s.unit_price || 0);
-                          const qty = Number(s.quantity || 1);
-                          const subtotal = Number(s.total_price || price * qty);
-                          return (
-                            <div key={idx} className="flex justify-between text-xs py-1 border-b border-zinc-50 last:border-0">
-                              <div>
-                                <span className="font-medium text-zinc-800">{itemName}</span>
-                                <span className="text-zinc-400 ml-1.5">x{qty}</span>
-                              </div>
-                              <span className="font-semibold text-zinc-700">{subtotal.toLocaleString()}₫</span>
-                            </div>
-                          );
-                        })}
+                      )}
+                      <div className="flex justify-between text-sm font-bold text-zinc-800 pt-1 border-t border-zinc-200">
+                        <span>Tổng cộng</span>
+                        <span className="text-emerald-600">
+                          {Number(b.total_price || 0).toLocaleString()}₫
+                        </span>
                       </div>
-                    ) : (
-                      <p className="text-xs text-zinc-400 italic">Không có dịch vụ đi kèm</p>
-                    )}
-                  </div>
-
-                  {/* Chi tiết tài chính */}
-                  <div className="bg-zinc-50 rounded-xl border border-zinc-100 p-4 space-y-2 text-xs">
-                    <p className="font-bold text-zinc-700 uppercase tracking-wider mb-1">Tổng quan tài chính</p>
-                    <div className="flex justify-between text-zinc-600">
-                      <span>Tiền sân gốc</span>
-                      <span>{Number(b.subtotal_court || 0).toLocaleString()}₫</span>
+                      <div className="flex justify-between text-xs text-zinc-500 pt-1">
+                        <span>Trạng thái thanh toán</span>
+                        <span
+                          className={`font-semibold ${b.payment_status === "paid" ? "text-emerald-600" : b.payment_status === "partially_paid" ? "text-amber-600" : "text-red-500"}`}
+                        >
+                          {b.payment_status === "paid"
+                            ? "Đã thanh toán đủ"
+                            : b.payment_status === "partially_paid"
+                              ? "Đã cọc một phần"
+                              : "Chưa thanh toán"}
+                        </span>
+                      </div>
                     </div>
-                    {(() => {
-                      const totalOvertimeFee = (b.details || []).reduce(
-                        (sum, d) => sum + Number(d.overtime_fee || 0),
-                        0
-                      );
-                      const totalOvertimeMinutes = (b.details || []).reduce(
-                        (sum, d) => sum + Number(d.overtime_minutes || 0),
-                        0
-                      );
-                      return totalOvertimeFee > 0 ? (
-                        <div className="flex justify-between text-amber-600 font-medium">
-                          <span>Phụ thu quá giờ {totalOvertimeMinutes > 0 ? `(${totalOvertimeMinutes} phút)` : ""}</span>
-                          <span>+{totalOvertimeFee.toLocaleString()}₫</span>
-                        </div>
-                      ) : null;
-                    })()}
-                    {Number(b.subtotal_service || 0) > 0 && (
-                      <div className="flex justify-between text-zinc-600">
-                        <span>Tiền dịch vụ / Pro-shop</span>
-                        <span>+{Number(b.subtotal_service).toLocaleString()}₫</span>
+
+                    {b.note && (
+                      <div className="bg-amber-50 border border-amber-100 rounded-xl p-3 text-xs">
+                        <span className="font-bold text-amber-800">
+                          Ghi chú:{" "}
+                        </span>
+                        <span className="text-amber-700">{b.note}</span>
                       </div>
                     )}
-                    <div className="flex justify-between text-sm font-bold text-zinc-800 pt-1 border-t border-zinc-200">
-                      <span>Tổng cộng</span>
-                      <span className="text-emerald-600">{Number(b.total_price || 0).toLocaleString()}₫</span>
-                    </div>
-                    <div className="flex justify-between text-xs text-zinc-500 pt-1">
-                      <span>Trạng thái thanh toán</span>
-                      <span className={`font-semibold ${b.payment_status === 'paid' ? 'text-emerald-600' : b.payment_status === 'partially_paid' ? 'text-amber-600' : 'text-red-500'}`}>
-                        {b.payment_status === 'paid' ? 'Đã thanh toán đủ' : b.payment_status === 'partially_paid' ? 'Đã cọc một phần' : 'Chưa thanh toán'}
-                      </span>
-                    </div>
                   </div>
 
-                  {b.note && (
-                    <div className="bg-amber-50 border border-amber-100 rounded-xl p-3 text-xs">
-                      <span className="font-bold text-amber-800">Ghi chú: </span>
-                      <span className="text-amber-700">{b.note}</span>
-                    </div>
-                  )}
-                </div>
-
-                <div className="p-4 border-t border-zinc-100 bg-zinc-50/50 rounded-b-xl flex justify-end">
-                  <button
-                    onClick={() => setSelectedDetailBooking(null)}
-                    className="admin-btn-outline px-4 py-2 text-xs font-medium"
-                  >
-                    Đóng
-                  </button>
-                </div>
-              </motion.div>
-            </div>
-          );
-        })()}
+                  <div className="p-4 border-t border-zinc-100 bg-zinc-50/50 rounded-b-xl flex justify-end">
+                    <button
+                      onClick={() => setSelectedDetailBooking(null)}
+                      className="admin-btn-outline px-4 py-2 text-xs font-medium"
+                    >
+                      Đóng
+                    </button>
+                  </div>
+                </motion.div>
+              </div>
+            );
+          })()}
       </AnimatePresence>
-
     </div>
   );
 };

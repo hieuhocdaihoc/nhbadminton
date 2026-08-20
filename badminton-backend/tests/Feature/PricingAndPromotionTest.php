@@ -133,9 +133,21 @@ class PricingAndPromotionTest extends TestCase
         ])->assertOk()->assertJsonPath('data.discount_amount', 20000);
 
         $this->postJson('/api/bookings/validate-promotion', [
+            'promotion_code' => 'tenpercent',
+            'total_amount' => 200000,
+        ])->assertOk()->assertJsonPath('data.discount_amount', 20000);
+
+        // Đơn 100k áp dụng mã FIXED50 thành công (giảm 50k)
+        $this->postJson('/api/bookings/validate-promotion', [
+            'promotion_code' => 'FIXED50',
+            'total_amount' => 100000,
+        ])->assertOk()->assertJsonPath('data.discount_amount', 50000);
+
+        // Đơn 30k nhỏ hơn mã FIXED50 (50k) bị từ chối 422
+        $this->postJson('/api/bookings/validate-promotion', [
             'promotion_code' => 'FIXED50',
             'total_amount' => 30000,
-        ])->assertOk()->assertJsonPath('data.discount_amount', 30000);
+        ])->assertStatus(422);
     }
 
     public function test_promotion_dates_serialization_preserves_exact_date_strings(): void

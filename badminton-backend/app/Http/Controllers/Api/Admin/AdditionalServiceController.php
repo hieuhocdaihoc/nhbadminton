@@ -38,7 +38,7 @@ class AdditionalServiceController extends Controller
     {
         $request->validate([
             'name' => 'required|string|max:100',
-            'service_type' => 'required|in:drink,rental,coaching,shuttlecock,other',
+            'service_type' => 'required|in:racket,shoe_care,drink,rental,coaching,shuttlecock,other',
             'description' => 'nullable|string',
             'price' => 'required|numeric|min:0',
             'unit' => 'nullable|string|max:50',
@@ -91,7 +91,7 @@ class AdditionalServiceController extends Controller
 
         $request->validate([
             'name' => 'sometimes|required|string|max:100',
-            'service_type' => 'sometimes|required|in:drink,rental,coaching,shuttlecock,other',
+            'service_type' => 'sometimes|required|in:racket,shoe_care,drink,rental,coaching,shuttlecock,other',
             'description' => 'nullable|string',
             'price' => 'sometimes|required|numeric|min:0',
             'unit' => 'nullable|string|max:50',

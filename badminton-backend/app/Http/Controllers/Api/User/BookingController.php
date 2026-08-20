@@ -932,25 +932,26 @@ class BookingController extends Controller
 
         // Đặt lẻ dùng tối đa số ca khả dụng; phần không được thẻ cover sẽ tính tiền.
         $singlePlan = null;
-        if (
-            $type === 'single'
-            && $request->boolean('use_membership_card')
-            && $request->filled('membership_card_id')
-        ) {
-            $card = MembershipCard::find($request->membership_card_id);
-
-            if (!$card || $card->user_id !== $user?->id) {
-                return response()->json(['status' => 'error', 'message' => 'Thẻ thành viên không hợp lệ.'], 422);
+        if ($type === 'single') {
+            $memberCardModel = null;
+            if ($request->boolean('use_membership_card') && $request->filled('membership_card_id')) {
+                $memberCardModel = MembershipCard::find($request->membership_card_id);
+                if (!$memberCardModel || $memberCardModel->user_id !== $user?->id) {
+                    return response()->json(['status' => 'error', 'message' => 'Thẻ thành viên không hợp lệ.'], 422);
+                }
+                if (!$memberCardModel->isUsable()) {
+                    $memberCardModel = null;
+                }
             }
 
             $singlePlan = $this->buildSingleBookingPlan(
                 $request,
-                $card->isUsable() ? $card : null,
+                $memberCardModel,
                 $promotion,
                 $user
             );
 
-            if ($singlePlan['payable_total'] <= 0 && $singlePlan['covered_count'] > 0) {
+            if ($memberCardModel && $singlePlan['payable_total'] <= 0 && $singlePlan['covered_count'] > 0) {
                 return response()->json([
                     'status' => 'success',
                     'data' => [
@@ -1074,14 +1075,17 @@ class BookingController extends Controller
         $promotionApplied = false;
 
         if ($type === 'single') {
+            $subtotal = 0;
+            $totalMinutes = 0;
             foreach ($request->slots as $slot) {
-                $price = $this->internalCalculatePrice($request->court_id, $slot['date'], $slot['start'], $slot['end']);
-                $minutes = (strtotime($slot['end']) - strtotime($slot['start'])) / 60;
-                $loyaltyDiscount = $this->calculateLoyaltyDiscount($user, $minutes);
-                $promoDiscount = (!$promotionApplied && $promotion) ? $this->calculatePromotionDiscount($promotion, $price) : 0;
-                $total += max(0, $price - min($price, $loyaltyDiscount + $promoDiscount));
-                $promotionApplied = $promotionApplied || $promoDiscount > 0;
+                $price = (float) $this->internalCalculatePrice($request->court_id, $slot['date'], $slot['start'], $slot['end']);
+                $minutes = max(0, (strtotime($slot['end']) - strtotime($slot['start'])) / 60);
+                $subtotal += $price;
+                $totalMinutes += $minutes;
             }
+            $loyaltyDiscount = $this->calculateLoyaltyDiscount($user, $totalMinutes);
+            $promoDiscount = $promotion ? $this->calculatePromotionDiscount($promotion, $subtotal) : 0;
+            return max(0, $subtotal - min($subtotal, $loyaltyDiscount + $promoDiscount));
         } elseif ($type === 'recurring') {
             $start = \Carbon\Carbon::parse($request->start_date);
             $end = \Carbon\Carbon::parse($request->end_date);
@@ -1437,17 +1441,19 @@ class BookingController extends Controller
         ]);
 
         $user = $request->user('sanctum');
+        $totalAmount = (float) $validated['total_amount'];
         $promotion = $this->resolvePromotionForBooking(
             $validated['promotion_code'],
             $user,
-            $validated['customer_phone'] ?? null
+            $validated['customer_phone'] ?? null,
+            $totalAmount
         );
 
-        $discountAmount = $this->calculatePromotionDiscount($promotion, (float) $validated['total_amount']);
+        $discountAmount = $this->calculatePromotionDiscount($promotion, $totalAmount);
 
         return response()->json([
             'status' => 'success',
-            'message' => 'Ma giam gia hop le.',
+            'message' => 'Mã giảm giá hợp lệ.',
             'data' => [
                 'id' => $promotion->id,
                 'code' => $promotion->code,
@@ -1875,7 +1881,8 @@ class BookingController extends Controller
     }
 
     // tim ma giam gia ngay dac biet (auto_apply) con han de tu dong ap dung
-    private function resolveAutoPromotion(?User $user, ?string $customerPhone): ?Promotion
+    // tim ma giam gia ngay dac biet (auto_apply) con han de tu dong ap dung
+    private function resolveAutoPromotion(?User $user, ?string $customerPhone, float $totalAmount = 0): ?Promotion
     {
         $promotion = Promotion::currentlyValid()
             ->where('auto_apply', true)
@@ -1883,6 +1890,11 @@ class BookingController extends Controller
             ->first();
 
         if (!$promotion) {
+            return null;
+        }
+
+        // Bỏ qua mã tự động cố định nếu lớn hơn tổng giá trị đơn
+        if ($totalAmount > 0 && $promotion->discount_type === 'fixed' && (float) $promotion->discount_value > $totalAmount) {
             return null;
         }
 
@@ -1934,7 +1946,7 @@ class BookingController extends Controller
     }
 
     // tim va kiem tra dieu kien voucher theo ma, tai khoan hoac so dien thoai khach
-    private function resolvePromotionForBooking(?string $code, ?User $user, ?string $customerPhone): ?Promotion
+    private function resolvePromotionForBooking(?string $code, ?User $user, ?string $customerPhone, float $totalAmount = 0): ?Promotion
     {
         $code = strtoupper(trim((string) $code));
 
@@ -1949,7 +1961,7 @@ class BookingController extends Controller
         if (!$promotion) {
             abort(response()->json([
                 'status' => 'error',
-                'message' => 'Ma giam gia khong ton tai hoac da ngung ap dung.',
+                'message' => 'Mã giảm giá không tồn tại hoặc đã ngừng áp dụng.',
             ], 422));
         }
 
@@ -1963,7 +1975,15 @@ class BookingController extends Controller
         ) {
             abort(response()->json([
                 'status' => 'error',
-                'message' => 'Ma giam gia da het han hoac chua den ngay ap dung.',
+                'message' => 'Mã giảm giá đã hết hạn hoặc chưa đến ngày áp dụng.',
+            ], 422));
+        }
+
+        // Kiểm tra mã giảm cố định lớn hơn giá trị đơn hàng (Ví dụ: Đơn 80k không được áp mã 100k)
+        if ($totalAmount > 0 && $promotion->discount_type === 'fixed' && (float) $promotion->discount_value > $totalAmount) {
+            abort(response()->json([
+                'status' => 'error',
+                'message' => 'Mã giảm giá (' . number_format($promotion->discount_value, 0, ',', '.') . 'đ) lớn hơn giá trị đơn hàng (' . number_format($totalAmount, 0, ',', '.') . 'đ). Đơn hàng phải từ ' . number_format($promotion->discount_value, 0, ',', '.') . 'đ trở lên để áp dụng.',
             ], 422));
         }
 
@@ -1971,7 +1991,7 @@ class BookingController extends Controller
         if ($currentPoints < (int) $promotion->min_points_required) {
             abort(response()->json([
                 'status' => 'error',
-                'message' => 'Tai khoan chua du diem tich luy de dung ma giam gia nay.',
+                'message' => 'Tài khoản chưa đủ điểm tích lũy để dùng mã giảm giá này.',
             ], 422));
         }
 
@@ -1990,7 +2010,7 @@ class BookingController extends Controller
             if ($usedCount >= $limit) {
                 abort(response()->json([
                     'status' => 'error',
-                    'message' => 'Ban da dung het so luot cua ma giam gia nay.',
+                    'message' => 'Bạn đã dùng hết số lượt của mã giảm giá này.',
                 ], 422));
             }
         }
@@ -2009,7 +2029,12 @@ class BookingController extends Controller
             return min($baseAmount, $baseAmount * ((float) $promotion->discount_value / 100));
         }
 
-        return min($baseAmount, (float) $promotion->discount_value);
+        $fixedVal = (float) $promotion->discount_value;
+        if ($fixedVal > $baseAmount) {
+            return 0;
+        }
+
+        return min($baseAmount, $fixedVal);
     }
 
     // tao thong bao cho admin/staff khi co don dat san moi
